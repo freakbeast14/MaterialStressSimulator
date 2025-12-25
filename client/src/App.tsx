@@ -15,6 +15,7 @@ import SimulationDetail from "@/pages/SimulationDetail";
 import SimulationComparison from "@/pages/SimulationComparison";
 import Compare from "@/pages/Compare";
 import CreateSimulation from "@/pages/CreateSimulation";
+import Settings from "@/pages/Settings";
 
 function Router() {
   return (
@@ -27,6 +28,7 @@ function Router() {
         <Route path="/simulations/create" component={CreateSimulation} />
         <Route path="/simulations/:id" component={SimulationDetail} />
         <Route path="/compare-simulations" component={SimulationComparison} />
+        <Route path="/settings" component={Settings} />
         <Route path="/compare" component={Compare} />
         <Route component={NotFound} />
       </Switch>

@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { z } from "zod";
 import { materials } from "@shared/schema";
+import { enqueueSimulation } from "./fea/queue";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -24,6 +25,22 @@ export async function registerRoutes(
     res.json(material);
   });
 
+  app.post(api.materials.create.path, async (req, res) => {
+    try {
+      const input = api.materials.create.input.parse(req.body);
+      const material = await storage.createMaterial(input);
+      res.status(201).json(material);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({
+          message: err.errors[0].message,
+          field: err.errors[0].path.join('.'),
+        });
+      }
+      throw err;
+    }
+  });
+
   // === Simulations Routes ===
   app.get(api.simulations.list.path, async (req, res) => {
     const allSimulations = await storage.getSimulations();
@@ -38,32 +55,21 @@ export async function registerRoutes(
     res.json(simulation);
   });
 
+  app.delete(api.simulations.delete.path, async (req, res) => {
+    const deleted = await storage.deleteSimulation(Number(req.params.id));
+    if (!deleted) {
+      return res.status(404).json({ message: 'Simulation not found' });
+    }
+    res.json({ success: true });
+  });
+
   app.post(api.simulations.create.path, async (req, res) => {
     try {
       const input = api.simulations.create.input.parse(req.body);
       const simulation = await storage.createSimulation(input);
       
-      // Simulate async processing with progress tracking
       if (simulation) {
-        // Switch to running after 500ms
-        setTimeout(async () => {
-          await storage.updateSimulationStatus(simulation.id, "running", null, 5);
-          
-          // Simulate progress increments (100 steps over ~6 seconds)
-          let progress = 5;
-          const progressInterval = setInterval(async () => {
-            progress += Math.random() * 20;
-            if (progress > 95) progress = 95;
-            await storage.updateSimulationStatus(simulation.id, "running", null, Math.floor(progress));
-          }, 300);
-          
-          // Complete after 6 seconds
-          setTimeout(async () => {
-            clearInterval(progressInterval);
-            const results = generateMockResults(input.type);
-            await storage.updateSimulationStatus(simulation.id, "completed", results, 100);
-          }, 6000);
-        }, 500);
+        enqueueSimulation(simulation.id, input);
       }
 
       res.status(201).json(simulation);
@@ -82,23 +88,6 @@ export async function registerRoutes(
   await seedDatabase();
 
   return httpServer;
-}
-
-// Helper to generate fake simulation results
-function generateMockResults(type: string) {
-  // Generate a time series
-  const timeSeriesData = Array.from({ length: 20 }, (_, i) => ({
-    time: i * 0.5,
-    stress: 200 + Math.random() * 50 + (i * 10),
-    displacement: i * 0.1 + (Math.random() * 0.01),
-  }));
-
-  return {
-    maxStress: 450 + Math.floor(Math.random() * 100),
-    maxDeformation: 2.5 + Math.random(),
-    safetyFactor: 1.5 + Math.random(),
-    timeSeriesData
-  };
 }
 
 export async function seedDatabase() {

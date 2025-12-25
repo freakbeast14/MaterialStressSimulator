@@ -1,4 +1,6 @@
 node_modules
+fenics_service/__pycache__/
+fenics_service/.venv/
 dist
 .DS_Store
 server/public

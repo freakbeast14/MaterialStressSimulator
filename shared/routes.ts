@@ -29,6 +29,15 @@ export const api = {
         200: z.array(z.custom<typeof materials.$inferSelect>()),
       },
     },
+    create: {
+      method: 'POST' as const,
+      path: '/api/materials',
+      input: insertMaterialSchema,
+      responses: {
+        201: z.custom<typeof materials.$inferSelect>(),
+        400: errorSchemas.validation,
+      },
+    },
     get: {
       method: 'GET' as const,
       path: '/api/materials/:id',
@@ -49,7 +58,16 @@ export const api = {
     create: {
       method: 'POST' as const,
       path: '/api/simulations',
-      input: insertSimulationSchema.pick({ name: true, materialId: true, type: true }),
+      input: insertSimulationSchema.pick({
+        name: true,
+        materialId: true,
+        type: true,
+        appliedLoad: true,
+        temperature: true,
+        duration: true,
+        frequency: true,
+        dampingRatio: true,
+      }),
       responses: {
         201: z.custom<typeof simulations.$inferSelect>(),
         400: errorSchemas.validation,
@@ -60,6 +78,14 @@ export const api = {
       path: '/api/simulations/:id',
       responses: {
         200: z.custom<typeof simulations.$inferSelect>(),
+        404: errorSchemas.notFound,
+      },
+    },
+    delete: {
+      method: 'DELETE' as const,
+      path: '/api/simulations/:id',
+      responses: {
+        200: z.object({ success: z.literal(true) }),
         404: errorSchemas.notFound,
       },
     },

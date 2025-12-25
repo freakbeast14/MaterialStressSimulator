@@ -20,6 +20,7 @@ export interface IStorage {
   getSimulation(id: number): Promise<Simulation | undefined>;
   createSimulation(simulation: InsertSimulation): Promise<Simulation>;
   updateSimulationStatus(id: number, status: string, results?: any, progress?: number): Promise<Simulation>;
+  deleteSimulation(id: number): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -66,6 +67,14 @@ export class DatabaseStorage implements IStorage {
       .where(eq(simulations.id, id))
       .returning();
     return updated;
+  }
+
+  async deleteSimulation(id: number): Promise<boolean> {
+    const [deleted] = await db
+      .delete(simulations)
+      .where(eq(simulations.id, id))
+      .returning();
+    return !!deleted;
   }
 }
 

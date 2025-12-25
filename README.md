@@ -20,7 +20,8 @@ MatSim Analytics is designed for engineers and material scientists to:
 1. [Prerequisites](#prerequisites)
 2. [Installation Guide (Windows)](#installation-guide-windows)
 3. [Database Setup](#database-setup)
-4. [Running the Application](#running-the-application)
+4. [FEniCS Solver Service (Windows + WSL)](#fenics-solver-service-windows--wsl)
+5. [Running the Application](#running-the-application)
 5. [Testing the Application](#testing-the-application)
 6. [Demo Walkthrough](#demo-walkthrough)
 7. [Troubleshooting](#troubleshooting)
@@ -54,7 +55,14 @@ Before starting, ensure you have the following installed on your Windows machine
   psql --version
   ```
 
-### 3. **Git** (Optional, for cloning the repo)
+### 3. **WSL + Ubuntu** (Required for FEniCS)
+- Install WSL2 with Ubuntu
+- You will run the FEniCS solver service inside Ubuntu
+
+### 4. **Python 3** (WSL/Ubuntu)
+- Install Python inside Ubuntu for the FastAPI + FEniCS service
+
+### 5. **Git** (Optional, for cloning the repo)
 - **Download**: https://git-scm.com/download/win
 - Helps if you want to clone the project from a repository
 
@@ -168,6 +176,54 @@ If you get errors, see the [Troubleshooting](#troubleshooting) section.
 
 ---
 
+## FEniCS Solver Service (Windows + WSL)
+
+The solver service runs in Ubuntu (WSL) and the Node server runs in Windows. The Node server calls the solver via `FENICS_API_URL`.
+
+### Step 1: Verify FEniCS in Ubuntu
+In Ubuntu (WSL), run:
+```bash
+python3 - <<'PY'
+import dolfin as df
+print(df.__version__)
+PY
+```
+
+### Step 2: Create the Python venv for the service
+In Ubuntu (WSL), from the project root:
+```bash
+cd /mnt/c/Users/smoham68/Documents/Job-Overview-Position/Job-Overview-Position
+rm -rf fenics_service/.venv
+python3 -m venv --system-site-packages fenics_service/.venv
+source fenics_service/.venv/bin/activate
+python -m pip install fastapi uvicorn
+```
+
+### Step 3: Start the solver API
+In Ubuntu (WSL):
+```bash
+fenics_service/.venv/bin/uvicorn fenics_service.main:app --host 0.0.0.0 --port 8001
+```
+Leave this terminal running.
+
+### Step 4: Get the WSL IP
+Open a second Ubuntu terminal:
+```bash
+ip addr show eth0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1
+```
+Use the first IP shown (e.g., `172.29.22.11`).
+
+### Step 5: Set `FENICS_API_URL` on Windows
+In Windows PowerShell (project root):
+```powershell
+$env:FENICS_API_URL="http://<WSL-IP>:8001"
+```
+
+You can also set it in `.env`:
+```
+FENICS_API_URL=http://<WSL-IP>:8001
+```
+
 ## Running the Application
 
 ### Step 1: Start the Development Server
@@ -182,6 +238,7 @@ npm run dev
 - Backend server starts on http://localhost:5000
 - Frontend (Vite) compiles and hot-reloads
 - Database connects and validates
+- The server can call the FEniCS service if `FENICS_API_URL` is set
 - You should see:
   ```
   > rest-express@1.0.0 dev
@@ -230,22 +287,21 @@ To stop the server later:
 - Charts render using Recharts library
 - Properties display in a formatted table
 
-### Test 2: Run a Simulation
+### Test 2: Run a Simulation (FEniCS)
 
 1. From a material detail page, click **"Run Simulation"**
 2. Enter a simulation name (e.g., "Tensile Test 1")
 3. Select a simulation type (e.g., "Tensile Test")
 4. Click **"Start Simulation"**
 5. Watch the status change:
-   - **Pending** (1 second)
-   - **Running** (5 seconds)
+   - **Pending**
+   - **Running**
    - **Completed** (with results)
 
 **What's happening:**
 - Frontend sends `POST /api/simulations` with material data
-- Backend creates a simulation record
-- Simulates async processing with timeouts
-- Returns time-series data and metrics
+- Backend enqueues a job and polls the FEniCS service
+- Results and time-series data are returned and stored
 
 ### Test 3: Compare Materials
 
@@ -478,7 +534,7 @@ project-root/
 ✅ **Simulation Engine**
 - Create and run material simulations
 - Real-time status tracking (Pending → Running → Completed)
-- Mock asynchronous processing (5-second simulations)
+- FEniCS solver service integration (FastAPI)
 - Results storage and retrieval
 
 ✅ **Material Comparison**
@@ -576,6 +632,20 @@ MIT License - Feel free to use this for your interview preparation.
 
 ---
 
-**Last Updated:** December 24, 2025
+**Last Updated:** December 25, 2025
 **Version:** 1.0.0
 **Status:** Ready for Demo
+### Issue 7: "FEniCS API unreachable"
+
+**Error:**
+```
+FEniCS API unreachable
+```
+
+**Solution:**
+1. Confirm the FastAPI service is running in Ubuntu on port 8001
+2. Ensure `FENICS_API_URL` points to the WSL IP
+3. Restart `npm run dev` after changing `FENICS_API_URL`
+
+├── fenics_service/            # FastAPI + FEniCS solver service (WSL)
+│   └── main.py
