@@ -63,3 +63,23 @@ export function useCreateSimulation() {
     },
   });
 }
+
+export function useDeleteSimulation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: number) => {
+      const url = buildUrl(api.simulations.delete.path, { id });
+      const res = await fetch(url, { method: "DELETE" });
+      if (!res.ok) {
+        if (res.status === 404) {
+          throw new Error("Simulation not found");
+        }
+        throw new Error("Failed to delete simulation");
+      }
+      return api.simulations.delete.responses[200].parse(await res.json());
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.simulations.list.path] });
+    },
+  });
+}

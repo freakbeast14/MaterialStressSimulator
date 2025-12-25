@@ -33,12 +33,17 @@ export function Layout({ children }: LayoutProps) {
   const NavContent = () => (
     <div className="flex flex-col h-full bg-card border-r border-border">
       <div className="p-6">
-        <div className="flex items-center gap-3">
-          <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
-            <Activity className="h-5 w-5 text-primary-foreground" />
+        <Link href="/">
+          <div
+            className="flex items-center gap-3 cursor-pointer"
+            onClick={() => setIsMobileOpen(false)}
+          >
+            <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
+              <Activity className="h-5 w-5 text-primary-foreground" />
+            </div>
+            <h1 className="font-display font-bold text-xl tracking-tight">MatSim</h1>
           </div>
-          <h1 className="font-display font-bold text-xl tracking-tight">MatSim</h1>
-        </div>
+        </Link>
       </div>
 
       <nav className="flex-1 px-4 space-y-1">
@@ -69,10 +74,15 @@ export function Layout({ children }: LayoutProps) {
       </nav>
 
       <div className="p-4 border-t border-border mt-auto">
-        <button className="flex items-center gap-3 px-3 py-2.5 w-full rounded-lg text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors">
-          <Settings className="h-4 w-4" />
-          Settings
-        </button>
+        <Link href="/settings">
+          <div
+            className="flex items-center gap-3 px-3 py-2.5 w-full rounded-lg text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
+            onClick={() => setIsMobileOpen(false)}
+          >
+            <Settings className="h-4 w-4" />
+            Settings
+          </div>
+        </Link>
       </div>
     </div>
   );
@@ -86,12 +96,14 @@ export function Layout({ children }: LayoutProps) {
 
       {/* Mobile Trigger */}
       <div className="md:hidden fixed top-0 left-0 right-0 z-30 flex items-center justify-between p-4 bg-background/80 backdrop-blur-md border-b border-border">
-        <div className="flex items-center gap-2">
-          <div className="h-7 w-7 rounded-md bg-primary flex items-center justify-center">
-            <Activity className="h-4 w-4 text-primary-foreground" />
+        <Link href="/">
+          <div className="flex items-center gap-2 cursor-pointer">
+            <div className="h-7 w-7 rounded-md bg-primary flex items-center justify-center">
+              <Activity className="h-4 w-4 text-primary-foreground" />
+            </div>
+            <span className="font-display font-bold">MatSim</span>
           </div>
-          <span className="font-display font-bold">MatSim</span>
-        </div>
+        </Link>
         <Sheet open={isMobileOpen} onOpenChange={setIsMobileOpen}>
           <SheetTrigger asChild>
             <Button variant="ghost" size="icon">
