@@ -1,4 +1,4 @@
-FROM docker.io/fenicsproject/stable:2019.1.0
+FROM docker.io/fenicsproject/fenics:2019.1.0
 
 WORKDIR /app
 COPY fenics_service/requirements.txt /app/requirements.txt
