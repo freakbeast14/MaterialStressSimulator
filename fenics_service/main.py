@@ -47,6 +47,11 @@ class JobStatus(BaseModel):
 _jobs: Dict[str, JobStatus] = {}
 
 
+@app.get("/health")
+def health_check() -> Dict[str, str]:
+    return {"status": "ok"}
+
+
 @app.post("/jobs", response_model=JobStatus)
 def create_job(payload: SimulationRequest, background_tasks: BackgroundTasks) -> JobStatus:
     job_id = str(uuid.uuid4())
