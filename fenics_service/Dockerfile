@@ -1,4 +1,4 @@
-FROM docker.io/fenicsproject/fenics:2019.1.0
+FROM ghcr.io/scientificcomputing/fenics-gmsh:2024-05-30
 
 WORKDIR /app
 COPY fenics_service/requirements.txt /app/requirements.txt
