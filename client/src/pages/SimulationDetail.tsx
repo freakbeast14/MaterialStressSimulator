@@ -10,6 +10,9 @@ import {
   ChevronLeft,
   Download,
   Gauge,
+  Info,
+  Pause,
+  Play,
   Ruler,
   Share2,
   Thermometer,
@@ -30,20 +33,30 @@ import {
   Area,
   BarChart,
   Bar,
+  ReferenceLine,
 } from "recharts";
 import { motion } from "framer-motion";
 import Plot from "react-plotly.js";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { useMemo, useState } from "react";
+import { Switch } from "@/components/ui/switch";
+import { useEffect, useMemo, useRef, useState } from "react";
+import Plotly from "plotly.js-dist-min";
 
 export default function SimulationDetail() {
   const { id } = useParams();
   const { data: simulation, isLoading } = useSimulation(parseInt(id || "0"));
   const { data: material } = useMaterial(simulation?.materialId || 0);
   const [showConfigDetails, setShowConfigDetails] = useState(false);
+  const [showMetricsDetails, setShowMetricsDetails] = useState(false);
+  const [overlayDisplacement, setOverlayDisplacement] = useState(false);
+  const [playheadIndex, setPlayheadIndex] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [fieldThreshold, setFieldThreshold] = useState(0.35);
+  const [fieldSlice, setFieldSlice] = useState(0.5);
   const { toast } = useToast();
+  const plotRef = useRef<any>(null);
 
   const results = simulation?.results as any;
   const isCompleted = simulation?.status === "completed";
@@ -157,6 +170,11 @@ export default function SimulationDetail() {
     (results?.stressStrainCurve as { strain: number; stress: number }[] | undefined) ||
     material?.stressStrainCurve ||
     [];
+  const timeSeriesData = (results?.timeSeriesData || []) as {
+    time: number;
+    stress: number;
+    displacement: number;
+  }[];
   const progressStage =
     (simulation?.progress ?? 0) < 20
       ? "Meshing"
@@ -164,8 +182,8 @@ export default function SimulationDetail() {
       ? "Solving"
       : "Post-processing";
   const timeMax =
-    results?.timeSeriesData?.length > 0
-      ? Math.max(...results.timeSeriesData.map((point: any) => Number(point.time) || 0))
+    timeSeriesData.length > 0
+      ? Math.max(...timeSeriesData.map((point) => Number(point.time) || 0))
       : 0;
   const timeTickStep = (() => {
     if (timeMax <= 0.5) return 0.5;
@@ -184,6 +202,89 @@ export default function SimulationDetail() {
   );
   const formatTimeTick = (value: number) =>
     timeTickStep === 0.5 ? value.toFixed(1) : Math.round(value).toString();
+  const activePoint = timeSeriesData[Math.min(playheadIndex, Math.max(timeSeriesData.length - 1, 0))];
+  const activeTime = activePoint?.time ?? 0;
+  const activeStress = activePoint?.stress ?? 0;
+  const activeDisplacement = activePoint?.displacement ?? 0;
+  const exportChartSvg = (chartId: string, filename: string) => {
+    const container = document.getElementById(chartId);
+    const svg = container?.querySelector("svg");
+    if (!svg) {
+      toast({
+        title: "Export unavailable",
+        description: "Chart is not ready to export yet.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const serializer = new XMLSerializer();
+    const svgString = serializer.serializeToString(svg);
+    const blob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+  const handleExportField = () => {
+    if (!plotRef.current) return;
+    Plotly.downloadImage(plotRef.current, {
+      format: "png",
+      filename: `${simulation.name || "simulation"}-field`,
+    });
+  };
+  const handleChartHover = (state: any) => {
+    if (isPlaying) return;
+    if (typeof state?.activeTooltipIndex === "number") {
+      setPlayheadIndex(state.activeTooltipIndex);
+    }
+  };
+
+  useEffect(() => {
+    if (timeSeriesData.length > 0) {
+      setPlayheadIndex(0);
+    }
+  }, [simulation?.id, timeSeriesData.length]);
+
+  useEffect(() => {
+    if (!isPlaying || timeSeriesData.length === 0) return;
+    const interval = window.setInterval(() => {
+      setPlayheadIndex((prev) =>
+        prev >= timeSeriesData.length - 1 ? 0 : prev + 1
+      );
+    }, 800);
+    return () => window.clearInterval(interval);
+  }, [isPlaying, timeSeriesData.length]);
+
+  const fieldData = useMemo(() => {
+    const grid = 8;
+    const layers = 6;
+    const x: number[] = [];
+    const y: number[] = [];
+    const z: number[] = [];
+    const value: number[] = [];
+    const span = Math.max(maxStress - minStress, 1);
+    for (let zi = 0; zi < layers; zi += 1) {
+      const zPos = zi / (layers - 1);
+      for (let yi = 0; yi < grid; yi += 1) {
+        const yPos = yi / (grid - 1);
+        for (let xi = 0; xi < grid; xi += 1) {
+          const xPos = xi / (grid - 1);
+          const wave =
+            Math.sin((xPos + fieldSlice) * Math.PI * 2) * 0.4 +
+            Math.cos((yPos + fieldSlice) * Math.PI * 1.5) * 0.3 +
+            Math.sin((zPos + fieldSlice) * Math.PI * 1.2) * 0.3;
+          const normalized = Math.min(Math.max(0.5 + wave * 0.5, 0), 1);
+          x.push(xPos);
+          y.push(yPos);
+          z.push(zPos);
+          value.push(minStress + span * normalized);
+        }
+      }
+    }
+    return { x, y, z, value };
+  }, [minStress, maxStress, fieldSlice]);
   const handleExportCsv = () => {
     if (!results) return;
     const rows = [
@@ -411,44 +512,138 @@ export default function SimulationDetail() {
               )}
             </div>
 
-            <div className="bg-primary/5 border border-primary/10 rounded-2xl p-6 space-y-4">
-              <div className="text-xs font-semibold uppercase tracking-widest text-primary">
-                Key Metrics
+            <div className="bg-card rounded-2xl border border-border p-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                  Key Metrics
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowMetricsDetails((prev) => !prev)}
+                  className="h-8 w-8 rounded-full border border-border flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/40 transition"
+                  aria-label="Toggle metrics details"
+                >
+                  <ChevronLeft
+                    className={`h-4 w-4 transition-transform ${showMetricsDetails ? "rotate-90" : "-rotate-90"}`}
+                  />
+                </button>
               </div>
-              <div className="space-y-3">
-                <div>
-                  <p className="text-sm text-muted-foreground">Max Stress</p>
-                  <p className="text-lg font-semibold">
-                    {formatNumber(maxStress)} MPa
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Avg Stress</p>
-                  <p className="text-lg font-semibold">
-                    {formatNumber(avgStress)} MPa
-                  </p>
-                </div>
+              <div className="grid grid-cols-2 gap-4">
+                {[
+                  {
+                    label: "Max Stress",
+                    value: `${formatNumber(maxStress)} MPa`,
+                    definition: "Peak stress encountered during simulation.",
+                    color: "text-primary",
+                    bg: "bg-primary/10 dark:bg-primary/20",
+                  },
+                  {
+                    label: "Min Stress",
+                    value: `${formatNumber(minStress)} MPa`,
+                    definition: "Baseline stress at zero strain.",
+                    color: "text-indigo-500",
+                    bg: "bg-indigo-100/70 dark:bg-indigo-500/20 dark:text-indigo-200",
+                  },
+                  {
+                    label: "Avg Stress",
+                    value: `${formatNumber(avgStress)} MPa`,
+                    definition: "Mean stress across all strain points.",
+                    color: "text-orange-500",
+                    bg: "bg-orange-100/70 dark:bg-orange-500/20 dark:text-orange-200",
+                  },
+                  {
+                    label: "Stress Range",
+                    value: `${formatNumber(stressRange)} MPa`,
+                    definition: "Total variation in stress values.",
+                    color: "text-emerald-500",
+                    bg: "bg-emerald-100/70 dark:bg-emerald-500/20 dark:text-emerald-200",
+                  },
+                  {
+                    label: "Max Strain",
+                    value: `${formatMicrostrain(results?.maxStrain)} με`,
+                    definition: "Peak strain during simulation.",
+                    color: "text-sky-500",
+                    bg: "bg-sky-100/70 dark:bg-sky-500/20 dark:text-sky-200",
+                  },
+                  {
+                    label: "Avg Strain",
+                    value: `${formatMicrostrain(results?.avgStrain)} με`,
+                    definition: "Mean strain across all points.",
+                    color: "text-slate-500",
+                    bg: "bg-slate-200/70 dark:bg-slate-500/20 dark:text-slate-200",
+                  },
+                  {
+                    label: "Safety Factor",
+                    value: formatNumber(results?.safetyFactor),
+                    definition: "Estimated margin to failure.",
+                    color: "text-emerald-600",
+                    bg: "bg-emerald-100/70 dark:bg-emerald-500/20 dark:text-emerald-200",
+                  },
+                ]
+                  .filter(Boolean)
+                  .map((metric, index) => {
+                    if (!showMetricsDetails && index > 3) return null;
+                    return (
+                      <div
+                        key={metric.label}
+                        className={`${metric.bg} rounded-2xl p-4`}
+                      >
+                        <div className="flex items-center justify-between text-xs font-semibold text-muted-foreground">
+                          <span>{metric.label}</span>
+                          <span className="relative inline-flex items-center justify-center group">
+                            <Info className="h-3.5 w-3.5 text-muted-foreground/70" />
+                            <span className="pointer-events-none absolute bottom-full left-1/2 mb-3 w-max -translate-x-1/2 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                              <span className="relative rounded-lg bg-slate-900 px-4 py-2 text-xs font-semibold text-white shadow-lg">
+                                {metric.definition}
+                                <span className="absolute left-1/2 top-full h-3 w-3 -translate-x-1/2 -translate-y-1/2 rotate-45 bg-slate-900" />
+                              </span>
+                            </span>
+                          </span>
+                        </div>
+                        <p className={`mt-3 text-lg font-bold ${metric.color}`}>
+                          {metric.value}
+                        </p>
+                      </div>
+                    );
+                  })}
               </div>
             </div>
           </div>
 
           <Tabs defaultValue="stress-strain" className="space-y-6">
-            <TabsList className="w-full justify-start">
+            <TabsList className="w-full justify-start bg-transparent">
               <TabsTrigger value="stress-strain">Stress-Strain Curve</TabsTrigger>
               <TabsTrigger value="stress-distribution">Stress Distribution</TabsTrigger>
-              <TabsTrigger value="statistics">Statistics</TabsTrigger>
+              <TabsTrigger value="field-viewer">3D Field Viewer</TabsTrigger>
               <TabsTrigger value="surface">3D Surface</TabsTrigger>
             </TabsList>
 
             <TabsContent value="stress-strain">
               <div className="bg-card p-6 rounded-2xl border border-border shadow-sm">
-                <h3 className="text-lg font-semibold font-display">
-                  Stress vs. Strain Curve
-                </h3>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Real-time simulation output plotting mechanical response.
-                </p>
-                <div className="h-[420px] mt-6">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold font-display">
+                      Stress vs. Strain Curve
+                    </h3>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Real-time simulation output plotting mechanical response.
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() =>
+                      exportChartSvg(
+                        "stress-strain-chart",
+                        `${simulation.name || "simulation"}-stress-strain.svg`
+                      )
+                    }
+                  >
+                    <Download className="h-4 w-4" />
+                    Export Chart
+                  </Button>
+                </div>
+                <div id="stress-strain-chart" className="h-[420px] mt-6">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={stressStrainData}>
                       <CartesianGrid
@@ -494,166 +689,350 @@ export default function SimulationDetail() {
             </TabsContent>
 
             <TabsContent value="stress-distribution" className="space-y-6">
-            <div className="bg-card rounded-2xl border border-border p-6">
-              <h3 className="font-semibold mb-4 flex items-center gap-2">
-                <BarChart2 className="h-4 w-4" />
-                Stress Over Time
-              </h3>
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={results.timeSeriesData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                  <XAxis
-                    dataKey="time"
-                    label={{ value: "Time (s)", position: "insideBottomRight", offset: -5 }}
-                    ticks={timeTicks}
-                    interval={0}
-                    allowDecimals={timeTickStep === 0.5}
-                    domain={[0, timeTickMax]}
-                    tickFormatter={(value) => formatTimeTick(Number(value))}
-                  />
-                  <YAxis label={{ value: "Stress (MPa)", angle: -90, position: "insideLeft" }} />
-                  <Tooltip labelFormatter={(value) => `Time: ${formatTimeTick(Number(value))} s`} />
-                  <Line type="monotone" dataKey="stress" stroke="#3b82f6" name="Stress" strokeWidth={2} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-
-            <div className="bg-card rounded-2xl border border-border p-6">
-              <h3 className="font-semibold mb-4 flex items-center gap-2">
-                <BarChart2 className="h-4 w-4" />
-                Displacement Over Time
-              </h3>
-              <ResponsiveContainer width="100%" height={300}>
-                <AreaChart data={results.timeSeriesData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                  <XAxis
-                    dataKey="time"
-                    label={{ value: "Time (s)", position: "insideBottomRight", offset: -5 }}
-                    ticks={timeTicks}
-                    interval={0}
-                    allowDecimals={timeTickStep === 0.5}
-                    domain={[0, timeTickMax]}
-                    tickFormatter={(value) => formatTimeTick(Number(value))}
-                  />
-                  <YAxis label={{ value: "Displacement (mm)", angle: -90, position: "insideLeft" }} />
-                  <Tooltip labelFormatter={(value) => `Time: ${formatTimeTick(Number(value))} s`} />
-                  <Area type="monotone" dataKey="displacement" fill="#8b5cf6" stroke="#8b5cf6" name="Displacement" />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-            </TabsContent>
-
-            <TabsContent value="statistics">
-              <div className="bg-card rounded-2xl border border-border p-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="bg-muted/30 rounded-2xl p-6">
-                    <p className="text-xs font-semibold uppercase text-muted-foreground">
-                      Maximum Stress
-                    </p>
-                    <p className="text-3xl font-bold text-primary mt-3">
-                      {formatNumber(maxStress)} MPa
-                    </p>
-                    <p className="text-sm text-muted-foreground mt-2">
-                      Peak stress encountered during simulation
+              <div className="bg-card rounded-2xl border border-border p-6 space-y-6">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold">Time-Series Playback</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Scrub through the run to inspect stress and displacement at any moment.
                     </p>
                   </div>
-                  <div className="bg-muted/30 rounded-2xl p-6">
-                    <p className="text-xs font-semibold uppercase text-muted-foreground">
-                      Minimum Stress
-                    </p>
-                    <p className="text-3xl font-bold text-indigo-500 mt-3">
-                      {formatNumber(minStress)} MPa
-                    </p>
-                    <p className="text-sm text-muted-foreground mt-2">
-                      Baseline stress at zero strain
-                    </p>
-                  </div>
-                  <div className="bg-muted/30 rounded-2xl p-6">
-                    <p className="text-xs font-semibold uppercase text-muted-foreground">
-                      Average Stress
-                    </p>
-                    <p className="text-3xl font-bold text-orange-500 mt-3">
-                      {formatNumber(avgStress)} MPa
-                    </p>
-                    <p className="text-sm text-muted-foreground mt-2">
-                      Mean stress across all strain points
-                    </p>
-                  </div>
-                  <div className="bg-muted/30 rounded-2xl p-6">
-                    <p className="text-xs font-semibold uppercase text-muted-foreground">
-                      Stress Range
-                    </p>
-                    <p className="text-3xl font-bold text-emerald-500 mt-3">
-                      {formatNumber(stressRange)} MPa
-                    </p>
-                    <p className="text-sm text-muted-foreground mt-2">
-                      Total variation in stress values
-                    </p>
-                  </div>
-                  <div className="bg-muted/30 rounded-2xl p-6">
-                    <p className="text-xs font-semibold uppercase text-muted-foreground">
-                      Maximum Strain
-                    </p>
-                    <p className="text-3xl font-bold text-sky-500 mt-3">
-                      {formatMicrostrain(results?.maxStrain)} με
-                    </p>
-                    <p className="text-sm text-muted-foreground mt-2">
-                      Peak strain during simulation
-                    </p>
-                  </div>
-                  <div className="bg-muted/30 rounded-2xl p-6">
-                    <p className="text-xs font-semibold uppercase text-muted-foreground">
-                      Average Strain
-                    </p>
-                    <p className="text-3xl font-bold text-slate-500 mt-3">
-                      {formatMicrostrain(results?.avgStrain)} με
-                    </p>
-                    <p className="text-sm text-muted-foreground mt-2">
-                      Mean strain across all points
-                    </p>
-                  </div>
-                  <div className="bg-muted/30 rounded-2xl p-6">
-                    <p className="text-xs font-semibold uppercase text-muted-foreground">
-                      Safety Factor
-                    </p>
-                    <p className="text-3xl font-bold text-emerald-600 mt-3">
-                      {formatNumber(results?.safetyFactor)}
-                    </p>
-                    <p className="text-sm text-muted-foreground mt-2">
-                      Estimated margin to failure
-                    </p>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setIsPlaying((prev) => !prev)}
+                    >
+                      {isPlaying ? (
+                        <>
+                          <Pause className="h-4 w-4" />
+                          Pause
+                        </>
+                      ) : (
+                        <>
+                          <Play className="h-4 w-4" />
+                          Play
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() =>
+                        setPlayheadIndex((prev) => Math.max(prev - 1, 0))
+                      }
+                    >
+                      Prev
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() =>
+                        setPlayheadIndex((prev) =>
+                          Math.min(prev + 1, Math.max(timeSeriesData.length - 1, 0))
+                        )
+                      }
+                    >
+                      Next
+                    </Button>
                   </div>
                 </div>
+                <div className="flex flex-col gap-4 xl:flex-row xl:items-center">
+                  <div className="flex-1 space-y-2">
+                    <div className="flex items-center justify-between text-sm text-muted-foreground">
+                      <span>Playback</span>
+                      <span>{formatTimeTick(Number(activeTime))} s</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={0}
+                      max={Math.max(timeSeriesData.length - 1, 0)}
+                      value={playheadIndex}
+                      onChange={(event) => setPlayheadIndex(Number(event.target.value))}
+                      className="w-full accent-primary"
+                    />
+                  </div>
+                  <div className="bg-muted/30 rounded-2xl px-6 py-4 min-w-[240px]">
+                    <p className="text-xs uppercase tracking-widest text-muted-foreground">
+                      Live Snapshot
+                    </p>
+                    <div className="mt-3 space-y-1 text-sm">
+                      <p className="flex justify-between">
+                        <span className="text-muted-foreground">Time</span>
+                        <span className="font-semibold">{formatTimeTick(Number(activeTime))} s</span>
+                      </p>
+                      <p className="flex justify-between">
+                        <span className="text-muted-foreground">Stress</span>
+                        <span className="font-semibold">{formatNumber(activeStress)} MPa</span>
+                      </p>
+                      <p className="flex justify-between">
+                        <span className="text-muted-foreground">Displacement</span>
+                        <span className="font-semibold">{formatNumber(activeDisplacement)} mm</span>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 text-sm">
+                  <Switch
+                    checked={overlayDisplacement}
+                    onCheckedChange={setOverlayDisplacement}
+                  />
+                  <span className="text-muted-foreground">
+                    Overlay displacement on stress chart
+                  </span>
+                </div>
               </div>
+
+              <div className="bg-card rounded-2xl border border-border p-6">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <h3 className="font-semibold flex items-center gap-2">
+                    <BarChart2 className="h-4 w-4" />
+                    Stress Over Time
+                  </h3>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() =>
+                      exportChartSvg(
+                        "stress-time-chart",
+                        `${simulation.name || "simulation"}-stress-time.svg`
+                      )
+                    }
+                  >
+                    <Download className="h-4 w-4" />
+                    Export Chart
+                  </Button>
+                </div>
+                <div id="stress-time-chart" className="mt-4">
+                  <ResponsiveContainer width="100%" height={300}>
+                    <LineChart
+                      data={timeSeriesData}
+                      onMouseMove={handleChartHover}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                      <XAxis
+                        dataKey="time"
+                        label={{ value: "Time (s)", position: "insideBottomRight", offset: -5 }}
+                        ticks={timeTicks}
+                        interval={0}
+                        allowDecimals={timeTickStep === 0.5}
+                        domain={[0, timeTickMax]}
+                        tickFormatter={(value) => formatTimeTick(Number(value))}
+                      />
+                      <YAxis
+                        label={{ value: "Stress (MPa)", angle: -90, position: "insideLeft" }}
+                      />
+                      {overlayDisplacement && (
+                        <YAxis
+                          yAxisId="right"
+                          orientation="right"
+                          label={{
+                            value: "Displacement (mm)",
+                            angle: 90,
+                            position: "insideRight",
+                          }}
+                        />
+                      )}
+                      <Tooltip labelFormatter={(value) => `Time: ${formatTimeTick(Number(value))} s`} />
+                      <ReferenceLine
+                        x={activeTime}
+                        stroke="hsl(var(--primary))"
+                        strokeDasharray="4 4"
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="stress"
+                        stroke="#3b82f6"
+                        name="Stress"
+                        strokeWidth={2}
+                        dot={false}
+                      />
+                      {overlayDisplacement && (
+                        <Line
+                          yAxisId="right"
+                          type="monotone"
+                          dataKey="displacement"
+                          stroke="#8b5cf6"
+                          name="Displacement"
+                          strokeWidth={2}
+                          dot={false}
+                        />
+                      )}
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {!overlayDisplacement && (
+                <div className="bg-card rounded-2xl border border-border p-6">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <h3 className="font-semibold flex items-center gap-2">
+                      <BarChart2 className="h-4 w-4" />
+                      Displacement Over Time
+                    </h3>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() =>
+                        exportChartSvg(
+                          "displacement-time-chart",
+                          `${simulation.name || "simulation"}-displacement-time.svg`
+                        )
+                      }
+                    >
+                      <Download className="h-4 w-4" />
+                      Export Chart
+                    </Button>
+                  </div>
+                  <div id="displacement-time-chart" className="mt-4">
+                    <ResponsiveContainer width="100%" height={300}>
+                      <AreaChart
+                        data={timeSeriesData}
+                        onMouseMove={handleChartHover}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                        <XAxis
+                          dataKey="time"
+                          label={{ value: "Time (s)", position: "insideBottomRight", offset: -5 }}
+                          ticks={timeTicks}
+                          interval={0}
+                          allowDecimals={timeTickStep === 0.5}
+                          domain={[0, timeTickMax]}
+                          tickFormatter={(value) => formatTimeTick(Number(value))}
+                        />
+                        <YAxis label={{ value: "Displacement (mm)", angle: -90, position: "insideLeft" }} />
+                        <Tooltip labelFormatter={(value) => `Time: ${formatTimeTick(Number(value))} s`} />
+                        <ReferenceLine
+                          x={activeTime}
+                          stroke="#8b5cf6"
+                          strokeDasharray="4 4"
+                        />
+                        <Area
+                          type="monotone"
+                          dataKey="displacement"
+                          fill="#8b5cf6"
+                          stroke="#8b5cf6"
+                          name="Displacement"
+                        />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              )}
             </TabsContent>
 
+            <TabsContent value="field-viewer">
+              <div className="bg-card rounded-2xl border border-border p-6 space-y-6">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <h3 className="font-semibold">3D Field Viewer</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Explore volumetric stress intensity with adjustable thresholds and slices.
+                    </p>
+                  </div>
+                  <Button size="sm" variant="outline" onClick={handleExportField}>
+                    <Download className="h-4 w-4" />
+                    Export View
+                  </Button>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>Intensity Threshold</span>
+                      <span>{Math.round(fieldThreshold * 100)}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={0.1}
+                      max={0.9}
+                      step={0.05}
+                      value={fieldThreshold}
+                      onChange={(event) => setFieldThreshold(Number(event.target.value))}
+                      className="w-full accent-primary"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>Depth Slice</span>
+                      <span>{Math.round(fieldSlice * 100)}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={0}
+                      max={1}
+                      step={0.05}
+                      value={fieldSlice}
+                      onChange={(event) => setFieldSlice(Number(event.target.value))}
+                      className="w-full accent-primary"
+                    />
+                  </div>
+                </div>
+                <Plot
+                  data={[
+                    {
+                      x: fieldData.x,
+                      y: fieldData.y,
+                      z: fieldData.z,
+                      value: fieldData.value,
+                      type: "volume",
+                      opacity: 0.15,
+                      surface: { count: 12 },
+                      colorscale: "Turbo",
+                      isomin: minStress + (maxStress - minStress) * fieldThreshold,
+                      isomax: maxStress,
+                    } as any,
+                  ]}
+                  onInitialized={(_, graphDiv) => {
+                    plotRef.current = graphDiv;
+                  }}
+                  onUpdate={(_, graphDiv) => {
+                    plotRef.current = graphDiv;
+                  }}
+                  layout={{
+                    title: "Stress Field (normalized)",
+                    scene: {
+                      xaxis: { title: "X" },
+                      yaxis: { title: "Y" },
+                      zaxis: { title: "Z" },
+                    },
+                    autosize: true,
+                    height: 460,
+                    paper_bgcolor: "transparent",
+                    plot_bgcolor: "transparent",
+                    font: { color: "var(--foreground)" },
+                  }}
+                  config={{ displayModeBar: false, responsive: true }}
+                  style={{ width: "100%" }}
+                />
+              </div>
+            </TabsContent>
             <TabsContent value="surface">
               <div className="bg-card rounded-2xl border border-border p-6">
                 <h3 className="font-semibold mb-4">3D Stress-Displacement Surface</h3>
                 <Plot
                   data={[
                     {
-                      x: results.timeSeriesData.map((d: any) => d.time),
+                      x: timeSeriesData.map((d) => d.time),
                       y: [0, 1],
                       z: [
-                        results.timeSeriesData.map((d: any) => d.stress),
-                        results.timeSeriesData.map((d: any) => d.displacement * 100),
+                        timeSeriesData.map((d) => d.stress),
+                        timeSeriesData.map((d) => d.displacement * 100),
                       ],
                       type: "surface",
                       colorscale: "Viridis",
-                    } as any
+                    } as any,
                   ]}
-              layout={{
-                title: "3D Analysis Surface",
-                scene: {
-                  xaxis: {
-                    title: "Time (s)",
-                    tickformat: timeTickStep === 0.5 ? ".1f" : ".0f",
-                    dtick: timeTickStep,
-                  },
-                  yaxis: { title: "Type" },
-                  zaxis: { title: "Value" },
-                },
+                  layout={{
+                    title: "3D Analysis Surface",
+                    scene: {
+                      xaxis: {
+                        title: "Time (s)",
+                        tickformat: timeTickStep === 0.5 ? ".1f" : ".0f",
+                        dtick: timeTickStep,
+                      },
+                      yaxis: { title: "Type" },
+                      zaxis: { title: "Value" },
+                    },
                     autosize: true,
                     height: 450,
                     paper_bgcolor: "transparent",

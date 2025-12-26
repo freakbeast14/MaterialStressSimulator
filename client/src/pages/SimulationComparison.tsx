@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useSimulations } from "@/hooks/use-simulations";
 import { useMaterials } from "@/hooks/use-materials";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -66,6 +66,72 @@ export default function SimulationComparison() {
     maxDeformationMicrons: ((sim.results as any)?.maxDeformation || 0) * 1000,
     safetyFactor: (sim.results as any)?.safetyFactor || 0,
   }));
+
+  const responseSurface = useMemo(() => {
+    if (selected.length < 2) return null;
+    const points = selected
+      .map((sim) => {
+        const r = sim.results as any;
+        const load = sim.appliedLoad ?? 0;
+        const temp = sim.temperature ?? 0;
+        const maxStress = r?.maxStress ?? 0;
+        return { load, temp, maxStress, name: sim.name };
+      })
+      .filter((p) => Number.isFinite(p.load) && Number.isFinite(p.temp));
+    if (points.length < 2) return null;
+
+    const loads = points.map((p) => p.load);
+    const temps = points.map((p) => p.temp);
+    const minLoad = Math.min(...loads);
+    const maxLoad = Math.max(...loads);
+    const minTemp = Math.min(...temps);
+    const maxTemp = Math.max(...temps);
+    const gridSize = 12;
+    const gridLoads = Array.from({ length: gridSize }, (_, i) =>
+      minLoad + (maxLoad - minLoad) * (i / (gridSize - 1))
+    );
+    const gridTemps = Array.from({ length: gridSize }, (_, i) =>
+      minTemp + (maxTemp - minTemp) * (i / (gridSize - 1))
+    );
+    const gridZ = gridTemps.map((tempValue) =>
+      gridLoads.map((loadValue) => {
+        let weightSum = 0;
+        let valueSum = 0;
+        for (const point of points) {
+          const dx = loadValue - point.load;
+          const dy = tempValue - point.temp;
+          const distance = Math.max(Math.sqrt(dx * dx + dy * dy), 1e-6);
+          const weight = 1 / distance;
+          weightSum += weight;
+          valueSum += weight * point.maxStress;
+        }
+        return weightSum > 0 ? valueSum / weightSum : 0;
+      })
+    );
+
+    return {
+      gridLoads,
+      gridTemps,
+      gridZ,
+      points,
+    };
+  }, [selected]);
+
+  const trajectoryTraces = useMemo(() => {
+    return selected.map((sim, index) => {
+      const r = sim.results as any;
+      const series = r?.timeSeriesData || [];
+      return {
+        x: series.map((p: any) => p.time),
+        y: series.map((p: any) => p.stress),
+        z: series.map((p: any) => p.displacement),
+        mode: "lines",
+        type: "scatter3d",
+        name: sim.name,
+        line: { width: 4 },
+      } as any;
+    });
+  }, [selected]);
 
 //   useLayoutEffect(() => {
 //     if (initialRender.current) {
@@ -173,10 +239,12 @@ export default function SimulationComparison() {
           }}
           className="space-y-6"
         >
-          <TabsList className="w-full justify-start">
+          <TabsList className="w-full justify-start bg-transparent">
             <TabsTrigger value="comparison">Results Comparison</TabsTrigger>
             <TabsTrigger value="heatmap">Heatmap</TabsTrigger>
             <TabsTrigger value="metrics">3D Metrics Space</TabsTrigger>
+            <TabsTrigger value="trajectories">3D Trajectories</TabsTrigger>
+            <TabsTrigger value="response-surface">3D Response Surface</TabsTrigger>
           </TabsList>
 
           <TabsContent value="comparison">
@@ -258,6 +326,74 @@ export default function SimulationComparison() {
                 }}
                 style={{ width: "100%" }}
               />
+            </div>
+          </TabsContent>
+          <TabsContent value="trajectories">
+            <div className="bg-card rounded-2xl border border-border p-6">
+              <h3 className="font-semibold mb-4">3D Stress-Displacement Trajectories</h3>
+              <Plot
+                data={trajectoryTraces}
+                layout={{
+                  scene: {
+                    xaxis: { title: "Time (s)" },
+                    yaxis: { title: "Stress (MPa)" },
+                    zaxis: { title: "Displacement (mm)" },
+                  },
+                  autosize: true,
+                  height: 520,
+                  paper_bgcolor: "transparent",
+                  plot_bgcolor: "transparent",
+                  font: { color: "var(--foreground)" },
+                }}
+                style={{ width: "100%" }}
+              />
+            </div>
+          </TabsContent>
+          <TabsContent value="response-surface">
+            <div className="bg-card rounded-2xl border border-border p-6">
+              <h3 className="font-semibold mb-4">3D Response Surface</h3>
+              {responseSurface ? (
+                <Plot
+                  data={[
+                    {
+                      x: responseSurface.gridLoads,
+                      y: responseSurface.gridTemps,
+                      z: responseSurface.gridZ,
+                      type: "surface",
+                      colorscale: "Viridis",
+                      opacity: 0.85,
+                      name: "Surface",
+                    } as any,
+                    {
+                      x: responseSurface.points.map((p) => p.load),
+                      y: responseSurface.points.map((p) => p.temp),
+                      z: responseSurface.points.map((p) => p.maxStress),
+                      type: "scatter3d",
+                      mode: "markers+text",
+                      text: responseSurface.points.map((p) => p.name),
+                      marker: { size: 5, color: "#f59e0b" },
+                      name: "Simulations",
+                    } as any,
+                  ]}
+                  layout={{
+                    scene: {
+                      xaxis: { title: "Applied Load (N)" },
+                      yaxis: { title: "Temperature (C)" },
+                      zaxis: { title: "Max Stress (MPa)" },
+                    },
+                    autosize: true,
+                    height: 520,
+                    paper_bgcolor: "transparent",
+                    plot_bgcolor: "transparent",
+                    font: { color: "var(--foreground)" },
+                  }}
+                  style={{ width: "100%" }}
+                />
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Add simulations with load and temperature to build a response surface.
+                </p>
+              )}
             </div>
           </TabsContent>
         </Tabs>
