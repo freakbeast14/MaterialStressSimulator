@@ -4,7 +4,7 @@ import { useMaterials } from "@/hooks/use-materials";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Eye, Search, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type CSSProperties } from "react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -20,6 +20,16 @@ export default function Simulations() {
   const [statusFilter, setStatusFilter] = useState("all");
 
   const getMaterialName = (id: number) => materials?.find(m => m.id === id)?.name || "Unknown Material";
+  const materialHueMap = useMemo(() => {
+    const list = materials ?? [];
+    const map = new Map<number, number>();
+    const count = Math.max(list.length, 1);
+    list.forEach((material, index) => {
+      const hue = Math.round((index * 360) / count);
+      map.set(material.id, hue);
+    });
+    return map;
+  }, [materials]);
 
   const simulationTypes = useMemo(() => {
     const types = simulations?.map((sim) => sim.type) || [];
@@ -40,6 +50,14 @@ export default function Simulations() {
     const matchesStatus = statusFilter === "all" || sim.status === statusFilter;
     return matchesSearch && matchesMaterial && matchesType && matchesStatus;
   });
+
+  const getTypeBadgeClass = (type: string) => {
+    const normalized = type.toLowerCase();
+    if (normalized.includes("tensile")) return "bg-sky-100 text-sky-700";
+    if (normalized.includes("thermal")) return "bg-orange-100 text-orange-700";
+    if (normalized.includes("fatigue")) return "bg-indigo-100 text-indigo-700";
+    return "bg-muted text-muted-foreground";
+  };
 
   const handleDelete = async (id: number, name: string) => {
     const confirmed = window.confirm(`Delete simulation "${name}"? This cannot be undone.`);
@@ -121,7 +139,16 @@ export default function Simulations() {
           </div>
         ) : (
           <div className="border-t border-border">
-            <table className="w-full text-sm text-left">
+            <table className="w-full table-fixed text-sm text-left">
+              <colgroup>
+                <col className="w-16" />
+                <col className="w-[20%]" />
+                <col className="w-[16%]" />
+                <col className="w-[20%]" />
+                <col className="w-[18%]" />
+                <col className="w-[12%]" />
+                <col className="w-[13%]" />
+              </colgroup>
               <thead className="text-xs uppercase bg-muted text-muted-foreground font-semibold">
                 <tr>
                   <th className="px-6 py-4">ID</th>
@@ -135,23 +162,39 @@ export default function Simulations() {
               </thead>
             </table>
             <div className="max-h-[70vh] overflow-y-auto overflow-x-auto">
-              <table className="w-full text-sm text-left">
+              <table className="w-full table-fixed text-sm text-left">
+                <colgroup>
+                  <col className="w-16" />
+                  <col className="w-[20%]" />
+                  <col className="w-[16%]" />
+                  <col className="w-[20%]" />
+                  <col className="w-[18%]" />
+                  <col className="w-[12%]" />
+                  <col className="w-[12%]" />
+                </colgroup>
                 <tbody className="divide-y divide-border">
                 {filteredSimulations?.map((sim) => (
                   <tr key={sim.id} className="hover:bg-muted/30 transition-colors">
                     <td className="px-6 py-4 font-mono text-xs text-muted-foreground">#{sim.id}</td>
                     <td className="px-6 py-4 font-medium text-foreground">{sim.name}</td>
                     <td className="px-6 py-4 text-muted-foreground">
-                      {/* <span className="px-2 py-1 rounded-md bg-secondary text-xs font-medium"> */}
+                      <span className={`px-2 py-1 rounded-md text-xs font-medium ${getTypeBadgeClass(sim.type)}`}>
                         {sim.type}
-                      {/* </span> */}
+                      </span>
                     </td>
                     <td className="px-6 py-4 text-foreground">
-                      <span className="px-2 py-1 rounded-md bg-secondary text-xs font-medium">
+                      <span
+                        style={
+                          {
+                            "--badge-hue": materialHueMap.get(sim.materialId) ?? 210,
+                          } as CSSProperties
+                        }
+                        className="px-2 py-1 rounded-md text-xs font-medium bg-[hsl(var(--badge-hue)_80%_90%)] text-[hsl(var(--badge-hue)_45%_30%)] dark:bg-[hsl(var(--badge-hue)_35%_20%)] dark:text-[hsl(var(--badge-hue)_70%_80%)]"
+                      >
                         {getMaterialName(sim.materialId)}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-muted-foreground font-mono">
+                    <td className="px-6 py-4 text-muted-foreground font-mono text-xs">
                       {sim.createdAt ? format(new Date(sim.createdAt), 'MMM d, yyyy HH:mm') : '-'}
                     </td>
                     <td className="px-6 py-4">
@@ -179,7 +222,7 @@ export default function Simulations() {
                 ))}
                 {filteredSimulations?.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-6 py-12 text-center text-muted-foreground">
+                    <td colSpan={7} className="px-6 py-12 text-center text-muted-foreground">
                       No simulations found.
                     </td>
                   </tr>
