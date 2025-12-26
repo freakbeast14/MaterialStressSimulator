@@ -1,4 +1,4 @@
-FROM quay.io/fenicsproject/stable:current
+FROM docker.io/fenicsproject/stable:latest
 
 WORKDIR /app
 COPY fenics_service/requirements.txt /app/requirements.txt
