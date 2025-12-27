@@ -1,5 +1,5 @@
 import { useParams } from "wouter";
-import type { ElementType } from "react";
+import type { ElementType, MouseEvent } from "react";
 import { useSimulation } from "@/hooks/use-simulations";
 import { useMaterial } from "@/hooks/use-materials";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -78,6 +78,12 @@ export default function SimulationDetail() {
   const [meshPreviewName, setMeshPreviewName] = useState<string | null>(null);
   const [meshPreviewError, setMeshPreviewError] = useState<string | null>(null);
   const [isLoadingMeshPreview, setIsLoadingMeshPreview] = useState(false);
+  const [infoTooltip, setInfoTooltip] = useState<{
+    text: string;
+    x: number;
+    y: number;
+    visible: boolean;
+  } | null>(null);
   const { toast } = useToast();
   const plotRef = useRef<any>(null);
 
@@ -106,6 +112,15 @@ export default function SimulationDetail() {
       : results?.avgStress ?? 0;
   const stressRange =
     stressSeries.length > 0 ? maxStress - minStress : 0;
+  const timeSeriesData = (results?.timeSeriesData || []) as {
+    time: number;
+    stress: number;
+    displacement: number;
+  }[];
+  const stressStrainData =
+    (results?.stressStrainCurve as { strain: number; stress: number }[] | undefined) ||
+    material?.stressStrainCurve ||
+    [];
   const formatNumber = (value?: number, decimals = 3) =>
     typeof value === "number" && Number.isFinite(value)
       ? value.toFixed(decimals)
@@ -189,15 +204,6 @@ export default function SimulationDetail() {
     ]
   );
 
-  const stressStrainData =
-    (results?.stressStrainCurve as { strain: number; stress: number }[] | undefined) ||
-    material?.stressStrainCurve ||
-    [];
-  const timeSeriesData = (results?.timeSeriesData || []) as {
-    time: number;
-    stress: number;
-    displacement: number;
-  }[];
   const progressStage =
     (simulation?.progress ?? 0) < 20
       ? "Meshing"
@@ -259,6 +265,17 @@ export default function SimulationDetail() {
       bg: "bg-emerald-100/70 dark:bg-emerald-500/20 dark:text-emerald-200",
     },
     {
+      label: "Max Deformation",
+      value: `${formatNumber(
+        typeof results?.maxDeformation === "number"
+          ? results.maxDeformation * 1000
+          : undefined
+      )} μm`,
+      definition: "Peak deformation during simulation.",
+      color: "text-purple-600",
+      bg: "bg-purple-100/70 dark:bg-purple-500/20 dark:text-purple-200",
+    },
+    {
       label: "Max Strain",
       value: `${formatMicrostrain(results?.maxStrain)} με`,
       definition: "Peak strain during simulation.",
@@ -313,6 +330,24 @@ export default function SimulationDetail() {
     if (typeof state?.activeTooltipIndex === "number") {
       setPlayheadIndex(state.activeTooltipIndex);
     }
+  };
+  useEffect(() => {
+    if (!Array.isArray(results?.meshWarnings) || results.meshWarnings.length === 0) {
+      return;
+    }
+    console.warn("Mesh notes:", results.meshWarnings);
+  }, [results?.meshWarnings]);
+  const showInfoTooltip = (event: MouseEvent<HTMLElement>, text: string) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    setInfoTooltip({
+      text,
+      x: rect.left + rect.width / 2,
+      y: rect.top,
+      visible: true,
+    });
+  };
+  const hideInfoTooltip = () => {
+    setInfoTooltip((prev) => (prev ? { ...prev, visible: false } : null));
   };
 
   useEffect(() => {
@@ -850,7 +885,7 @@ export default function SimulationDetail() {
                 </div>
                 {results?.source && (
                   <span className="text-[11px] font-semibold tracking-wider text-muted-foreground bg-muted/40 border border-border rounded-full px-2 py-1">
-                    SOURCE: {results.source == 'fenics' ? 'FEniCS' : results.source}
+                    SOURCE: {results.source === "fenics" ? "FEniCS" : results.source}
                   </span>
                 )}
               </div>
@@ -858,17 +893,6 @@ export default function SimulationDetail() {
                 <p className="text-sm text-muted-foreground">Loading mesh files...</p>
               ) : meshError ? (
                 <p className="text-sm text-destructive">{meshError}</p>
-              ) : Array.isArray(results?.meshWarnings) && results.meshWarnings.length > 0 ? (
-                <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-700">
-                  <p className="font-semibold uppercase tracking-widest text-[10px] text-amber-600">
-                    Mesh notes
-                  </p>
-                  <ul className="mt-2 space-y-1">
-                    {results.meshWarnings.map((warning: string, idx: number) => (
-                      <li key={`${warning}-${idx}`}>{warning}</li>
-                    ))}
-                  </ul>
-                </div>
               ) : simulationMeshes.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
                   No mesh artifacts saved yet.
@@ -1104,19 +1128,22 @@ export default function SimulationDetail() {
                 }`}
               >
                 <div className="overflow-hidden">
-                  <div className="grid grid-cols-2 gap-4 pt-4">
+                  <div className="grid grid-cols-2 gap-4">
                     {metricsList.slice(4).map((metric) => (
                       <div key={metric.label} className={`${metric.bg} rounded-2xl p-4`}>
                         <div className="flex items-center justify-between text-xs font-semibold text-muted-foreground">
                           <span>{metric.label}</span>
-                          <span className="relative inline-flex items-center justify-center group">
+                          <span
+                            className="relative inline-flex items-center justify-center"
+                            onMouseEnter={(event) =>
+                              showInfoTooltip(event, metric.definition)
+                            }
+                            onMouseMove={(event) =>
+                              showInfoTooltip(event, metric.definition)
+                            }
+                            onMouseLeave={hideInfoTooltip}
+                          >
                             <Info className="h-3.5 w-3.5 text-muted-foreground/70" />
-                            <span className="pointer-events-none absolute bottom-full left-1/2 mb-3 w-max -translate-x-1/2 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-                              <span className="relative rounded-lg bg-slate-900 px-4 py-2 text-xs font-semibold text-white shadow-lg">
-                                {metric.definition}
-                                <span className="absolute left-1/2 top-full h-3 w-3 -translate-x-1/2 -translate-y-1/2 rotate-45 bg-slate-900" />
-                              </span>
-                            </span>
                           </span>
                         </div>
                         <p className={`mt-3 text-lg font-bold ${metric.color}`}>
@@ -1570,6 +1597,22 @@ export default function SimulationDetail() {
               </div>
             </TabsContent>
           </Tabs>
+        </div>
+      )}
+
+      {infoTooltip?.visible && (
+        <div
+          className="pointer-events-none fixed z-50"
+          style={{
+            left: infoTooltip.x,
+            top: infoTooltip.y,
+            transform: "translate(-50%, calc(-100% - 36px))",
+          }}
+        >
+          <div className="relative rounded-lg bg-slate-900 px-4 py-2 text-xs font-semibold text-white shadow-lg">
+            {infoTooltip.text}
+            <span className="absolute left-1/2 top-full h-3 w-3 -translate-x-1/2 -translate-y-1/2 rotate-45 bg-slate-900" />
+          </div>
         </div>
       )}
 

@@ -1,6 +1,7 @@
 import { Link } from "wouter";
 import { useDeleteSimulation, useSimulations } from "@/hooks/use-simulations";
 import { useMaterials } from "@/hooks/use-materials";
+import { useGeometries } from "@/hooks/use-geometries";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Eye, Search, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -13,13 +14,22 @@ export default function Simulations() {
   const { data: simulations, isLoading } = useSimulations();
   const { mutateAsync: deleteSimulation, isPending: isDeleting } = useDeleteSimulation();
   const { data: materials } = useMaterials();
+  const { data: geometries } = useGeometries();
   const [search, setSearch] = useState("");
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [materialFilter, setMaterialFilter] = useState("all");
+  const [geometryFilter, setGeometryFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
 
-  const getMaterialName = (id: number) => materials?.find(m => m.id === id)?.name || "Unknown Material";
+  const getMaterialName = (id: number) =>
+    materials?.find(m => m.id === id)?.name || "Unknown Material";
+  const formatMaterialName = (name: string) => {
+    const trimmed = name.split(" (")[0];
+    return trimmed.length > 15 ? `${trimmed.slice(0, 15)}…` : trimmed;
+  };
+  const getGeometryName = (id?: number | null) =>
+    geometries?.find((geom) => geom.id === id)?.name || "Unknown Geometry";
   const materialHueMap = useMemo(() => {
     const list = materials ?? [];
     const map = new Map<number, number>();
@@ -30,6 +40,16 @@ export default function Simulations() {
     });
     return map;
   }, [materials]);
+  const geometryHueMap = useMemo(() => {
+    const list = geometries ?? [];
+    const map = new Map<number, number>();
+    const count = Math.max(list.length, 1);
+    list.forEach((geometry, index) => {
+      const hue = Math.round((index * 360) / count);
+      map.set(geometry.id, hue);
+    });
+    return map;
+  }, [geometries]);
 
   const simulationTypes = useMemo(() => {
     const types = simulations?.map((sim) => sim.type) || [];
@@ -41,14 +61,22 @@ export default function Simulations() {
     return Array.from(new Set(statuses)).sort();
   }, [simulations]);
 
+  const simulationGeometries = useMemo(() => {
+    const ids = simulations?.map((sim) => sim.geometryId).filter(Boolean) || [];
+    return Array.from(new Set(ids)).sort((a, b) => Number(a) - Number(b));
+  }, [simulations]);
+
   const filteredSimulations = simulations?.filter((sim) => {
+    const geometryName = getGeometryName(sim.geometryId);
     const matchesSearch =
       sim.name.toLowerCase().includes(search.toLowerCase()) ||
-      sim.type.toLowerCase().includes(search.toLowerCase());
+      sim.type.toLowerCase().includes(search.toLowerCase()) ||
+      geometryName.toLowerCase().includes(search.toLowerCase());
     const matchesMaterial = materialFilter === "all" || String(sim.materialId) === materialFilter;
+    const matchesGeometry = geometryFilter === "all" || String(sim.geometryId) === geometryFilter;
     const matchesType = typeFilter === "all" || sim.type === typeFilter;
     const matchesStatus = statusFilter === "all" || sim.status === statusFilter;
-    return matchesSearch && matchesMaterial && matchesType && matchesStatus;
+    return matchesSearch && matchesMaterial && matchesGeometry && matchesType && matchesStatus;
   });
 
   const getTypeBadgeClass = (type: string) => {
@@ -75,13 +103,13 @@ export default function Simulations() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+      <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
         <div>
           <h1 className="text-3xl font-display font-bold text-foreground">Simulation Jobs</h1>
           <p className="text-muted-foreground mt-1">Monitor active jobs and view historical results.</p>
         </div>
-        <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
-          <div className="relative w-full sm:w-72">
+        <div className="flex flex-col gap-3 w-full lg:w-auto">
+          <div className="relative w-full">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input 
               placeholder="Search jobs..." 
@@ -90,10 +118,11 @@ export default function Simulations() {
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-          <Select value={materialFilter} onValueChange={setMaterialFilter}>
-            <SelectTrigger className="w-full sm:w-44 bg-card">
-              <SelectValue placeholder="Material" />
-            </SelectTrigger>
+          <div className="flex flex-wrap gap-3">
+            <Select value={materialFilter} onValueChange={setMaterialFilter}>
+              <SelectTrigger className="w-full sm:w-44 bg-card">
+                <SelectValue placeholder="Material" />
+              </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Materials</SelectItem>
               {materials?.map((material) => (
@@ -103,32 +132,46 @@ export default function Simulations() {
               ))}
             </SelectContent>
           </Select>
-          <Select value={typeFilter} onValueChange={setTypeFilter}>
-            <SelectTrigger className="w-full sm:w-40 bg-card">
-              <SelectValue placeholder="Test Type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Types</SelectItem>
-              {simulationTypes.map((type) => (
-                <SelectItem key={type} value={type}>
-                  {type}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-full sm:w-36 bg-card">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Statuses</SelectItem>
-              {simulationStatuses.map((status) => (
-                <SelectItem key={status} value={status}>
-                  {status[0].toUpperCase() + status.slice(1)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            <Select value={geometryFilter} onValueChange={setGeometryFilter}>
+              <SelectTrigger className="w-full sm:w-44 bg-card">
+                <SelectValue placeholder="Geometry" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Geometries</SelectItem>
+                {simulationGeometries.map((geometryId) => (
+                  <SelectItem key={geometryId} value={String(geometryId)}>
+                    {getGeometryName(geometryId)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={typeFilter} onValueChange={setTypeFilter}>
+              <SelectTrigger className="w-full sm:w-40 bg-card">
+                <SelectValue placeholder="Test Type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                {simulationTypes.map((type) => (
+                  <SelectItem key={type} value={type}>
+                    {type}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-full sm:w-36 bg-card">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                {simulationStatuses.map((status) => (
+                  <SelectItem key={status} value={status}>
+                    {status[0].toUpperCase() + status.slice(1)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </div>
 
@@ -141,24 +184,26 @@ export default function Simulations() {
           <div className="border-t border-border">
             <table className="w-full table-fixed text-sm text-left">
               <colgroup>
-                <col className="w-16" />
-                <col className="w-[20%]" />
-                <col className="w-[16%]" />
-                <col className="w-[20%]" />
-                <col className="w-[18%]" />
-                <col className="w-[12%]" />
-                <col className="w-[13%]" />
-              </colgroup>
-              <thead className="text-xs uppercase bg-muted text-muted-foreground font-semibold">
-                <tr>
-                  <th className="px-6 py-4">ID</th>
-                  <th className="px-6 py-4">Simulation Name</th>
-                  <th className="px-6 py-4">Type</th>
-                  <th className="px-6 py-4">Material</th>
-                  <th className="px-6 py-4">Date Started</th>
-                  <th className="px-6 py-4">Status</th>
-                  <th className="px-6 py-4 text-center">Action</th>
-                </tr>
+              <col className="w-16" />
+              <col className="w-[20%]" />
+              <col className="w-[16%]" />
+              <col className="w-[16%]" />
+              <col className="w-[16%]" />
+              <col className="w-[18%]" />
+              <col className="w-[12%]" />
+              <col className="w-[13%]" />
+            </colgroup>
+            <thead className="text-xs uppercase bg-muted text-muted-foreground font-semibold">
+              <tr>
+                <th className="px-6 py-4">ID</th>
+                <th className="px-6 py-4">Simulation Name</th>
+                <th className="px-6 py-4">Type</th>
+                <th className="px-6 py-4">Material</th>
+                <th className="px-6 py-4">Geometry</th>
+                <th className="px-6 py-4">Date Started</th>
+                <th className="px-6 py-4">Status</th>
+                <th className="px-6 py-4 text-center">Action</th>
+              </tr>
               </thead>
             </table>
             <div className="max-h-[70vh] overflow-y-auto overflow-x-auto">
@@ -167,7 +212,8 @@ export default function Simulations() {
                   <col className="w-16" />
                   <col className="w-[20%]" />
                   <col className="w-[16%]" />
-                  <col className="w-[20%]" />
+                  <col className="w-[16%]" />
+                  <col className="w-[16%]" />
                   <col className="w-[18%]" />
                   <col className="w-[12%]" />
                   <col className="w-[12%]" />
@@ -190,15 +236,30 @@ export default function Simulations() {
                           } as CSSProperties
                         }
                         className="px-2 py-1 rounded-md text-xs font-medium bg-[hsl(var(--badge-hue)_80%_90%)] text-[hsl(var(--badge-hue)_45%_30%)] dark:bg-[hsl(var(--badge-hue)_35%_20%)] dark:text-[hsl(var(--badge-hue)_70%_80%)]"
+                        title={getMaterialName(sim.materialId)}
                       >
-                        {getMaterialName(sim.materialId)}
+                        {formatMaterialName(getMaterialName(sim.materialId))}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-foreground">
+                      <span
+                        style={
+                          {
+                            "--badge-hue": geometryHueMap.get(sim.geometryId ?? 0) ?? 160,
+                          } as CSSProperties
+                        }
+                        className="px-2 py-1 rounded-md text-xs font-medium bg-[hsl(var(--badge-hue)_80%_92%)] text-[hsl(var(--badge-hue)_45%_28%)] dark:bg-[hsl(var(--badge-hue)_35%_18%)] dark:text-[hsl(var(--badge-hue)_70%_85%)]"
+                      >
+                        {getGeometryName(sim.geometryId)}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-muted-foreground font-mono text-xs">
                       {sim.createdAt ? format(new Date(sim.createdAt), 'MMM d, yyyy HH:mm') : '-'}
                     </td>
                     <td className="px-6 py-4">
-                      <StatusBadge status={sim.status} />
+                      <StatusBadge
+                        status={sim.status}
+                      />
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end">
@@ -222,7 +283,7 @@ export default function Simulations() {
                 ))}
                 {filteredSimulations?.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="px-6 py-12 text-center text-muted-foreground">
+                    <td colSpan={8} className="px-6 py-12 text-center text-muted-foreground">
                       No simulations found.
                     </td>
                   </tr>

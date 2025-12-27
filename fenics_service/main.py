@@ -3,6 +3,8 @@ from __future__ import annotations
 from fastapi import BackgroundTasks, FastAPI, HTTPException
 from pydantic import BaseModel, Field
 from typing import Callable, Dict, List, Optional, Tuple
+from contextlib import redirect_stderr, redirect_stdout
+from io import StringIO
 import math
 import random
 import time
@@ -102,12 +104,9 @@ def _run_job(job_id: str, payload: SimulationRequest) -> None:
         if artifacts:
             status.artifacts = artifacts
     except Exception as exc:
-        set_progress(70)
-        fallback = _build_stub_results(job_id, payload, set_progress)
-        fallback["warning"] = "FEniCS unavailable, using fallback results."
-        status.status = "completed"
-        status.progress = 100
-        status.results = fallback
+        status.status = "failed"
+        status.progress = 0
+        status.error = str(exc)
 
 
 def _solve_with_fenics(
@@ -118,95 +117,143 @@ def _solve_with_fenics(
     import numpy as np
     import dolfin as df
 
-    mesh, mesh_artifacts = _load_geometry_mesh(payload.geometry, payload)
-    V = df.VectorFunctionSpace(mesh, "P", 1)
-    if progress_cb:
-        progress_cb(12)
+    log_buffer = StringIO()
+    with redirect_stdout(log_buffer), redirect_stderr(log_buffer):
+        mesh, mesh_artifacts, facet_markers = _load_geometry_mesh(
+            payload.geometry, payload
+        )
+        V = df.VectorFunctionSpace(mesh, "P", 1)
+        if progress_cb:
+            progress_cb(12)
 
-    u = df.TrialFunction(V)
-    v = df.TestFunction(V)
+        u = df.TrialFunction(V)
+        v = df.TestFunction(V)
 
-    youngs_modulus = payload.material.youngsModulus * 1000.0
-    poisson = payload.material.poissonRatio
-    temperature = payload.temperature or 20.0
-    temperature_factor = max(0.6, 1.0 - (temperature - 20.0) * 0.0002)
-    youngs_modulus *= temperature_factor
-    mu = youngs_modulus / (2.0 * (1.0 + poisson))
-    lmbda = youngs_modulus * poisson / ((1.0 + poisson) * (1.0 - 2.0 * poisson))
+        youngs_modulus = payload.material.youngsModulus * 1000.0
+        poisson = payload.material.poissonRatio
+        temperature = payload.temperature or 20.0
+        temperature_factor = max(0.6, 1.0 - (temperature - 20.0) * 0.0002)
+        youngs_modulus *= temperature_factor
+        mu = youngs_modulus / (2.0 * (1.0 + poisson))
+        lmbda = youngs_modulus * poisson / ((1.0 + poisson) * (1.0 - 2.0 * poisson))
 
-    def eps(u_field):
-        return df.sym(df.grad(u_field))
+        def eps(u_field):
+            return df.sym(df.grad(u_field))
 
-    def sigma(u_field):
-        return 2.0 * mu * eps(u_field) + lmbda * df.tr(eps(u_field)) * df.Identity(3)
+        def sigma(u_field):
+            return 2.0 * mu * eps(u_field) + lmbda * df.tr(eps(u_field)) * df.Identity(3)
 
-    def top_boundary(x, on_boundary):
-        return on_boundary and df.near(x[2], 1.0)
+        applied_load = payload.appliedLoad if payload.appliedLoad is not None else 1000.0
+        traction = applied_load / 1000.0
+        t = df.Constant((0.0, 0.0, float(traction)))
+        boundaries = df.MeshFunction("size_t", mesh, mesh.topology().dim() - 1, 0)
+        for facet in df.facets(mesh):
+            if not facet.exterior():
+                continue
+            nz = facet.normal().z()
+            if nz >= 0.2:
+                boundaries[facet] = 1
+            elif nz <= -0.2:
+                boundaries[facet] = 2
 
-    def bottom_boundary(x, on_boundary):
-        return on_boundary and df.near(x[2], 0.0)
+        top_count = int((boundaries.array() == 1).sum())
+        bottom_count = int((boundaries.array() == 2).sum())
+        if top_count == 0 or bottom_count == 0:
+            coords = mesh.coordinates()
+            if coords.size > 0:
+                min_z = float(coords[:, 2].min())
+                max_z = float(coords[:, 2].max())
+            else:
+                min_z, max_z = 0.0, 1.0
+            tol = max(1e-6, (max_z - min_z) * 1e-6)
 
-    bc = df.DirichletBC(V, df.Constant((0.0, 0.0, 0.0)), bottom_boundary)
+            def top_boundary(x, on_boundary):
+                return on_boundary and df.near(x[2], max_z, tol)
 
-    applied_load = payload.appliedLoad if payload.appliedLoad is not None else 1000.0
-    traction = applied_load / 1000.0
-    t = df.Constant((0.0, 0.0, float(traction)))
+            def bottom_boundary(x, on_boundary):
+                return on_boundary and df.near(x[2], min_z, tol)
 
-    boundaries = df.MeshFunction("size_t", mesh, mesh.topology().dim() - 1, 0)
-    df.AutoSubDomain(top_boundary).mark(boundaries, 1)
-    ds = df.Measure("ds", domain=mesh, subdomain_data=boundaries)
+            boundaries = df.MeshFunction(
+                "size_t", mesh, mesh.topology().dim() - 1, 0
+            )
+            df.AutoSubDomain(top_boundary).mark(boundaries, 1)
+            df.AutoSubDomain(bottom_boundary).mark(boundaries, 2)
+            top_count = int((boundaries.array() == 1).sum())
+            bottom_count = int((boundaries.array() == 2).sum())
 
-    a = df.inner(sigma(u), eps(v)) * df.dx
-    L = df.dot(t, v) * ds(1)
+        if top_count == 0 or bottom_count == 0:
+            warning = (
+                "Boundary condition facets not found "
+                f"(top={top_count}, bottom={bottom_count})."
+            )
+            if not mesh_artifacts:
+                mesh_artifacts = {"logs": [warning]}
+            else:
+                logs = mesh_artifacts.setdefault("logs", [])
+                logs.append(warning)
 
-    u_solution = df.Function(V)
-    if progress_cb:
-        progress_cb(35)
-    df.solve(a == L, u_solution, bc)
-    if progress_cb:
-        progress_cb(55)
+        bc = df.DirichletBC(V, df.Constant((0.0, 0.0, 0.0)), boundaries, 2)
+        ds = df.Measure("ds", domain=mesh, subdomain_data=boundaries)
 
-    stress_tensor = sigma(u_solution)
-    stress_dev = stress_tensor - df.Identity(3) * df.tr(stress_tensor) / 3.0
-    von_mises = df.sqrt(3.0 / 2.0 * df.inner(stress_dev, stress_dev))
+        a = df.inner(sigma(u), eps(v)) * df.dx
+        L = df.dot(t, v) * ds(1)
 
-    stress_space = df.FunctionSpace(mesh, "P", 1)
-    strain_space = df.FunctionSpace(mesh, "P", 1)
-    stress_field = df.project(von_mises, stress_space)
-    strain_field = df.project(df.sqrt(df.inner(eps(u_solution), eps(u_solution))), strain_space)
-    if progress_cb:
-        progress_cb(70)
+        u_solution = df.Function(V)
+        if progress_cb:
+            progress_cb(35)
+        df.solve(a == L, u_solution, bc)
+        if progress_cb:
+            progress_cb(55)
 
-    stress_values = stress_field.vector().get_local()
-    strain_values = strain_field.vector().get_local()
-    max_stress = float(np.max(stress_values))
-    min_stress = float(np.min(stress_values))
-    avg_stress = float(np.mean(stress_values))
-    stress_range = max_stress - min_stress
+        stress_tensor = sigma(u_solution)
+        stress_dev = stress_tensor - df.Identity(3) * df.tr(stress_tensor) / 3.0
+        von_mises = df.sqrt(3.0 / 2.0 * df.inner(stress_dev, stress_dev))
 
-    max_strain = float(np.max(strain_values))
-    avg_strain = float(np.mean(strain_values))
+        stress_space = df.FunctionSpace(mesh, "P", 1)
+        strain_space = df.FunctionSpace(mesh, "P", 1)
+        stress_field = df.project(von_mises, stress_space)
+        strain_field = df.project(df.sqrt(df.inner(eps(u_solution), eps(u_solution))), strain_space)
+        if progress_cb:
+            progress_cb(70)
 
-    displacement_magnitude = df.project(df.sqrt(df.dot(u_solution, u_solution)), stress_space)
-    max_deformation = float(np.max(displacement_magnitude.vector().get_local()))
+        stress_values = stress_field.vector().get_local()
+        strain_values = strain_field.vector().get_local()
+        max_stress = float(np.max(stress_values))
+        min_stress = float(np.min(stress_values))
+        avg_stress = float(np.mean(stress_values))
+        stress_range = max_stress - min_stress
 
-    vertex_map = df.vertex_to_dof_map(stress_space)
-    coords = mesh.coordinates()
-    max_index = int(np.argmax(stress_values[vertex_map]))
-    hotspot_location = coords[max_index].tolist()
-    if progress_cb:
-        progress_cb(80)
+        max_strain = float(np.max(strain_values))
+        avg_strain = float(np.mean(strain_values))
 
-    stress_strain_curve = _build_stress_strain_curve(job_id, payload, max_stress)
-    time_series = _build_time_series(
-        job_id,
-        payload,
-        max_stress,
-        progress_cb=progress_cb,
-        progress_range=(80, 95),
-    )
-    if progress_cb:
-        progress_cb(95)
+        displacement_magnitude = df.project(df.sqrt(df.dot(u_solution, u_solution)), stress_space)
+        max_deformation = float(np.max(displacement_magnitude.vector().get_local()))
+
+        vertex_map = df.vertex_to_dof_map(stress_space)
+        coords = mesh.coordinates()
+        max_index = int(np.argmax(stress_values[vertex_map]))
+        hotspot_location = coords[max_index].tolist()
+        if progress_cb:
+            progress_cb(80)
+
+        stress_strain_curve = _build_stress_strain_curve(job_id, payload, max_stress)
+        time_series = _build_time_series(
+            job_id,
+            payload,
+            max_stress,
+            progress_cb=progress_cb,
+            progress_range=(80, 95),
+        )
+        if progress_cb:
+            progress_cb(95)
+
+    log_text = log_buffer.getvalue().strip()
+    if log_text:
+        if not mesh_artifacts:
+            mesh_artifacts = {"logs": [log_text]}
+        else:
+            logs = mesh_artifacts.setdefault("logs", [])
+            logs.append(log_text)
 
     allowable_stress = _estimate_allowable_stress(payload, max_stress)
     safety_factor = allowable_stress / max_stress if max_stress > 0 else 0.0
@@ -348,14 +395,14 @@ def _mesh_resolution(payload: SimulationRequest) -> int:
 def _load_geometry_mesh(
     geometry: Optional[Dict[str, str]],
     payload: SimulationRequest,
-) -> Tuple["df.Mesh", Optional[Dict[str, list]]]:
+) -> Tuple["df.Mesh", Optional[Dict[str, list]], Optional["df.MeshFunction"]]:
     import dolfin as df
 
     if not geometry:
         resolution = _mesh_resolution(payload)
         return df.UnitCubeMesh(resolution, resolution, resolution), {
             "logs": ["No geometry payload provided; mesh artifacts not generated."],
-        }
+        }, None
 
     content = geometry.get("contentBase64", "")
     fmt = geometry.get("format", "stl").lower()
@@ -363,11 +410,12 @@ def _load_geometry_mesh(
         resolution = _mesh_resolution(payload)
         return df.UnitCubeMesh(resolution, resolution, resolution), {
             "logs": ["Geometry payload missing content; mesh artifacts not generated."],
-        }
+        }, None
 
     with tempfile.TemporaryDirectory() as tmpdir:
         try:
             source_path = os.path.join(tmpdir, f"geometry.{fmt}")
+            geo_path = os.path.join(tmpdir, "mesh.geo")
             mesh_path = os.path.join(tmpdir, "mesh.msh")
             xml_path = os.path.join(tmpdir, "mesh.xml")
             vtu_path = os.path.join(tmpdir, "mesh.vtu")
@@ -377,9 +425,19 @@ def _load_geometry_mesh(
             with open(source_path, "wb") as f:
                 f.write(base64.b64decode(content_bytes))
 
+            if fmt == "stl":
+                with open(geo_path, "w", encoding="utf-8") as f:
+                    f.write(f'Merge "{source_path}";\n')
+                    f.write("Surface Loop(1) = Surface{:};\n")
+                    f.write("Volume(1) = {1};\n")
+                    f.write("Mesh 3;\n")
+                gmsh_input = geo_path
+            else:
+                gmsh_input = source_path
+
             # Mesh with gmsh (3D tetrahedra)
             process = subprocess.run(
-                ["gmsh", "-3", source_path, "-format", "msh2", "-o", mesh_path],
+                ["gmsh", "-3", gmsh_input, "-format", "msh2", "-o", mesh_path],
                 capture_output=True,
                 text=True,
             )
@@ -389,45 +447,59 @@ def _load_geometry_mesh(
             import meshio
 
             msh = meshio.read(mesh_path)
-            # Write legacy DOLFIN XML to avoid HDF5 dependency issues.
-            meshio.write(xml_path, msh, file_format="dolfin-xml")
-            # Write VTK XML for external viewing (ParaView/online viewers).
-            meshio.write(vtu_path, msh, file_format="vtu")
-            mesh = df.Mesh(xml_path)
-            node_count = len(msh.points)
-            element_count = sum(len(block.data) for block in msh.cells)
-            artifacts = {"meshes": []}
-            with open(xml_path, "rb") as f:
-                xdmf_bytes = f.read()
-            artifacts["meshes"].append(
-                {
-                    "name": "mesh",
-                    "format": "xml",
-                    "contentBase64": base64.b64encode(xdmf_bytes).decode("utf-8"),
-                    "sizeBytes": len(xdmf_bytes),
-                    "nodeCount": node_count,
-                    "elementCount": element_count,
-                }
-            )
-            if os.path.exists(vtu_path):
-                with open(vtu_path, "rb") as f:
-                    vtu_bytes = f.read()
+
+            def write_artifacts(meshio_mesh, logs=None):
+                meshio.write(xml_path, meshio_mesh, file_format="dolfin-xml")
+                meshio.write(vtu_path, meshio_mesh, file_format="vtu")
+                node_count = len(meshio_mesh.points)
+                element_count = sum(len(block.data) for block in meshio_mesh.cells)
+                artifacts = {"meshes": []}
+                if logs:
+                    artifacts["logs"] = logs
+                with open(xml_path, "rb") as f:
+                    xml_bytes = f.read()
                 artifacts["meshes"].append(
                     {
                         "name": "mesh",
-                        "format": "vtu",
-                        "contentBase64": base64.b64encode(vtu_bytes).decode("utf-8"),
-                        "sizeBytes": len(vtu_bytes),
+                        "format": "xml",
+                        "contentBase64": base64.b64encode(xml_bytes).decode("utf-8"),
+                        "sizeBytes": len(xml_bytes),
                         "nodeCount": node_count,
                         "elementCount": element_count,
                     }
                 )
-            return mesh, artifacts
+                if os.path.exists(vtu_path):
+                    with open(vtu_path, "rb") as f:
+                        vtu_bytes = f.read()
+                    artifacts["meshes"].append(
+                        {
+                            "name": "mesh",
+                            "format": "vtu",
+                            "contentBase64": base64.b64encode(vtu_bytes).decode("utf-8"),
+                            "sizeBytes": len(vtu_bytes),
+                            "nodeCount": node_count,
+                            "elementCount": element_count,
+                        }
+                    )
+                return artifacts
+
+            tetra_cells = msh.cells_dict.get("tetra")
+            if tetra_cells is None or len(tetra_cells) == 0:
+                cell_types = ", ".join(sorted(msh.cells_dict.keys())) or "none"
+                raise RuntimeError(
+                    f"Volume mesh not available; gmsh cell types: {cell_types}"
+                )
+
+            msh = meshio.Mesh(points=msh.points, cells=[("tetra", tetra_cells)])
+            artifacts = write_artifacts(msh)
+            mesh = df.Mesh(xml_path)
+            facet_markers = None
+            return mesh, artifacts, None
         except Exception as exc:
             resolution = _mesh_resolution(payload)
             return df.UnitCubeMesh(resolution, resolution, resolution), {
                 "logs": [str(exc)]
-            }
+            }, None
 
 
 def _estimate_allowable_stress(payload: SimulationRequest, max_stress: float) -> float:

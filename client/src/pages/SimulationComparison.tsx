@@ -27,6 +27,16 @@ export default function SimulationComparison() {
   };
 
   const completedSims = simulations?.filter(s => s.status === "completed" && s.results) || [];
+  const formatMetric = (value: number) =>
+    Number.isFinite(value) ? value.toFixed(3) : "0.000";
+  const getMaxStress = (sim: (typeof completedSims)[number]) => {
+    const results = sim.results as any;
+    const series = results?.timeSeriesData;
+    if (Array.isArray(series) && series.length > 0) {
+      return Math.max(...series.map((point: any) => Number(point?.stress) || 0));
+    }
+    return results?.maxStress || 0;
+  };
   const filteredSims = completedSims.filter((sim) => {
     const materialName = getMaterialName(sim.materialId);
     const query = search.toLowerCase();
@@ -45,7 +55,7 @@ export default function SimulationComparison() {
     const z = selected.map((sim) => {
       const results = sim.results as any;
       return [
-        results?.maxStress || 0,
+        getMaxStress(sim),
         results?.maxDeformation || 0,
         results?.safetyFactor || 0,
       ];
@@ -62,9 +72,9 @@ export default function SimulationComparison() {
   // Comparison data for bar chart
   const comparisonData = selected.map(sim => ({
     name: sim.name,
-    maxStress: (sim.results as any)?.maxStress || 0,
+    maxStress: getMaxStress(sim),
     maxDeformation: (sim.results as any)?.maxDeformation || 0,
-    maxDeformationMicrons: ((sim.results as any)?.maxDeformation || 0) * 1000,
+    maxDeformationNanometers: ((sim.results as any)?.maxDeformation || 0) * 1_000_000,
     safetyFactor: (sim.results as any)?.safetyFactor || 0,
   }));
 
@@ -106,7 +116,7 @@ export default function SimulationComparison() {
 
   const scoreData = useMemo(() => {
     if (selected.length === 0) return [];
-    const stressValues = selected.map((sim) => (sim.results as any)?.maxStress || 0);
+    const stressValues = selected.map((sim) => getMaxStress(sim));
     const defValues = selected.map((sim) => (sim.results as any)?.maxDeformation || 0);
     const safetyValues = selected.map((sim) => (sim.results as any)?.safetyFactor || 0);
     const stressMin = Math.min(...stressValues);
@@ -120,7 +130,7 @@ export default function SimulationComparison() {
 
     return selected.map((sim) => {
       const r = sim.results as any;
-      const maxStress = r?.maxStress || 0;
+      const maxStress = getMaxStress(sim);
       const maxDef = r?.maxDeformation || 0;
       const safety = r?.safetyFactor || 0;
       const stressScore = 1 - normalize(maxStress, stressMin, stressMax);
@@ -217,7 +227,7 @@ export default function SimulationComparison() {
                     <th className="text-left p-2 font-medium">ID</th>
                     <th className="text-left p-2 font-medium">Simulation</th>
                     <th className="text-right p-2 font-medium">Max Stress (MPa)</th>
-                    <th className="text-right p-2 font-medium">Deformation (μm)</th>
+                    <th className="text-right p-2 font-medium">Deformation (nm)</th>
                     <th className="text-right p-2 font-medium">Safety</th>
                   </tr>
                 </thead>
@@ -228,9 +238,15 @@ export default function SimulationComparison() {
                       <tr key={sim.id} className="border-b border-border/50">
                         <td className="p-2 truncate max-w-xs font-mono text-muted-foreground">#{sim.id}</td>
                         <td className="p-2 truncate max-w-xs">{sim.name}</td>
-                        <td className="text-right p-2 font-mono">{r?.maxStress?.toFixed(2) || 0}</td>
-                        <td className="text-right p-2 font-mono">{((r?.maxDeformation || 0) * 1000).toFixed(2)}</td>
-                        <td className="text-right p-2 font-mono">{r?.safetyFactor?.toFixed(2) || 0}</td>
+                        <td className="text-right p-2 font-mono">
+                          {formatMetric(getMaxStress(sim))}
+                        </td>
+                        <td className="text-right p-2 font-mono">
+                          {formatMetric((r?.maxDeformation || 0) * 1_000_000)}
+                        </td>
+                        <td className="text-right p-2 font-mono">
+                          {formatMetric(r?.safetyFactor || 0)}
+                        </td>
                       </tr>
                     );
                   })}
@@ -329,7 +345,7 @@ export default function SimulationComparison() {
                       <Tooltip />
                       <Legend />
                       <Bar yAxisId="left" dataKey="maxStress" fill="#3b82f6" name="Max Stress (MPa)" />
-                      <Bar yAxisId="left" dataKey="maxDeformationMicrons" fill="#8b5cf6" name="Deformation (μm)" />
+                      <Bar yAxisId="left" dataKey="maxDeformationNanometers" fill="#8b5cf6" name="Deformation (nm)" />
                       <Line yAxisId="right" type="monotone" dataKey="safetyFactor" stroke="#10b981" name="Safety Factor" />
                     </ComposedChart>
                   </ResponsiveContainer>
