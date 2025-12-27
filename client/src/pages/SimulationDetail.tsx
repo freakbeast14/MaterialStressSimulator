@@ -139,6 +139,11 @@ export default function SimulationDetail() {
       })
     : "N/A";
 
+  const geometry = useMemo(
+    () => geometries?.find((item) => item.id === simulation?.geometryId),
+    [geometries, simulation?.geometryId]
+  );
+
   const primaryConfigItems = useMemo(
     () =>
       [
@@ -149,7 +154,7 @@ export default function SimulationDetail() {
         value: string;
         icon: ElementType;
       }[],
-    [material?.name, simulation?.type]
+    [geometry?.name, material?.name, simulation?.type]
   );
 
   const secondaryConfigItems = useMemo(
@@ -355,11 +360,6 @@ export default function SimulationDetail() {
       setPlayheadIndex(0);
     }
   }, [simulation?.id, timeSeriesData.length]);
-
-  const geometry = useMemo(
-    () => geometries?.find((item) => item.id === simulation?.geometryId),
-    [geometries, simulation?.geometryId]
-  );
 
   useEffect(() => {
     if (!geometry?.id) {
@@ -821,193 +821,6 @@ export default function SimulationDetail() {
             <div className="bg-card rounded-2xl border border-border p-6 space-y-4">
               <div className="flex items-center justify-between">
                 <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-                  Geometry
-                </div>
-                {geometry?.name && (
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-foreground bg-muted/40 border border-border rounded-full px-2 py-1">
-                    {geometry.name}
-                  </span>
-                )}
-              </div>
-              <div className="space-y-2">
-                <div className="rounded-xl border border-border bg-background p-3">
-                  {isLoadingGeometry ? (
-                    <p className="text-sm text-muted-foreground">Loading preview...</p>
-                  ) : geometryError ? (
-                    <p className="text-sm text-destructive">{geometryError}</p>
-                  ) : geometryMesh ? (
-                    <div className="h-[220px]">
-                      <Plot
-                        data={[
-                          {
-                            type: "mesh3d",
-                            x: geometryMesh.x,
-                            y: geometryMesh.y,
-                            z: geometryMesh.z,
-                            i: geometryMesh.i,
-                            j: geometryMesh.j,
-                            k: geometryMesh.k,
-                            color: "#60a5fa",
-                            opacity: 0.85,
-                          } as any,
-                        ]}
-                        layout={{
-                          margin: { l: 0, r: 0, t: 0, b: 0 },
-                          paper_bgcolor: "transparent",
-                          plot_bgcolor: "transparent",
-                          scene: {
-                            aspectmode: "data",
-                            xaxis: { visible: false },
-                            yaxis: { visible: false },
-                            zaxis: { visible: false },
-                          },
-                        }}
-                        style={{ width: "100%", height: "100%" }}
-                        config={{ displayModeBar: false }}
-                      />
-                    </div>
-                  ) : geometry?.id ? (
-                    <p className="text-sm text-muted-foreground">
-                      Preview available for ASCII STL only.
-                    </p>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">
-                      Select a geometry in Create Simulation.
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-            <div className="bg-card rounded-2xl border border-border p-6 space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-                  Mesh Outputs
-                </div>
-                {results?.source && (
-                  <span className="text-[11px] font-semibold tracking-wider text-muted-foreground bg-muted/40 border border-border rounded-full px-2 py-1">
-                    SOURCE: {results.source === "fenics" ? "FEniCS" : results.source}
-                  </span>
-                )}
-              </div>
-              {isLoadingMeshes ? (
-                <p className="text-sm text-muted-foreground">Loading mesh files...</p>
-              ) : meshError ? (
-                <p className="text-sm text-destructive">{meshError}</p>
-              ) : simulationMeshes.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  No mesh artifacts saved yet.
-                </p>
-              ) : (
-                <div className="space-y-3">
-                  {Object.values(
-                    simulationMeshes.reduce(
-                      (acc, mesh) => {
-                        const key = mesh.name;
-                        if (!acc[key]) {
-                          acc[key] = {
-                            name: mesh.name,
-                            nodeCount: mesh.nodeCount ?? null,
-                            elementCount: mesh.elementCount ?? null,
-                            formats: [],
-                          };
-                        }
-                        acc[key].formats.push(mesh);
-                        return acc;
-                      },
-                      {} as Record<
-                        string,
-                        {
-                          name: string;
-                          nodeCount: number | null;
-                          elementCount: number | null;
-                          formats: { id: number; name: string; format: string }[];
-                        }
-                      >
-                    )
-                  ).map((group) => (
-                    <div
-                      key={group.name}
-                      className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-muted/20 px-4 py-3"
-                    >
-                      <div>
-                        <p className="text-sm font-semibold text-foreground">
-                          {group.name}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          Nodes: {" "} {group.nodeCount ?? "—"} <br/>
-                          Elements: {" "} {group.elementCount ?? "—"} <br/>
-                        </p>
-                      </div>
-                      <div className="flex flex-col flex-wrap items-center gap-2">
-                        {group.formats.map((item) => (
-                          <button
-                            key={item.id}
-                            type="button"
-                            className="flex items-center gap-2 rounded-full border border-border px-3 py-1 text-xs text-muted-foreground font-semibold hover:bg-primary/10 hover:text-primary"
-                            onClick={() =>
-                              handleDownloadMesh(item.id, item.name, item.format)
-                            }
-                          >
-                            <Download className="h-3.5 w-3.5" />
-                            {item.format.toUpperCase()}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                  <div className="rounded-xl border border-border bg-background p-3">
-                    {isLoadingMeshPreview ? (
-                      <p className="text-sm text-muted-foreground">Rendering mesh preview...</p>
-                    ) : meshPreviewError ? (
-                      <p className="text-sm text-destructive">{meshPreviewError}</p>
-                    ) : meshPreview ? (
-                      <div className="relative h-[240px]">
-                        {meshPreviewName && (
-                          <div className="absolute left-1 top-1 z-10 text-[9px] font-semibold uppercase tracking-widest text-muted-foreground">
-                            Preview: {meshPreviewName}
-                          </div>
-                        )}
-                        <Plot
-                          data={[
-                            {
-                              type: "mesh3d",
-                              x: meshPreview.x,
-                              y: meshPreview.y,
-                              z: meshPreview.z,
-                              i: meshPreview.i,
-                              j: meshPreview.j,
-                              k: meshPreview.k,
-                              color: "#22c55e",
-                              opacity: 0.7,
-                            } as any,
-                          ]}
-                          layout={{
-                            margin: { l: 0, r: 0, t: 0, b: 0 },
-                            paper_bgcolor: "transparent",
-                            plot_bgcolor: "transparent",
-                            scene: {
-                              aspectmode: "data",
-                              xaxis: { visible: false },
-                              yaxis: { visible: false },
-                              zaxis: { visible: false },
-                            },
-                          }}
-                          style={{ width: "100%", height: "100%" }}
-                          config={{ displayModeBar: false }}
-                        />
-                      </div>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">
-                        Select a mesh to preview.
-                      </p>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-            <div className="bg-card rounded-2xl border border-border p-6 space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
                   Configuration
                 </div>
                 <button
@@ -1020,6 +833,54 @@ export default function SimulationDetail() {
                     className={`h-4 w-4 transition-transform ${showConfigDetails ? "rotate-90" : "-rotate-90"}`}
                   />
                 </button>
+              </div>
+              <div className="rounded-lg border border-border bg-muted/20 p-3">
+                <div className="flex items-center justify-between">
+                  <div className="text-[9px] font-semibold uppercase tracking-widest text-muted-foreground">
+                    Geometry
+                  </div>
+                  {geometry?.name && (
+                    <span className="text-[9px] font-semibold uppercase tracking-wider text-foreground">
+                      {geometry.name}
+                    </span>
+                  )}
+                </div>
+                <div className="mt-3 h-36">
+                  {geometryMesh ? (
+                    <Plot
+                      data={[
+                        {
+                          type: "mesh3d",
+                          x: geometryMesh.x,
+                          y: geometryMesh.y,
+                          z: geometryMesh.z,
+                          i: geometryMesh.i,
+                          j: geometryMesh.j,
+                          k: geometryMesh.k,
+                          color: "#3b82f6",
+                          opacity: 0.7,
+                        } as any,
+                      ]}
+                      layout={{
+                        margin: { l: 0, r: 0, t: 0, b: 0 },
+                        paper_bgcolor: "transparent",
+                        plot_bgcolor: "transparent",
+                        scene: {
+                          aspectmode: "data",
+                          xaxis: { visible: false },
+                          yaxis: { visible: false },
+                          zaxis: { visible: false },
+                        },
+                      }}
+                      style={{ width: "100%", height: "100%" }}
+                      config={{ displayModeBar: false }}
+                    />
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      Geometry preview unavailable.
+                    </p>
+                  )}
+                </div>
               </div>
               <div className="space-y-3">
                 {primaryConfigItems.map((item) => (
@@ -1084,7 +945,140 @@ export default function SimulationDetail() {
                 </div>
               </div>
             </div>
-
+            <div className="bg-card rounded-2xl border border-border p-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                  Mesh Outputs
+                </div>
+                {results?.source && (
+                  <span className="text-[11px] font-semibold tracking-wider text-muted-foreground bg-muted/40 border border-border rounded-full px-2 py-1">
+                    SOURCE: {results.source === "fenics" ? "FEniCS" : results.source}
+                  </span>
+                )}
+              </div>
+              {isLoadingMeshes ? (
+                <p className="text-sm text-muted-foreground">Loading mesh files...</p>
+              ) : meshError ? (
+                <p className="text-sm text-destructive">{meshError}</p>
+              ) : simulationMeshes.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No mesh artifacts saved yet.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {Object.values(
+                    simulationMeshes.reduce(
+                      (acc, mesh) => {
+                        const key = mesh.name;
+                        if (!acc[key]) {
+                          acc[key] = {
+                            name: mesh.name,
+                            nodeCount: mesh.nodeCount ?? null,
+                            elementCount: mesh.elementCount ?? null,
+                            formats: [],
+                          };
+                        }
+                        acc[key].formats.push(mesh);
+                        return acc;
+                      },
+                      {} as Record<
+                        string,
+                        {
+                          name: string;
+                          nodeCount: number | null;
+                          elementCount: number | null;
+                          formats: { id: number; name: string; format: string }[];
+                        }
+                      >
+                    )
+                  ).map((group) => (
+                    <div
+                      key={group.name}
+                      className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-muted/20 px-4 py-3"
+                    >
+                      <div>
+                        <p className="text-sm font-semibold text-foreground">
+                          {group.name}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Nodes: {" "} {group.nodeCount ?? "—"} <br/>
+                          Elements: {" "} {group.elementCount ?? "—"} <br/>
+                        </p>
+                      </div>
+                      <div className="flex flex-col flex-wrap items-center gap-2">
+                        {group.formats.map((item) => (
+                          <button
+                            key={item.id}
+                            type="button"
+                            className="flex items-center gap-2 rounded-full border border-border px-3 py-1 text-xs text-muted-foreground font-semibold hover:bg-primary/10 hover:text-primary"
+                            onClick={() =>
+                              handleDownloadMesh(item.id, item.name, item.format)
+                            }
+                          >
+                            <Download className="h-3.5 w-3.5" />
+                            {item.format.toUpperCase()}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                  <div className="rounded-lg border border-border bg-muted/20 p-3">
+                    {isLoadingMeshPreview ? (
+                      <p className="text-sm text-muted-foreground">Rendering mesh preview...</p>
+                    ) : meshPreviewError ? (
+                      <p className="text-sm text-destructive">{meshPreviewError}</p>
+                    ) : meshPreview ? (
+                      <div className="relative h-[240px]">
+                        {meshPreviewName && (                          
+                          <div className="flex items-center justify-between">
+                            <div className="text-[9px] font-semibold uppercase tracking-widest text-muted-foreground">
+                              Preview
+                            </div>
+                            {geometry?.name && (
+                              <span className="text-[9px] font-semibold uppercase tracking-wider text-foreground">
+                                {meshPreviewName}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                        <Plot
+                          data={[
+                            {
+                              type: "mesh3d",
+                              x: meshPreview.x,
+                              y: meshPreview.y,
+                              z: meshPreview.z,
+                              i: meshPreview.i,
+                              j: meshPreview.j,
+                              k: meshPreview.k,
+                              color: "#22c55e",
+                              opacity: 0.7,
+                            } as any,
+                          ]}
+                          layout={{
+                            margin: { l: 0, r: 0, t: 0, b: 0 },
+                            paper_bgcolor: "transparent",
+                            plot_bgcolor: "transparent",
+                            scene: {
+                              aspectmode: "data",
+                              xaxis: { visible: false },
+                              yaxis: { visible: false },
+                              zaxis: { visible: false },
+                            },
+                          }}
+                          style={{ width: "100%", height: "100%" }}
+                          config={{ displayModeBar: false }}
+                        />
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        Select a mesh to preview.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
             <div className="bg-card rounded-2xl border border-border p-6 space-y-4">
               <div className="flex items-center justify-between">
                 <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
