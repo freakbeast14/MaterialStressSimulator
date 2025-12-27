@@ -1,5 +1,12 @@
 import { storage } from "../storage";
-import { createFenicsJob, getFenicsJob, type FenicsJobInput } from "./fenics-client";
+import {
+  createFenicsJob,
+  getFenicsJob,
+  type FenicsJobInput,
+  type FenicsMeshArtifact,
+} from "./fenics-client";
+import fs from "fs/promises";
+import path from "path";
 
 type SimulationJob = {
   id: number;
@@ -38,8 +45,24 @@ async function runJob(job: SimulationJob): Promise<void> {
 
   let fenicsJobId: string | null = null;
   try {
+    let geometryPayload: FenicsJobInput["geometry"] | undefined;
+    if (job.input.geometryId) {
+      const geometry = await storage.getGeometry(job.input.geometryId);
+      if (!geometry) {
+        await storage.updateSimulationStatus(job.id, "failed", { message: "Geometry not found" }, 0);
+        return;
+      }
+      const fileBuffer = await fs.readFile(geometry.storagePath);
+      geometryPayload = {
+        name: geometry.name,
+        format: geometry.format,
+        contentBase64: fileBuffer.toString("base64"),
+      };
+    }
+
     const fenicsJob = await createFenicsJob({
       ...job.input,
+      geometry: geometryPayload,
       material: {
         id: material.id,
         name: material.name,
@@ -63,7 +86,14 @@ async function runJob(job: SimulationJob): Promise<void> {
     try {
       const status = await getFenicsJob(fenicsJobId);
       if (status.status === "completed") {
-        await storage.updateSimulationStatus(job.id, "completed", status.results || null, 100);
+        if (status.artifacts?.meshes?.length) {
+          await persistMeshArtifacts(job.id, job.input.geometryId, status.artifacts.meshes);
+        }
+        const results = status.results ? { ...status.results } : null;
+        if (results && status.artifacts?.logs?.length) {
+          (results as Record<string, unknown>).meshWarnings = status.artifacts.logs;
+        }
+        await storage.updateSimulationStatus(job.id, "completed", results, 100);
         break;
       }
       if (status.status === "failed") {
@@ -77,6 +107,34 @@ async function runJob(job: SimulationJob): Promise<void> {
     }
 
     await sleep(1000);
+  }
+}
+
+async function persistMeshArtifacts(
+  simulationId: number,
+  geometryId: number | null | undefined,
+  meshes: FenicsMeshArtifact[],
+): Promise<void> {
+  const storageRoot = path.resolve(process.cwd(), "storage", "meshes", String(simulationId));
+  await fs.mkdir(storageRoot, { recursive: true });
+
+  for (const [index, mesh] of meshes.entries()) {
+    const safeName = (mesh.name || "mesh").replace(/[^a-z0-9-_]+/gi, "_");
+    const safeFormat = mesh.format.replace(".", "").toLowerCase();
+    const fileName = `${safeName}-${index}.${safeFormat}`;
+    const storagePath = path.join(storageRoot, fileName);
+    const buffer = Buffer.from(mesh.contentBase64, "base64");
+    await fs.writeFile(storagePath, buffer);
+    await storage.createSimulationMesh({
+      simulationId,
+      geometryId: geometryId ?? null,
+      name: safeName,
+      format: safeFormat,
+      storagePath,
+      sizeBytes: buffer.length,
+      nodeCount: mesh.nodeCount ?? null,
+      elementCount: mesh.elementCount ?? null,
+    });
   }
 }
 

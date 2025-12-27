@@ -22,10 +22,10 @@ MatSim Analytics is designed for engineers and material scientists to:
 3. [Database Setup](#database-setup)
 4. [FEniCS Solver Service (Windows + WSL)](#fenics-solver-service-windows--wsl)
 5. [Running the Application](#running-the-application)
-5. [Testing the Application](#testing-the-application)
-6. [Demo Walkthrough](#demo-walkthrough)
-7. [Troubleshooting](#troubleshooting)
-8. [Project Structure](#project-structure)
+6. [Testing the Application](#testing-the-application)
+7. [Demo Walkthrough](#demo-walkthrough)
+8. [Troubleshooting](#troubleshooting)
+9. [Project Structure](#project-structure)
 
 ---
 
@@ -162,7 +162,7 @@ npm run db:push
 ```
 
 This will:
-- Create all necessary tables (materials, simulations)
+- Create all necessary tables (materials, simulations, geometries, simulation_meshes)
 - Set up the database structure
 - Seed initial data (4 materials: Steel, Aluminum, Titanium, PEEK)
 
@@ -196,7 +196,14 @@ cd /mnt/c/Users/smoham68/Documents/Job-Overview-Position/Job-Overview-Position
 rm -rf fenics_service/.venv
 python3 -m venv --system-site-packages fenics_service/.venv
 source fenics_service/.venv/bin/activate
-python -m pip install fastapi uvicorn
+python -m pip install -r fenics_service/requirements.txt
+```
+
+### Step 2b: Ensure gmsh is installed (Ubuntu)
+The solver uses gmsh to generate mesh artifacts. Install it once at the OS level:
+```bash
+sudo apt update
+sudo apt install -y gmsh
 ```
 
 ### Step 3: Start the solver API
@@ -302,6 +309,15 @@ To stop the server later:
 - Frontend sends `POST /api/simulations` with material data
 - Backend enqueues a job and polls the FEniCS service
 - Results and time-series data are returned and stored
+- Mesh artifacts (XML + VTU) are generated and saved under `storage/meshes/<simulationId>/`
+- Mesh metadata is stored in `simulation_meshes` and shown in the Simulation Detail page
+
+### Test 2b: Mesh Outputs (Preview + Download)
+1. Open a completed simulation detail page.
+2. In **Mesh Outputs**, you should see:
+   - Mesh name, node count, element count
+   - Download buttons for **XML** and **VTU**
+   - Auto-loaded 3D preview (XML)
 
 ### Test 3: Compare Materials
 
@@ -456,6 +472,40 @@ Server running but page shows error
 3. Refresh page: Ctrl+R
 4. Check for errors in terminal and browser console (F12)
 
+### Issue 7: "FEniCS API unreachable"
+
+**Error:**
+```
+FEniCS API unreachable
+```
+
+**Solution:**
+1. Confirm the FastAPI service is running in Ubuntu on port 8001
+2. Ensure `FENICS_API_URL` points to the WSL IP
+3. Restart `npm run dev` after changing `FENICS_API_URL`
+
+### Issue 8: "gmsh not found" or no mesh artifacts
+
+**Error:**
+```
+[Errno 2] No such file or directory: 'gmsh'
+```
+
+**Solution:**
+Install gmsh in Ubuntu:
+```bash
+sudo apt update
+sudo apt install -y gmsh
+```
+
+### Issue 9: Mesh preview shows no artifacts
+
+**Cause:** The simulation ran before mesh artifacts were enabled or gmsh failed.
+
+**Solution:**
+1. Run a **new** simulation after installing gmsh.
+2. Confirm the Mesh Outputs panel updates automatically.
+
 ---
 
 ## Project Structure
@@ -487,6 +537,15 @@ project-root/
 ├── shared/                    # Shared between frontend & backend
 │   ├── schema.ts             # Data models (Drizzle + Zod)
 │   └── routes.ts             # API contract definitions
+│
+├── fenics_service/            # FastAPI + FEniCS solver service (WSL)
+│   ├── main.py
+│   ├── requirements.txt
+│   └── Dockerfile
+│
+├── storage/
+│   ├── geometries/            # Uploaded geometry files
+│   └── meshes/                # Saved mesh artifacts per simulation
 │
 ├── package.json              # Dependencies
 ├── tsconfig.json             # TypeScript config
@@ -632,20 +691,6 @@ MIT License - Feel free to use this for your interview preparation.
 
 ---
 
-**Last Updated:** December 25, 2025
+**Last Updated:** December 27, 2025
 **Version:** 1.0.0
 **Status:** Ready for Demo
-### Issue 7: "FEniCS API unreachable"
-
-**Error:**
-```
-FEniCS API unreachable
-```
-
-**Solution:**
-1. Confirm the FastAPI service is running in Ubuntu on port 8001
-2. Ensure `FENICS_API_URL` points to the WSL IP
-3. Restart `npm run dev` after changing `FENICS_API_URL`
-
-├── fenics_service/            # FastAPI + FEniCS solver service (WSL)
-│   └── main.py

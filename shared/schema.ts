@@ -27,6 +27,7 @@ export const simulations = pgTable("simulations", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   materialId: integer("material_id").notNull(),
+  geometryId: integer("geometry_id"),
   status: text("status").notNull(), // pending, running, completed, failed
   type: text("type").notNull(), // Tensile Test, Thermal Stress, Fatigue
   
@@ -52,9 +53,34 @@ export const simulations = pgTable("simulations", {
   completedAt: timestamp("completed_at"),
 });
 
+export const geometries = pgTable("geometries", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  originalName: text("original_name").notNull(),
+  format: text("format").notNull(),
+  storagePath: text("storage_path").notNull(),
+  sizeBytes: integer("size_bytes").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const simulationMeshes = pgTable("simulation_meshes", {
+  id: serial("id").primaryKey(),
+  simulationId: integer("simulation_id").notNull(),
+  geometryId: integer("geometry_id"),
+  name: text("name").notNull(),
+  format: text("format").notNull(),
+  storagePath: text("storage_path").notNull(),
+  sizeBytes: integer("size_bytes").notNull(),
+  nodeCount: integer("node_count"),
+  elementCount: integer("element_count"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // === BASE SCHEMAS ===
 export const insertMaterialSchema = createInsertSchema(materials).omit({ id: true, createdAt: true });
 export const insertSimulationSchema = createInsertSchema(simulations).omit({ id: true, createdAt: true, completedAt: true, results: true, progress: true });
+export const insertGeometrySchema = createInsertSchema(geometries).omit({ id: true, createdAt: true });
+export const insertSimulationMeshSchema = createInsertSchema(simulationMeshes).omit({ id: true, createdAt: true });
 
 // === EXPLICIT API CONTRACT TYPES ===
 export type Material = typeof materials.$inferSelect;
@@ -62,6 +88,10 @@ export type InsertMaterial = z.infer<typeof insertMaterialSchema>;
 
 export type Simulation = typeof simulations.$inferSelect;
 export type InsertSimulation = z.infer<typeof insertSimulationSchema>;
+export type Geometry = typeof geometries.$inferSelect;
+export type InsertGeometry = z.infer<typeof insertGeometrySchema>;
+export type SimulationMesh = typeof simulationMeshes.$inferSelect;
+export type InsertSimulationMesh = z.infer<typeof insertSimulationMeshSchema>;
 
 export type CreateSimulationRequest = {
   name: string;

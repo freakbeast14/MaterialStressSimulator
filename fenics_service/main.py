@@ -2,11 +2,15 @@ from __future__ import annotations
 
 from fastapi import BackgroundTasks, FastAPI, HTTPException
 from pydantic import BaseModel, Field
-from typing import Callable, Dict, List, Optional
+from typing import Callable, Dict, List, Optional, Tuple
 import math
 import random
 import time
 import uuid
+import os
+import tempfile
+import subprocess
+import base64
 
 app = FastAPI(title="FEniCS Solver Service")
 
@@ -34,6 +38,7 @@ class SimulationRequest(BaseModel):
     frequency: Optional[float] = None
     dampingRatio: Optional[float] = None
     material: Material
+    geometry: Optional[Dict[str, str]] = None
 
 
 class JobStatus(BaseModel):
@@ -42,6 +47,7 @@ class JobStatus(BaseModel):
     progress: int
     results: Optional[Dict[str, float | int | list | str]] = None
     error: Optional[str] = None
+    artifacts: Optional[Dict[str, list]] = None
 
 
 _jobs: Dict[str, JobStatus] = {}
@@ -89,10 +95,12 @@ def _run_job(job_id: str, payload: SimulationRequest) -> None:
 
     try:
         set_progress(8)
-        results = _solve_with_fenics(job_id, payload, set_progress)
+        results, artifacts = _solve_with_fenics(job_id, payload, set_progress)
         status.status = "completed"
         status.progress = 100
         status.results = results
+        if artifacts:
+            status.artifacts = artifacts
     except Exception as exc:
         set_progress(70)
         fallback = _build_stub_results(job_id, payload, set_progress)
@@ -106,12 +114,11 @@ def _solve_with_fenics(
     job_id: str,
     payload: SimulationRequest,
     progress_cb: Optional[Callable[[int], None]] = None,
-) -> Dict[str, float | int | list | str]:
+) -> Tuple[Dict[str, float | int | list | str], Optional[Dict[str, list]]]:
     import numpy as np
     import dolfin as df
 
-    resolution = _mesh_resolution(payload)
-    mesh = df.UnitCubeMesh(resolution, resolution, resolution)
+    mesh, mesh_artifacts = _load_geometry_mesh(payload.geometry, payload)
     V = df.VectorFunctionSpace(mesh, "P", 1)
     if progress_cb:
         progress_cb(12)
@@ -204,7 +211,7 @@ def _solve_with_fenics(
     allowable_stress = _estimate_allowable_stress(payload, max_stress)
     safety_factor = allowable_stress / max_stress if max_stress > 0 else 0.0
 
-    return {
+    results = {
         "maxStress": max_stress,
         "minStress": min_stress,
         "avgStress": avg_stress,
@@ -220,6 +227,7 @@ def _solve_with_fenics(
         ],
         "source": "fenics",
     }
+    return results, mesh_artifacts
 
 
 def _build_stub_results(
@@ -335,6 +343,91 @@ def _mesh_resolution(payload: SimulationRequest) -> int:
     duration = payload.duration or 10.0
     resolution = 6 + int(min(6, (applied_load / 1000.0) + (duration / 10.0)))
     return max(6, min(14, resolution))
+
+
+def _load_geometry_mesh(
+    geometry: Optional[Dict[str, str]],
+    payload: SimulationRequest,
+) -> Tuple["df.Mesh", Optional[Dict[str, list]]]:
+    import dolfin as df
+
+    if not geometry:
+        resolution = _mesh_resolution(payload)
+        return df.UnitCubeMesh(resolution, resolution, resolution), {
+            "logs": ["No geometry payload provided; mesh artifacts not generated."],
+        }
+
+    content = geometry.get("contentBase64", "")
+    fmt = geometry.get("format", "stl").lower()
+    if not content:
+        resolution = _mesh_resolution(payload)
+        return df.UnitCubeMesh(resolution, resolution, resolution), {
+            "logs": ["Geometry payload missing content; mesh artifacts not generated."],
+        }
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        try:
+            source_path = os.path.join(tmpdir, f"geometry.{fmt}")
+            mesh_path = os.path.join(tmpdir, "mesh.msh")
+            xml_path = os.path.join(tmpdir, "mesh.xml")
+            vtu_path = os.path.join(tmpdir, "mesh.vtu")
+            content_bytes = content.encode("utf-8")
+            if "base64," in content:
+                content_bytes = content.split("base64,", 1)[1].encode("utf-8")
+            with open(source_path, "wb") as f:
+                f.write(base64.b64decode(content_bytes))
+
+            # Mesh with gmsh (3D tetrahedra)
+            process = subprocess.run(
+                ["gmsh", "-3", source_path, "-format", "msh2", "-o", mesh_path],
+                capture_output=True,
+                text=True,
+            )
+            if process.returncode != 0:
+                raise RuntimeError(process.stderr or process.stdout or "gmsh failed")
+
+            import meshio
+
+            msh = meshio.read(mesh_path)
+            # Write legacy DOLFIN XML to avoid HDF5 dependency issues.
+            meshio.write(xml_path, msh, file_format="dolfin-xml")
+            # Write VTK XML for external viewing (ParaView/online viewers).
+            meshio.write(vtu_path, msh, file_format="vtu")
+            mesh = df.Mesh(xml_path)
+            node_count = len(msh.points)
+            element_count = sum(len(block.data) for block in msh.cells)
+            artifacts = {"meshes": []}
+            with open(xml_path, "rb") as f:
+                xdmf_bytes = f.read()
+            artifacts["meshes"].append(
+                {
+                    "name": "mesh",
+                    "format": "xml",
+                    "contentBase64": base64.b64encode(xdmf_bytes).decode("utf-8"),
+                    "sizeBytes": len(xdmf_bytes),
+                    "nodeCount": node_count,
+                    "elementCount": element_count,
+                }
+            )
+            if os.path.exists(vtu_path):
+                with open(vtu_path, "rb") as f:
+                    vtu_bytes = f.read()
+                artifacts["meshes"].append(
+                    {
+                        "name": "mesh",
+                        "format": "vtu",
+                        "contentBase64": base64.b64encode(vtu_bytes).decode("utf-8"),
+                        "sizeBytes": len(vtu_bytes),
+                        "nodeCount": node_count,
+                        "elementCount": element_count,
+                    }
+                )
+            return mesh, artifacts
+        except Exception as exc:
+            resolution = _mesh_resolution(payload)
+            return df.UnitCubeMesh(resolution, resolution, resolution), {
+                "logs": [str(exc)]
+            }
 
 
 def _estimate_allowable_stress(payload: SimulationRequest, max_stress: float) -> float:
