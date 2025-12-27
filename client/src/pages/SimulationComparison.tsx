@@ -1,6 +1,7 @@
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useSimulations } from "@/hooks/use-simulations";
 import { useMaterials } from "@/hooks/use-materials";
+import { useGeometries } from "@/hooks/use-geometries";
 import { StatusBadge } from "@/components/StatusBadge";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, ComposedChart } from "recharts";
 import Plot from "react-plotly.js";
@@ -11,6 +12,7 @@ import { Input } from "@/components/ui/input";
 export default function SimulationComparison() {
   const { data: simulations } = useSimulations();
   const { data: materials } = useMaterials();
+  const { data: geometries } = useGeometries();
   const [selectedSims, setSelectedSims] = useState<number[]>([]);
   const [activeTab, setActiveTab] = useState("comparison");
 //   const scrollRef = useRef<number | null>(null);
@@ -19,6 +21,38 @@ export default function SimulationComparison() {
   const [weights, setWeights] = useState({ stress: 1, deformation: 1, safety: 1 });
 
   const getMaterialName = (id: number) => materials?.find(m => m.id === id)?.name || "Unknown";
+  const getGeometryName = (id?: number | null) =>
+    geometries?.find((geom) => geom.id === id)?.name || "Unknown";
+  const truncateText = (value: string, max = 10) =>
+    value.length > max ? `${value.slice(0, max)}…` : value;
+  const materialHueMap = useMemo(() => {
+    const list = materials ?? [];
+    const map = new Map<number, number>();
+    const count = Math.max(list.length, 1);
+    list.forEach((material, index) => {
+      const hue = Math.round((index * 360) / count);
+      map.set(material.id, hue);
+    });
+    return map;
+  }, [materials]);
+  const geometryHueMap = useMemo(() => {
+    const list = geometries ?? [];
+    const map = new Map<number, number>();
+    const count = Math.max(list.length, 1);
+    list.forEach((geometry, index) => {
+      const hue = Math.round((index * 360) / count);
+      map.set(geometry.id, hue);
+    });
+    return map;
+  }, [geometries]);
+
+  const getTypeBadgeClass = (type: string) => {
+    const normalized = type.toLowerCase();
+    if (normalized.includes("tensile")) return "bg-sky-100 text-sky-700";
+    if (normalized.includes("thermal")) return "bg-orange-100 text-orange-700";
+    if (normalized.includes("fatigue")) return "bg-indigo-100 text-indigo-700";
+    return "bg-muted text-muted-foreground";
+  };
 
   const toggleSimulation = (id: number) => {
     setSelectedSims(prev => 
@@ -27,6 +61,16 @@ export default function SimulationComparison() {
   };
 
   const completedSims = simulations?.filter(s => s.status === "completed" && s.results) || [];
+  const formatMetric = (value: number) =>
+    Number.isFinite(value) ? value.toFixed(3) : "0.000";
+  const getMaxStress = (sim: (typeof completedSims)[number]) => {
+    const results = sim.results as any;
+    const series = results?.timeSeriesData;
+    if (Array.isArray(series) && series.length > 0) {
+      return Math.max(...series.map((point: any) => Number(point?.stress) || 0));
+    }
+    return results?.maxStress || 0;
+  };
   const filteredSims = completedSims.filter((sim) => {
     const materialName = getMaterialName(sim.materialId);
     const query = search.toLowerCase();
@@ -45,7 +89,7 @@ export default function SimulationComparison() {
     const z = selected.map((sim) => {
       const results = sim.results as any;
       return [
-        results?.maxStress || 0,
+        getMaxStress(sim),
         results?.maxDeformation || 0,
         results?.safetyFactor || 0,
       ];
@@ -62,9 +106,9 @@ export default function SimulationComparison() {
   // Comparison data for bar chart
   const comparisonData = selected.map(sim => ({
     name: sim.name,
-    maxStress: (sim.results as any)?.maxStress || 0,
+    maxStress: getMaxStress(sim),
     maxDeformation: (sim.results as any)?.maxDeformation || 0,
-    maxDeformationMicrons: ((sim.results as any)?.maxDeformation || 0) * 1000,
+    maxDeformationNanometers: ((sim.results as any)?.maxDeformation || 0) * 1_000_000,
     safetyFactor: (sim.results as any)?.safetyFactor || 0,
   }));
 
@@ -106,7 +150,7 @@ export default function SimulationComparison() {
 
   const scoreData = useMemo(() => {
     if (selected.length === 0) return [];
-    const stressValues = selected.map((sim) => (sim.results as any)?.maxStress || 0);
+    const stressValues = selected.map((sim) => getMaxStress(sim));
     const defValues = selected.map((sim) => (sim.results as any)?.maxDeformation || 0);
     const safetyValues = selected.map((sim) => (sim.results as any)?.safetyFactor || 0);
     const stressMin = Math.min(...stressValues);
@@ -120,7 +164,7 @@ export default function SimulationComparison() {
 
     return selected.map((sim) => {
       const r = sim.results as any;
-      const maxStress = r?.maxStress || 0;
+      const maxStress = getMaxStress(sim);
       const maxDef = r?.maxDeformation || 0;
       const safety = r?.safetyFactor || 0;
       const stressScore = 1 - normalize(maxStress, stressMin, stressMax);
@@ -166,7 +210,7 @@ export default function SimulationComparison() {
       </div>
 
       {/* Selection */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-[1.4fr_1fr] gap-4">
         <div className="bg-card rounded-2xl border border-border p-6">
           <div className="flex items-center justify-between gap-3 mb-4">
             <h3 className="font-semibold">Available Simulations</h3>
@@ -182,24 +226,144 @@ export default function SimulationComparison() {
               </div>
             </div>
           </div>
-          <div className="space-y-2 max-h-96 overflow-y-auto">
+          <div className="border-t border-border">
             {filteredSims.length === 0 ? (
-              <p className="text-muted-foreground text-sm">No completed simulations yet.</p>
+              <p className="text-muted-foreground text-sm py-4">No completed simulations yet.</p>
             ) : (
-              filteredSims.map(sim => (
-                <label key={sim.id} className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={selectedSims.includes(sim.id)}
-                    onChange={() => toggleSimulation(sim.id)}
-                    className="w-4 h-4 rounded border-border"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm truncate">{sim.name}</p>
-                    <p className="text-xs text-muted-foreground">{getMaterialName(sim.materialId)} • {sim.type}</p>
-                  </div>
-                </label>
-              ))
+              <>
+                <table className="w-full table-fixed text-xs text-left">
+                  <colgroup>
+                    <col className="w-10" />
+                    <col className="w-14" />
+                    <col className="w-[22%]" />
+                    <col className="w-[18%]" />
+                    <col className="w-[18%]" />
+                    <col className="w-[18%]" />
+                    <col className="w-[14%]" />
+                  </colgroup>
+                  <thead className="text-[11px] uppercase bg-muted text-muted-foreground font-semibold">
+                    <tr>
+                      <th className="px-3 py-3"></th>
+                      <th className="px-3 py-3">ID</th>
+                      <th className="px-3 py-3">Simulation</th>
+                      <th className="px-3 py-3">Test</th>
+                      <th className="px-3 py-3">Material</th>
+                      <th className="px-3 py-3">Geometry</th>
+                      <th className="px-3 py-3">Status</th>
+                    </tr>
+                  </thead>
+                </table>
+                <div className="max-h-96 overflow-y-auto">
+                  <table className="w-full table-fixed text-xs text-left">
+                    <colgroup>
+                      <col className="w-10" />
+                      <col className="w-14" />
+                      <col className="w-[22%]" />
+                      <col className="w-[18%]" />
+                      <col className="w-[18%]" />
+                      <col className="w-[18%]" />
+                      <col className="w-[14%]" />
+                    </colgroup>
+                    <tbody className="divide-y divide-border">
+                      {filteredSims.map((sim) => (
+                        <tr key={sim.id} className="hover:bg-muted/30 transition-colors">
+                          <td className="px-3 py-3">
+                            <input
+                              type="checkbox"
+                              checked={selectedSims.includes(sim.id)}
+                              onChange={() => toggleSimulation(sim.id)}
+                              className="w-4 h-4 rounded border-border"
+                            />
+                          </td>
+                          <td className="px-3 py-3 font-mono text-muted-foreground">
+                            #{sim.id}
+                          </td>
+                          <td
+                            className="px-3 py-3 font-medium text-foreground truncate"
+                            title={sim.name}
+                          >
+                            {truncateText(sim.name)}
+                          </td>
+                          <td className="px-3 py-3 text-muted-foreground">
+                            <span className={`px-2 py-1 rounded-md text-[11px] font-medium ${getTypeBadgeClass(sim.type)}`} title={truncateText(sim.type)}>
+                              {truncateText(sim.type)}
+                            </span>
+                          </td>
+                          <td className="px-3 py-3 text-foreground">
+                            <span
+                              style={
+                                {
+                                  "--badge-hue": materialHueMap.get(sim.materialId) ?? 210,
+                                } as React.CSSProperties
+                              }
+                              className="px-2 py-1 rounded-md text-[11px] font-medium bg-[hsl(var(--badge-hue)_80%_90%)] text-[hsl(var(--badge-hue)_45%_30%)] dark:bg-[hsl(var(--badge-hue)_35%_20%)] dark:text-[hsl(var(--badge-hue)_70%_80%)]"
+                              title={getMaterialName(sim.materialId)}
+                            >
+                              {truncateText(getMaterialName(sim.materialId))}
+                            </span>
+                          </td>
+                          <td className="px-3 py-3 text-foreground">
+                            <span
+                              style={
+                                {
+                                  "--badge-hue": geometryHueMap.get(sim.geometryId ?? 0) ?? 160,
+                                } as React.CSSProperties
+                              }
+                              className="px-2 py-1 rounded-md text-[11px] font-medium bg-[hsl(var(--badge-hue)_80%_92%)] text-[hsl(var(--badge-hue)_45%_28%)] dark:bg-[hsl(var(--badge-hue)_35%_18%)] dark:text-[hsl(var(--badge-hue)_70%_85%)]"
+                              title={getGeometryName(sim.geometryId)}
+                            >
+                              {truncateText(getGeometryName(sim.geometryId))}
+                            </span>
+                          </td>
+                          <td className="px-3 py-3 text-center">
+                            {sim.status === "completed" ? (
+                              <span
+                                className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500"
+                                title="completed"
+                              >
+                                <svg
+                                  viewBox="0 0 16 16"
+                                  className="h-3.5 w-3.5 text-white"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                >
+                                  <polyline points="3.5 8.5 6.5 11.5 12.5 5.5" />
+                                </svg>
+                              </span>
+                            ) : sim.status === "failed" ? (
+                              <span
+                                className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-red-500"
+                                title="failed"
+                              >
+                                <svg
+                                  viewBox="0 0 16 16"
+                                  className="h-3.5 w-3.5 text-white"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                >
+                                  <line x1="4" y1="4" x2="12" y2="12" />
+                                  <line x1="12" y1="4" x2="4" y2="12" />
+                                </svg>
+                              </span>
+                            ) : (
+                              <StatusBadge
+                                status={sim.status}
+                                className="text-[11px] font-mono tracking-normal"
+                              />
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
             )}
           </div>
         </div>
@@ -217,7 +381,7 @@ export default function SimulationComparison() {
                     <th className="text-left p-2 font-medium">ID</th>
                     <th className="text-left p-2 font-medium">Simulation</th>
                     <th className="text-right p-2 font-medium">Max Stress (MPa)</th>
-                    <th className="text-right p-2 font-medium">Deformation (μm)</th>
+                    <th className="text-right p-2 font-medium">Deformation (nm)</th>
                     <th className="text-right p-2 font-medium">Safety</th>
                   </tr>
                 </thead>
@@ -228,9 +392,15 @@ export default function SimulationComparison() {
                       <tr key={sim.id} className="border-b border-border/50">
                         <td className="p-2 truncate max-w-xs font-mono text-muted-foreground">#{sim.id}</td>
                         <td className="p-2 truncate max-w-xs">{sim.name}</td>
-                        <td className="text-right p-2 font-mono">{r?.maxStress?.toFixed(2) || 0}</td>
-                        <td className="text-right p-2 font-mono">{((r?.maxDeformation || 0) * 1000).toFixed(2)}</td>
-                        <td className="text-right p-2 font-mono">{r?.safetyFactor?.toFixed(2) || 0}</td>
+                        <td className="text-right p-2 font-mono">
+                          {formatMetric(getMaxStress(sim))}
+                        </td>
+                        <td className="text-right p-2 font-mono">
+                          {formatMetric((r?.maxDeformation || 0) * 1_000_000)}
+                        </td>
+                        <td className="text-right p-2 font-mono">
+                          {formatMetric(r?.safetyFactor || 0)}
+                        </td>
                       </tr>
                     );
                   })}
@@ -329,7 +499,7 @@ export default function SimulationComparison() {
                       <Tooltip />
                       <Legend />
                       <Bar yAxisId="left" dataKey="maxStress" fill="#3b82f6" name="Max Stress (MPa)" />
-                      <Bar yAxisId="left" dataKey="maxDeformationMicrons" fill="#8b5cf6" name="Deformation (μm)" />
+                      <Bar yAxisId="left" dataKey="maxDeformationNanometers" fill="#8b5cf6" name="Deformation (nm)" />
                       <Line yAxisId="right" type="monotone" dataKey="safetyFactor" stroke="#10b981" name="Safety Factor" />
                     </ComposedChart>
                   </ResponsiveContainer>

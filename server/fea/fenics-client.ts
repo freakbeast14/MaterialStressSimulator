@@ -8,15 +8,37 @@ export type FenicsMaterial = {
   stressStrainCurve: { strain: number; stress: number }[];
 };
 
+export type FenicsGeometry = {
+  name: string;
+  format: string;
+  contentBase64: string;
+};
+
+export type FenicsMeshArtifact = {
+  name: string;
+  format: string;
+  contentBase64: string;
+  sizeBytes?: number;
+  nodeCount?: number;
+  elementCount?: number;
+};
+
+export type FenicsJobArtifacts = {
+  meshes?: FenicsMeshArtifact[];
+  logs?: string[];
+};
+
 export type FenicsJobInput = {
   name: string;
   materialId: number;
+  geometryId?: number | null;
   type: string;
   appliedLoad?: number | null;
   temperature?: number | null;
   duration?: number | null;
   frequency?: number | null;
   dampingRatio?: number | null;
+  geometry?: FenicsGeometry;
   material: FenicsMaterial;
 };
 
@@ -26,6 +48,7 @@ type FenicsJobResponse = {
   progress: number;
   results?: Record<string, unknown>;
   error?: string;
+  artifacts?: FenicsJobArtifacts;
 };
 
 const DEFAULT_BASE_URL = "http://127.0.0.1:8001";

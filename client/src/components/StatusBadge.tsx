@@ -1,6 +1,12 @@
 import clsx from "clsx";
 
-export function StatusBadge({ status }: { status: string }) {
+export function StatusBadge({
+  status,
+  className,
+}: {
+  status: string;
+  className?: string;
+}) {
   const normalized = status.toLowerCase();
   
   const styles = {
@@ -13,7 +19,13 @@ export function StatusBadge({ status }: { status: string }) {
   const currentStyle = styles[normalized as keyof typeof styles] || styles.pending;
 
   return (
-    <span className={clsx("inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border uppercase tracking-wider", currentStyle)}>
+    <span
+      className={clsx(
+        "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border uppercase tracking-wider",
+        currentStyle,
+        className
+      )}
+    >
       {status}
     </span>
   );

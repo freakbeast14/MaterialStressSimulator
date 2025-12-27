@@ -5,6 +5,8 @@ import { api } from "@shared/routes";
 import { z } from "zod";
 import { materials } from "@shared/schema";
 import { enqueueSimulation } from "./fea/queue";
+import fs from "fs/promises";
+import path from "path";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -82,6 +84,89 @@ export async function registerRoutes(
       }
       throw err;
     }
+  });
+
+  // === Geometry Routes ===
+  app.get(api.geometries.list.path, async (_req, res) => {
+    const allGeometries = await storage.getGeometries();
+    res.json(allGeometries);
+  });
+
+  app.get(api.geometries.get.path, async (req, res) => {
+    const geometry = await storage.getGeometry(Number(req.params.id));
+    if (!geometry) {
+      return res.status(404).json({ message: "Geometry not found" });
+    }
+    res.json(geometry);
+  });
+
+  app.get(api.geometries.content.path, async (req, res) => {
+    const geometry = await storage.getGeometry(Number(req.params.id));
+    if (!geometry) {
+      return res.status(404).json({ message: "Geometry not found" });
+    }
+    const buffer = await fs.readFile(geometry.storagePath);
+    res.json({
+      name: geometry.name,
+      format: geometry.format,
+      contentBase64: buffer.toString("base64"),
+    });
+  });
+
+  app.post(api.geometries.create.path, async (req, res) => {
+    try {
+      const input = api.geometries.create.input.parse(req.body);
+      const { name, originalName, format, contentBase64 } = input;
+      const normalized = contentBase64.includes(",")
+        ? contentBase64.split(",")[1]
+        : contentBase64;
+      const buffer = Buffer.from(normalized, "base64");
+      const safeFormat = format.replace(".", "").toLowerCase();
+      const safeName = name.replace(/[^a-z0-9-_]+/gi, "_");
+      const fileName = `${Date.now()}-${safeName}.${safeFormat}`;
+      const storageRoot = path.resolve(process.cwd(), "storage", "geometries");
+      await fs.mkdir(storageRoot, { recursive: true });
+      const storagePath = path.join(storageRoot, fileName);
+      await fs.writeFile(storagePath, buffer);
+
+      const geometry = await storage.createGeometry({
+        name,
+        originalName,
+        format: safeFormat,
+        storagePath,
+        sizeBytes: buffer.length,
+      });
+
+      res.status(201).json(geometry);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({
+          message: err.errors[0].message,
+          field: err.errors[0].path.join("."),
+        });
+      }
+      throw err;
+    }
+  });
+
+  // === Simulation Mesh Routes ===
+  app.get(api.simulationMeshes.listBySimulation.path, async (req, res) => {
+    const simulationId = Number(req.params.id);
+    const meshes = await storage.getSimulationMeshes(simulationId);
+    res.json(meshes);
+  });
+
+  app.get(api.simulationMeshes.content.path, async (req, res) => {
+    const mesh = await storage.getSimulationMesh(Number(req.params.id));
+    if (!mesh) {
+      return res.status(404).json({ message: "Simulation mesh not found" });
+    }
+    const buffer = await fs.readFile(mesh.storagePath);
+    res.json({
+      name: mesh.name,
+      format: mesh.format,
+      contentBase64: buffer.toString("base64"),
+    });
   });
 
   // Seed if empty
@@ -189,5 +274,585 @@ export async function seedDatabase() {
         { temperature: 150, coefficient: 120 }, // Glass transition area
       ]
     });
+  }
+
+  const existingGeometries = await storage.getGeometries();
+  if (existingGeometries.length === 0) {
+    const storageRoot = path.resolve(process.cwd(), "storage", "geometries");
+    await fs.mkdir(storageRoot, { recursive: true });
+    const samples = [
+      {
+        name: "Unit Cube",
+        originalName: "unit-cube.stl",
+        format: "stl",
+        content: `solid unit_cube
+  facet normal 0 0 1
+    outer loop
+      vertex 0 0 1
+      vertex 1 0 1
+      vertex 1 1 1
+    endloop
+  endfacet
+  facet normal 0 0 1
+    outer loop
+      vertex 0 0 1
+      vertex 1 1 1
+      vertex 0 1 1
+    endloop
+  endfacet
+  facet normal 0 0 -1
+    outer loop
+      vertex 0 0 0
+      vertex 1 1 0
+      vertex 1 0 0
+    endloop
+  endfacet
+  facet normal 0 0 -1
+    outer loop
+      vertex 0 0 0
+      vertex 0 1 0
+      vertex 1 1 0
+    endloop
+  endfacet
+  facet normal 0 1 0
+    outer loop
+      vertex 0 1 0
+      vertex 1 1 1
+      vertex 1 1 0
+    endloop
+  endfacet
+  facet normal 0 1 0
+    outer loop
+      vertex 0 1 0
+      vertex 0 1 1
+      vertex 1 1 1
+    endloop
+  endfacet
+  facet normal 0 -1 0
+    outer loop
+      vertex 0 0 0
+      vertex 1 0 0
+      vertex 1 0 1
+    endloop
+  endfacet
+  facet normal 0 -1 0
+    outer loop
+      vertex 0 0 0
+      vertex 1 0 1
+      vertex 0 0 1
+    endloop
+  endfacet
+  facet normal 1 0 0
+    outer loop
+      vertex 1 0 0
+      vertex 1 1 0
+      vertex 1 1 1
+    endloop
+  endfacet
+  facet normal 1 0 0
+    outer loop
+      vertex 1 0 0
+      vertex 1 1 1
+      vertex 1 0 1
+    endloop
+  endfacet
+  facet normal -1 0 0
+    outer loop
+      vertex 0 0 0
+      vertex 0 1 1
+      vertex 0 1 0
+    endloop
+  endfacet
+  facet normal -1 0 0
+    outer loop
+      vertex 0 0 0
+      vertex 0 0 1
+      vertex 0 1 1
+    endloop
+  endfacet
+endsolid unit_cube
+`,
+      },
+      {
+        name: "Square Pyramid",
+        originalName: "square-pyramid.stl",
+        format: "stl",
+        content: `solid square_pyramid
+  facet normal 0 0 -1
+    outer loop
+      vertex 0 0 0
+      vertex 1 0 0
+      vertex 1 1 0
+    endloop
+  endfacet
+  facet normal 0 0 -1
+    outer loop
+      vertex 0 0 0
+      vertex 1 1 0
+      vertex 0 1 0
+    endloop
+  endfacet
+  facet normal 0 1 1
+    outer loop
+      vertex 0 1 0
+      vertex 1 1 0
+      vertex 0.5 0.5 1
+    endloop
+  endfacet
+  facet normal 1 0 1
+    outer loop
+      vertex 1 0 0
+      vertex 1 1 0
+      vertex 0.5 0.5 1
+    endloop
+  endfacet
+  facet normal 0 -1 1
+    outer loop
+      vertex 0 0 0
+      vertex 1 0 0
+      vertex 0.5 0.5 1
+    endloop
+  endfacet
+  facet normal -1 0 1
+    outer loop
+      vertex 0 0 0
+      vertex 0.5 0.5 1
+      vertex 0 1 0
+    endloop
+  endfacet
+endsolid square_pyramid
+`,
+      },
+      {
+        name: "Rectangular Plate",
+        originalName: "rectangular-plate.stl",
+        format: "stl",
+        content: `solid rectangular_plate
+  facet normal 0 0 1
+    outer loop
+      vertex 0 0 0.2
+      vertex 2 0 0.2
+      vertex 2 2 0.2
+    endloop
+  endfacet
+  facet normal 0 0 1
+    outer loop
+      vertex 0 0 0.2
+      vertex 2 2 0.2
+      vertex 0 2 0.2
+    endloop
+  endfacet
+  facet normal 0 0 -1
+    outer loop
+      vertex 0 0 0
+      vertex 2 2 0
+      vertex 2 0 0
+    endloop
+  endfacet
+  facet normal 0 0 -1
+    outer loop
+      vertex 0 0 0
+      vertex 0 2 0
+      vertex 2 2 0
+    endloop
+  endfacet
+  facet normal 0 1 0
+    outer loop
+      vertex 0 2 0
+      vertex 2 2 0
+      vertex 2 2 0.2
+    endloop
+  endfacet
+  facet normal 0 1 0
+    outer loop
+      vertex 0 2 0
+      vertex 2 2 0.2
+      vertex 0 2 0.2
+    endloop
+  endfacet
+  facet normal 0 -1 0
+    outer loop
+      vertex 0 0 0
+      vertex 2 0 0.2
+      vertex 2 0 0
+    endloop
+  endfacet
+  facet normal 0 -1 0
+    outer loop
+      vertex 0 0 0
+      vertex 0 0 0.2
+      vertex 2 0 0.2
+    endloop
+  endfacet
+  facet normal 1 0 0
+    outer loop
+      vertex 2 0 0
+      vertex 2 2 0
+      vertex 2 2 0.2
+    endloop
+  endfacet
+  facet normal 1 0 0
+    outer loop
+      vertex 2 0 0
+      vertex 2 2 0.2
+      vertex 2 0 0.2
+    endloop
+  endfacet
+  facet normal -1 0 0
+    outer loop
+      vertex 0 0 0
+      vertex 0 2 0.2
+      vertex 0 2 0
+    endloop
+  endfacet
+  facet normal -1 0 0
+    outer loop
+      vertex 0 0 0
+      vertex 0 0 0.2
+      vertex 0 2 0.2
+    endloop
+  endfacet
+endsolid rectangular_plate
+`,
+      },
+      {
+        name: "Beam",
+        originalName: "beam.stl",
+        format: "stl",
+        content: `solid beam
+  facet normal 0 0 1
+    outer loop
+      vertex 0 0 0.5
+      vertex 3 0 0.5
+      vertex 3 0.5 0.5
+    endloop
+  endfacet
+  facet normal 0 0 1
+    outer loop
+      vertex 0 0 0.5
+      vertex 3 0.5 0.5
+      vertex 0 0.5 0.5
+    endloop
+  endfacet
+  facet normal 0 0 -1
+    outer loop
+      vertex 0 0 0
+      vertex 3 0.5 0
+      vertex 3 0 0
+    endloop
+  endfacet
+  facet normal 0 0 -1
+    outer loop
+      vertex 0 0 0
+      vertex 0 0.5 0
+      vertex 3 0.5 0
+    endloop
+  endfacet
+  facet normal 0 1 0
+    outer loop
+      vertex 0 0.5 0
+      vertex 3 0.5 0
+      vertex 3 0.5 0.5
+    endloop
+  endfacet
+  facet normal 0 1 0
+    outer loop
+      vertex 0 0.5 0
+      vertex 3 0.5 0.5
+      vertex 0 0.5 0.5
+    endloop
+  endfacet
+  facet normal 0 -1 0
+    outer loop
+      vertex 0 0 0
+      vertex 3 0 0.5
+      vertex 3 0 0
+    endloop
+  endfacet
+  facet normal 0 -1 0
+    outer loop
+      vertex 0 0 0
+      vertex 0 0 0.5
+      vertex 3 0 0.5
+    endloop
+  endfacet
+  facet normal 1 0 0
+    outer loop
+      vertex 3 0 0
+      vertex 3 0.5 0
+      vertex 3 0.5 0.5
+    endloop
+  endfacet
+  facet normal 1 0 0
+    outer loop
+      vertex 3 0 0
+      vertex 3 0.5 0.5
+      vertex 3 0 0.5
+    endloop
+  endfacet
+  facet normal -1 0 0
+    outer loop
+      vertex 0 0 0
+      vertex 0 0.5 0.5
+      vertex 0 0.5 0
+    endloop
+  endfacet
+  facet normal -1 0 0
+    outer loop
+      vertex 0 0 0
+      vertex 0 0 0.5
+      vertex 0 0.5 0.5
+    endloop
+  endfacet
+endsolid beam
+`,
+      },
+      {
+        name: "Cylinder",
+        originalName: "cylinder.stl",
+        format: "stl",
+        content: `solid cylinder
+  facet normal 0 0 1
+    outer loop
+      vertex 0 0 1
+      vertex 1 0 1
+      vertex 0.707 0.707 1
+    endloop
+  endfacet
+  facet normal 0 0 1
+    outer loop
+      vertex 0 0 1
+      vertex 0.707 0.707 1
+      vertex 0 1 1
+    endloop
+  endfacet
+  facet normal 0 0 1
+    outer loop
+      vertex 0 0 1
+      vertex 0 1 1
+      vertex -0.707 0.707 1
+    endloop
+  endfacet
+  facet normal 0 0 1
+    outer loop
+      vertex 0 0 1
+      vertex -0.707 0.707 1
+      vertex -1 0 1
+    endloop
+  endfacet
+  facet normal 0 0 1
+    outer loop
+      vertex 0 0 1
+      vertex -1 0 1
+      vertex -0.707 -0.707 1
+    endloop
+  endfacet
+  facet normal 0 0 1
+    outer loop
+      vertex 0 0 1
+      vertex -0.707 -0.707 1
+      vertex 0 -1 1
+    endloop
+  endfacet
+  facet normal 0 0 1
+    outer loop
+      vertex 0 0 1
+      vertex 0 -1 1
+      vertex 0.707 -0.707 1
+    endloop
+  endfacet
+  facet normal 0 0 1
+    outer loop
+      vertex 0 0 1
+      vertex 0.707 -0.707 1
+      vertex 1 0 1
+    endloop
+  endfacet
+  facet normal 0 0 -1
+    outer loop
+      vertex 0 0 0
+      vertex 0.707 0.707 0
+      vertex 1 0 0
+    endloop
+  endfacet
+  facet normal 0 0 -1
+    outer loop
+      vertex 0 0 0
+      vertex 0 1 0
+      vertex 0.707 0.707 0
+    endloop
+  endfacet
+  facet normal 0 0 -1
+    outer loop
+      vertex 0 0 0
+      vertex -0.707 0.707 0
+      vertex 0 1 0
+    endloop
+  endfacet
+  facet normal 0 0 -1
+    outer loop
+      vertex 0 0 0
+      vertex -1 0 0
+      vertex -0.707 0.707 0
+    endloop
+  endfacet
+  facet normal 0 0 -1
+    outer loop
+      vertex 0 0 0
+      vertex -0.707 -0.707 0
+      vertex -1 0 0
+    endloop
+  endfacet
+  facet normal 0 0 -1
+    outer loop
+      vertex 0 0 0
+      vertex 0 -1 0
+      vertex -0.707 -0.707 0
+    endloop
+  endfacet
+  facet normal 0 0 -1
+    outer loop
+      vertex 0 0 0
+      vertex 0.707 -0.707 0
+      vertex 0 -1 0
+    endloop
+  endfacet
+  facet normal 0 0 -1
+    outer loop
+      vertex 0 0 0
+      vertex 1 0 0
+      vertex 0.707 -0.707 0
+    endloop
+  endfacet
+  facet normal 0.707 0.707 0
+    outer loop
+      vertex 1 0 0
+      vertex 0.707 0.707 0
+      vertex 0.707 0.707 1
+    endloop
+  endfacet
+  facet normal 0.707 0.707 0
+    outer loop
+      vertex 1 0 0
+      vertex 0.707 0.707 1
+      vertex 1 0 1
+    endloop
+  endfacet
+  facet normal 0 1 0
+    outer loop
+      vertex 0.707 0.707 0
+      vertex 0 1 0
+      vertex 0 1 1
+    endloop
+  endfacet
+  facet normal 0 1 0
+    outer loop
+      vertex 0.707 0.707 0
+      vertex 0 1 1
+      vertex 0.707 0.707 1
+    endloop
+  endfacet
+  facet normal -0.707 0.707 0
+    outer loop
+      vertex 0 1 0
+      vertex -0.707 0.707 0
+      vertex -0.707 0.707 1
+    endloop
+  endfacet
+  facet normal -0.707 0.707 0
+    outer loop
+      vertex 0 1 0
+      vertex -0.707 0.707 1
+      vertex 0 1 1
+    endloop
+  endfacet
+  facet normal -1 0 0
+    outer loop
+      vertex -0.707 0.707 0
+      vertex -1 0 0
+      vertex -1 0 1
+    endloop
+  endfacet
+  facet normal -1 0 0
+    outer loop
+      vertex -0.707 0.707 0
+      vertex -1 0 1
+      vertex -0.707 0.707 1
+    endloop
+  endfacet
+  facet normal -0.707 -0.707 0
+    outer loop
+      vertex -1 0 0
+      vertex -0.707 -0.707 0
+      vertex -0.707 -0.707 1
+    endloop
+  endfacet
+  facet normal -0.707 -0.707 0
+    outer loop
+      vertex -1 0 0
+      vertex -0.707 -0.707 1
+      vertex -1 0 1
+    endloop
+  endfacet
+  facet normal 0 -1 0
+    outer loop
+      vertex -0.707 -0.707 0
+      vertex 0 -1 0
+      vertex 0 -1 1
+    endloop
+  endfacet
+  facet normal 0 -1 0
+    outer loop
+      vertex -0.707 -0.707 0
+      vertex 0 -1 1
+      vertex -0.707 -0.707 1
+    endloop
+  endfacet
+  facet normal 0.707 -0.707 0
+    outer loop
+      vertex 0 -1 0
+      vertex 0.707 -0.707 0
+      vertex 0.707 -0.707 1
+    endloop
+  endfacet
+  facet normal 0.707 -0.707 0
+    outer loop
+      vertex 0 -1 0
+      vertex 0.707 -0.707 1
+      vertex 0 -1 1
+    endloop
+  endfacet
+  facet normal 1 0 0
+    outer loop
+      vertex 0.707 -0.707 0
+      vertex 1 0 0
+      vertex 1 0 1
+    endloop
+  endfacet
+  facet normal 1 0 0
+    outer loop
+      vertex 0.707 -0.707 0
+      vertex 1 0 1
+      vertex 0.707 -0.707 1
+    endloop
+  endfacet
+endsolid cylinder
+`,
+      },
+    ];
+
+    for (const sample of samples) {
+      const safeName = sample.originalName.replace(/[^a-z0-9-_.]+/gi, "_");
+      const fileName = `${Date.now()}-${safeName}`;
+      const storagePath = path.join(storageRoot, fileName);
+      await fs.writeFile(storagePath, sample.content);
+      await storage.createGeometry({
+        name: sample.name,
+        originalName: sample.originalName,
+        format: sample.format,
+        storagePath,
+        sizeBytes: Buffer.byteLength(sample.content),
+      });
+    }
   }
 }

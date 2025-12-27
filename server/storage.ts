@@ -2,10 +2,16 @@ import { db } from "./db";
 import {
   materials,
   simulations,
+  geometries,
+  simulationMeshes,
   type Material,
   type InsertMaterial,
   type Simulation,
   type InsertSimulation,
+  type Geometry,
+  type InsertGeometry,
+  type SimulationMesh,
+  type InsertSimulationMesh,
 } from "@shared/schema";
 import { eq, desc } from "drizzle-orm";
 
@@ -21,6 +27,16 @@ export interface IStorage {
   createSimulation(simulation: InsertSimulation): Promise<Simulation>;
   updateSimulationStatus(id: number, status: string, results?: any, progress?: number): Promise<Simulation>;
   deleteSimulation(id: number): Promise<boolean>;
+
+  // Geometries
+  getGeometries(): Promise<Geometry[]>;
+  getGeometry(id: number): Promise<Geometry | undefined>;
+  createGeometry(geometry: InsertGeometry): Promise<Geometry>;
+
+  // Simulation meshes
+  getSimulationMeshes(simulationId: number): Promise<SimulationMesh[]>;
+  getSimulationMesh(id: number): Promise<SimulationMesh | undefined>;
+  createSimulationMesh(mesh: InsertSimulationMesh): Promise<SimulationMesh>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -75,6 +91,38 @@ export class DatabaseStorage implements IStorage {
       .where(eq(simulations.id, id))
       .returning();
     return !!deleted;
+  }
+
+  async getGeometries(): Promise<Geometry[]> {
+    return await db.select().from(geometries).orderBy(desc(geometries.createdAt));
+  }
+
+  async getGeometry(id: number): Promise<Geometry | undefined> {
+    const [geometry] = await db.select().from(geometries).where(eq(geometries.id, id));
+    return geometry;
+  }
+
+  async createGeometry(insertGeometry: InsertGeometry): Promise<Geometry> {
+    const [geometry] = await db.insert(geometries).values(insertGeometry).returning();
+    return geometry;
+  }
+
+  async getSimulationMeshes(simulationId: number): Promise<SimulationMesh[]> {
+    return await db
+      .select()
+      .from(simulationMeshes)
+      .where(eq(simulationMeshes.simulationId, simulationId))
+      .orderBy(desc(simulationMeshes.createdAt));
+  }
+
+  async getSimulationMesh(id: number): Promise<SimulationMesh | undefined> {
+    const [mesh] = await db.select().from(simulationMeshes).where(eq(simulationMeshes.id, id));
+    return mesh;
+  }
+
+  async createSimulationMesh(insertMesh: InsertSimulationMesh): Promise<SimulationMesh> {
+    const [mesh] = await db.insert(simulationMeshes).values(insertMesh).returning();
+    return mesh;
   }
 }
 

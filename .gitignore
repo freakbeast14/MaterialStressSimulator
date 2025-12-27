@@ -1,4 +1,6 @@
 node_modules
+.TODO.txt
+TODO.txt
 fenics_service/__pycache__/
 fenics_service/.venv/
 dist
@@ -7,3 +9,4 @@ server/public
 vite.config.ts.*
 *.tar.gz
 .env
+storage/

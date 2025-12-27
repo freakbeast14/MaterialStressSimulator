@@ -1,5 +1,13 @@
 import { z } from 'zod';
-import { insertMaterialSchema, materials, simulations, insertSimulationSchema } from './schema';
+import {
+  insertMaterialSchema,
+  materials,
+  simulations,
+  insertSimulationSchema,
+  geometries,
+  insertGeometrySchema,
+  simulationMeshes,
+} from './schema';
 
 // ============================================
 // SHARED ERROR SCHEMAS
@@ -61,6 +69,7 @@ export const api = {
       input: insertSimulationSchema.pick({
         name: true,
         materialId: true,
+        geometryId: true,
         type: true,
         appliedLoad: true,
         temperature: true,
@@ -86,6 +95,70 @@ export const api = {
       path: '/api/simulations/:id',
       responses: {
         200: z.object({ success: z.literal(true) }),
+        404: errorSchemas.notFound,
+      },
+    },
+  },
+  geometries: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/geometries',
+      responses: {
+        200: z.array(z.custom<typeof geometries.$inferSelect>()),
+      },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/geometries',
+      input: z.object({
+        name: z.string().min(1),
+        originalName: z.string().min(1),
+        format: z.string().min(1),
+        contentBase64: z.string().min(1),
+      }),
+      responses: {
+        201: z.custom<typeof geometries.$inferSelect>(),
+        400: errorSchemas.validation,
+      },
+    },
+    get: {
+      method: 'GET' as const,
+      path: '/api/geometries/:id',
+      responses: {
+        200: z.custom<typeof geometries.$inferSelect>(),
+        404: errorSchemas.notFound,
+      },
+    },
+    content: {
+      method: 'GET' as const,
+      path: '/api/geometries/:id/content',
+      responses: {
+        200: z.object({
+          name: z.string(),
+          format: z.string(),
+          contentBase64: z.string(),
+        }),
+        404: errorSchemas.notFound,
+      },
+    },
+  },
+  simulationMeshes: {
+    listBySimulation: {
+      method: 'GET' as const,
+      path: '/api/simulations/:id/meshes',
+      responses: {
+        200: z.array(z.custom<typeof simulationMeshes.$inferSelect>()),
+      },
+    },
+    content: {
+      method: 'GET' as const,
+      path: '/api/simulation-meshes/:id/content',
+      responses: {
+        200: z.object({
+          name: z.string(),
+          format: z.string(),
+          contentBase64: z.string(),
+        }),
         404: errorSchemas.notFound,
       },
     },

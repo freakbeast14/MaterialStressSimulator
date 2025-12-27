@@ -1,7 +1,10 @@
 import { useParams } from "wouter";
-import type { ElementType } from "react";
+import type { ElementType, MouseEvent } from "react";
 import { useSimulation } from "@/hooks/use-simulations";
 import { useMaterial } from "@/hooks/use-materials";
+import { useEffect, useMemo, useRef, useState } from "react";
+import Plot from "react-plotly.js";
+import { useGeometries } from "@/hooks/use-geometries";
 import { StatusBadge } from "@/components/StatusBadge";
 import {
   Activity,
@@ -37,18 +40,17 @@ import {
   ReferenceLine,
 } from "recharts";
 import { motion } from "framer-motion";
-import Plot from "react-plotly.js";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
-import { useEffect, useMemo, useRef, useState } from "react";
 import Plotly from "plotly.js-dist-min";
 
 export default function SimulationDetail() {
   const { id } = useParams();
   const { data: simulation, isLoading } = useSimulation(parseInt(id || "0"));
   const { data: material } = useMaterial(simulation?.materialId || 0);
+  const { data: geometries } = useGeometries();
   const [showConfigDetails, setShowConfigDetails] = useState(false);
   const [showMetricsDetails, setShowMetricsDetails] = useState(false);
   const [overlayDisplacement, setOverlayDisplacement] = useState(false);
@@ -56,6 +58,32 @@ export default function SimulationDetail() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [fieldThreshold, setFieldThreshold] = useState(0.35);
   const [fieldSlice, setFieldSlice] = useState(0.5);
+  const [geometryContent, setGeometryContent] = useState<string | null>(null);
+  const [geometryFormat, setGeometryFormat] = useState<string | null>(null);
+  const [geometryError, setGeometryError] = useState<string | null>(null);
+  const [isLoadingGeometry, setIsLoadingGeometry] = useState(false);
+  const [simulationMeshes, setSimulationMeshes] = useState<
+    { id: number; name: string; format: string; nodeCount?: number | null; elementCount?: number | null }[]
+  >([]);
+  const [isLoadingMeshes, setIsLoadingMeshes] = useState(false);
+  const [meshError, setMeshError] = useState<string | null>(null);
+  const [meshPreview, setMeshPreview] = useState<{
+    x: number[];
+    y: number[];
+    z: number[];
+    i: number[];
+    j: number[];
+    k: number[];
+  } | null>(null);
+  const [meshPreviewName, setMeshPreviewName] = useState<string | null>(null);
+  const [meshPreviewError, setMeshPreviewError] = useState<string | null>(null);
+  const [isLoadingMeshPreview, setIsLoadingMeshPreview] = useState(false);
+  const [infoTooltip, setInfoTooltip] = useState<{
+    text: string;
+    x: number;
+    y: number;
+    visible: boolean;
+  } | null>(null);
   const { toast } = useToast();
   const plotRef = useRef<any>(null);
 
@@ -84,6 +112,15 @@ export default function SimulationDetail() {
       : results?.avgStress ?? 0;
   const stressRange =
     stressSeries.length > 0 ? maxStress - minStress : 0;
+  const timeSeriesData = (results?.timeSeriesData || []) as {
+    time: number;
+    stress: number;
+    displacement: number;
+  }[];
+  const stressStrainData =
+    (results?.stressStrainCurve as { strain: number; stress: number }[] | undefined) ||
+    material?.stressStrainCurve ||
+    [];
   const formatNumber = (value?: number, decimals = 3) =>
     typeof value === "number" && Number.isFinite(value)
       ? value.toFixed(decimals)
@@ -102,6 +139,11 @@ export default function SimulationDetail() {
       })
     : "N/A";
 
+  const geometry = useMemo(
+    () => geometries?.find((item) => item.id === simulation?.geometryId),
+    [geometries, simulation?.geometryId]
+  );
+
   const primaryConfigItems = useMemo(
     () =>
       [
@@ -112,7 +154,7 @@ export default function SimulationDetail() {
         value: string;
         icon: ElementType;
       }[],
-    [material?.name, simulation?.type]
+    [geometry?.name, material?.name, simulation?.type]
   );
 
   const secondaryConfigItems = useMemo(
@@ -167,15 +209,6 @@ export default function SimulationDetail() {
     ]
   );
 
-  const stressStrainData =
-    (results?.stressStrainCurve as { strain: number; stress: number }[] | undefined) ||
-    material?.stressStrainCurve ||
-    [];
-  const timeSeriesData = (results?.timeSeriesData || []) as {
-    time: number;
-    stress: number;
-    displacement: number;
-  }[];
   const progressStage =
     (simulation?.progress ?? 0) < 20
       ? "Meshing"
@@ -237,6 +270,17 @@ export default function SimulationDetail() {
       bg: "bg-emerald-100/70 dark:bg-emerald-500/20 dark:text-emerald-200",
     },
     {
+      label: "Max Deformation",
+      value: `${formatNumber(
+        typeof results?.maxDeformation === "number"
+          ? results.maxDeformation * 1000
+          : undefined
+      )} μm`,
+      definition: "Peak deformation during simulation.",
+      color: "text-purple-600",
+      bg: "bg-purple-100/70 dark:bg-purple-500/20 dark:text-purple-200",
+    },
+    {
       label: "Max Strain",
       value: `${formatMicrostrain(results?.maxStrain)} με`,
       definition: "Peak strain during simulation.",
@@ -292,12 +336,177 @@ export default function SimulationDetail() {
       setPlayheadIndex(state.activeTooltipIndex);
     }
   };
+  useEffect(() => {
+    if (!Array.isArray(results?.meshWarnings) || results.meshWarnings.length === 0) {
+      return;
+    }
+    console.warn("Mesh notes:", results.meshWarnings);
+  }, [results?.meshWarnings]);
+  const showInfoTooltip = (event: MouseEvent<HTMLElement>, text: string) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    setInfoTooltip({
+      text,
+      x: rect.left + rect.width / 2,
+      y: rect.top,
+      visible: true,
+    });
+  };
+  const hideInfoTooltip = () => {
+    setInfoTooltip((prev) => (prev ? { ...prev, visible: false } : null));
+  };
 
   useEffect(() => {
     if (timeSeriesData.length > 0) {
       setPlayheadIndex(0);
     }
   }, [simulation?.id, timeSeriesData.length]);
+
+  useEffect(() => {
+    if (!geometry?.id) {
+      setGeometryContent(null);
+      setGeometryFormat(null);
+      setGeometryError(null);
+      return;
+    }
+    setIsLoadingGeometry(true);
+    setGeometryError(null);
+    fetch(`/api/geometries/${geometry.id}/content`)
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to load geometry");
+        return res.json();
+      })
+      .then((data) => {
+        setGeometryContent(data.contentBase64 || null);
+        setGeometryFormat(data.format || null);
+      })
+      .catch((err) => {
+        setGeometryError(err instanceof Error ? err.message : "Failed to load geometry");
+        setGeometryContent(null);
+        setGeometryFormat(null);
+      })
+      .finally(() => setIsLoadingGeometry(false));
+  }, [geometry?.id]);
+
+  useEffect(() => {
+    if (!simulation?.id) {
+      setSimulationMeshes([]);
+      setMeshError(null);
+      return;
+    }
+    setIsLoadingMeshes(true);
+    setMeshError(null);
+    const fetchMeshes = () =>
+      fetch(`/api/simulations/${simulation.id}/meshes`)
+        .then((res) => {
+          if (!res.ok) throw new Error("Failed to load meshes");
+          return res.json();
+        })
+      .then((data) => {
+        const list = Array.isArray(data) ? data : [];
+        setSimulationMeshes(list);
+      })
+        .catch((err) => {
+          setMeshError(err instanceof Error ? err.message : "Failed to load meshes");
+          setSimulationMeshes([]);
+        })
+        .finally(() => setIsLoadingMeshes(false));
+
+    void fetchMeshes();
+
+    if (!isRunning) return;
+    const interval = window.setInterval(fetchMeshes, 2000);
+    return () => window.clearInterval(interval);
+  }, [simulation?.id, isRunning]);
+
+  useEffect(() => {
+    if (!simulationMeshes.length) return;
+    if (meshPreview || isLoadingMeshPreview) return;
+    const xmlMesh = simulationMeshes.find(
+      (mesh) => mesh.format.toLowerCase() === "xml"
+    );
+    if (xmlMesh) {
+      void handlePreviewMesh(xmlMesh);
+    }
+  }, [simulationMeshes, meshPreview, isLoadingMeshPreview]);
+
+  const geometryMesh = useMemo(() => {
+    const isCylinder = geometry?.name?.toLowerCase().includes("cylinder");
+    if (isCylinder) {
+      const segments = 32;
+      const radius = 1;
+      const height = 1;
+      const x: number[] = [];
+      const y: number[] = [];
+      const z: number[] = [];
+      const i: number[] = [];
+      const j: number[] = [];
+      const k: number[] = [];
+      const topCenterIndex = 0;
+      const bottomCenterIndex = 1;
+      x.push(0, 0);
+      y.push(0, 0);
+      z.push(height, 0);
+      let idx = 2;
+      for (let s = 0; s < segments; s += 1) {
+        const angle = (2 * Math.PI * s) / segments;
+        const cx = Math.cos(angle) * radius;
+        const cy = Math.sin(angle) * radius;
+        x.push(cx, cx);
+        y.push(cy, cy);
+        z.push(height, 0);
+        const topIndex = idx;
+        const bottomIndex = idx + 1;
+        const nextTop = idx + 2 >= 2 + segments * 2 ? 2 : idx + 2;
+        const nextBottom = nextTop + 1;
+        i.push(topCenterIndex);
+        j.push(topIndex);
+        k.push(nextTop);
+        i.push(bottomCenterIndex);
+        j.push(nextBottom);
+        k.push(bottomIndex);
+        i.push(topIndex);
+        j.push(bottomIndex);
+        k.push(nextBottom);
+        i.push(topIndex);
+        j.push(nextBottom);
+        k.push(nextTop);
+        idx += 2;
+      }
+      return { x, y, z, i, j, k };
+    }
+    if (!geometryContent || !geometryFormat) return null;
+    if (geometryFormat.toLowerCase() !== "stl") return null;
+    let decoded = "";
+    try {
+      decoded = atob(geometryContent);
+    } catch {
+      return null;
+    }
+    if (!decoded.trim().startsWith("solid")) return null;
+    const vertexRegex =
+      /vertex\s+([+-]?\d*\.?\d+(?:[eE][+-]?\d+)?)\s+([+-]?\d*\.?\d+(?:[eE][+-]?\d+)?)\s+([+-]?\d*\.?\d+(?:[eE][+-]?\d+)?)/g;
+    const x: number[] = [];
+    const y: number[] = [];
+    const z: number[] = [];
+    const i: number[] = [];
+    const j: number[] = [];
+    const k: number[] = [];
+    let match: RegExpExecArray | null;
+    let idx = 0;
+    while ((match = vertexRegex.exec(decoded)) !== null) {
+      x.push(parseFloat(match[1]));
+      y.push(parseFloat(match[2]));
+      z.push(parseFloat(match[3]));
+      if (x.length % 3 === 0) {
+        i.push(idx);
+        j.push(idx + 1);
+        k.push(idx + 2);
+        idx += 3;
+      }
+    }
+    if (x.length < 3) return null;
+    return { x, y, z, i, j, k };
+  }, [geometryContent, geometryFormat, geometry?.name]);
 
   useEffect(() => {
     if (!isPlaying || timeSeriesData.length === 0) return;
@@ -392,6 +601,125 @@ export default function SimulationDetail() {
       toast({
         title: "Copy failed",
         description: "Unable to copy link. Please copy it manually.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const buildMeshPreview = (xmlText: string) => {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(xmlText, "application/xml");
+    const vertexNodes = Array.from(doc.getElementsByTagName("vertex"));
+    const triangleNodes = Array.from(doc.getElementsByTagName("triangle"));
+    const tetraNodes = Array.from(doc.getElementsByTagName("tetrahedron"));
+
+    if (vertexNodes.length === 0) {
+      throw new Error("Unsupported mesh format for preview.");
+    }
+
+    const x: number[] = [];
+    const y: number[] = [];
+    const z: number[] = [];
+    vertexNodes.forEach((node) => {
+      x.push(parseFloat(node.getAttribute("x") || "0"));
+      y.push(parseFloat(node.getAttribute("y") || "0"));
+      z.push(parseFloat(node.getAttribute("z") || "0"));
+    });
+
+    const i: number[] = [];
+    const j: number[] = [];
+    const k: number[] = [];
+
+    if (triangleNodes.length > 0) {
+      triangleNodes.forEach((node) => {
+        i.push(Number(node.getAttribute("v0")));
+        j.push(Number(node.getAttribute("v1")));
+        k.push(Number(node.getAttribute("v2")));
+      });
+    } else if (tetraNodes.length > 0) {
+      const faceMap = new Map<string, { a: number; b: number; c: number; count: number }>();
+      const addFace = (a: number, b: number, c: number) => {
+        const key = [a, b, c].sort((m, n) => m - n).join(",");
+        const existing = faceMap.get(key);
+        if (existing) {
+          existing.count += 1;
+        } else {
+          faceMap.set(key, { a, b, c, count: 1 });
+        }
+      };
+
+      tetraNodes.forEach((node) => {
+        const a = Number(node.getAttribute("v0"));
+        const b = Number(node.getAttribute("v1"));
+        const c = Number(node.getAttribute("v2"));
+        const d = Number(node.getAttribute("v3"));
+        addFace(a, b, c);
+        addFace(a, b, d);
+        addFace(a, c, d);
+        addFace(b, c, d);
+      });
+
+      faceMap.forEach((face) => {
+        if (face.count === 1) {
+          i.push(face.a);
+          j.push(face.b);
+          k.push(face.c);
+        }
+      });
+    } else {
+      throw new Error("Unsupported mesh format for preview.");
+    }
+
+    if (i.length === 0) {
+      throw new Error("Mesh preview has no surface faces.");
+    }
+
+    if (i.length > 50000) {
+      throw new Error("Mesh preview too large to render in the browser.");
+    }
+
+    return { x, y, z, i, j, k };
+  };
+
+  const handlePreviewMesh = async (mesh: { id: number; name: string; format: string }) => {
+    setIsLoadingMeshPreview(true);
+    setMeshPreviewError(null);
+    setMeshPreview(null);
+    setMeshPreviewName(mesh.name);
+    try {
+      if (mesh.format.toLowerCase() !== "xml") {
+        throw new Error("Preview available for XML mesh only.");
+      }
+      const response = await fetch(`/api/simulation-meshes/${mesh.id}/content`);
+      if (!response.ok) throw new Error("Failed to load mesh content.");
+      const data = await response.json();
+      const decoded = atob(data.contentBase64 || "");
+      const preview = buildMeshPreview(decoded);
+      setMeshPreview(preview);
+    } catch (err) {
+      setMeshPreviewError(err instanceof Error ? err.message : "Unable to render mesh preview.");
+    } finally {
+      setIsLoadingMeshPreview(false);
+    }
+  };
+
+  const handleDownloadMesh = async (meshId: number, name: string, format: string) => {
+    try {
+      const response = await fetch(`/api/simulation-meshes/${meshId}/content`);
+      if (!response.ok) throw new Error("Failed to download mesh");
+      const data = await response.json();
+      const buffer = Uint8Array.from(atob(data.contentBase64 || ""), (c) => c.charCodeAt(0));
+      const blob = new Blob([buffer], { type: "application/octet-stream" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${name || "mesh"}.${format || "xdmf"}`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      toast({
+        title: "Download failed",
+        description: err instanceof Error ? err.message : "Unable to download mesh.",
         variant: "destructive",
       });
     }
@@ -506,6 +834,54 @@ export default function SimulationDetail() {
                   />
                 </button>
               </div>
+              <div className="rounded-lg border border-border bg-muted/20 p-3">
+                <div className="flex items-center justify-between">
+                  <div className="text-[9px] font-semibold uppercase tracking-widest text-muted-foreground">
+                    Geometry
+                  </div>
+                  {geometry?.name && (
+                    <span className="text-[9px] font-semibold uppercase tracking-wider text-foreground">
+                      {geometry.name}
+                    </span>
+                  )}
+                </div>
+                <div className="mt-3 h-36">
+                  {geometryMesh ? (
+                    <Plot
+                      data={[
+                        {
+                          type: "mesh3d",
+                          x: geometryMesh.x,
+                          y: geometryMesh.y,
+                          z: geometryMesh.z,
+                          i: geometryMesh.i,
+                          j: geometryMesh.j,
+                          k: geometryMesh.k,
+                          color: "#3b82f6",
+                          opacity: 0.7,
+                        } as any,
+                      ]}
+                      layout={{
+                        margin: { l: 0, r: 0, t: 0, b: 0 },
+                        paper_bgcolor: "transparent",
+                        plot_bgcolor: "transparent",
+                        scene: {
+                          aspectmode: "data",
+                          xaxis: { visible: false },
+                          yaxis: { visible: false },
+                          zaxis: { visible: false },
+                        },
+                      }}
+                      style={{ width: "100%", height: "100%" }}
+                      config={{ displayModeBar: false }}
+                    />
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      Geometry preview unavailable.
+                    </p>
+                  )}
+                </div>
+              </div>
               <div className="space-y-3">
                 {primaryConfigItems.map((item) => (
                   <div
@@ -569,7 +945,140 @@ export default function SimulationDetail() {
                 </div>
               </div>
             </div>
-
+            <div className="bg-card rounded-2xl border border-border p-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                  Mesh Outputs
+                </div>
+                {results?.source && (
+                  <span className="text-[11px] font-semibold tracking-wider text-muted-foreground bg-muted/40 border border-border rounded-full px-2 py-1">
+                    SOURCE: {results.source === "fenics" ? "FEniCS" : results.source}
+                  </span>
+                )}
+              </div>
+              {isLoadingMeshes ? (
+                <p className="text-sm text-muted-foreground">Loading mesh files...</p>
+              ) : meshError ? (
+                <p className="text-sm text-destructive">{meshError}</p>
+              ) : simulationMeshes.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No mesh artifacts saved yet.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {Object.values(
+                    simulationMeshes.reduce(
+                      (acc, mesh) => {
+                        const key = mesh.name;
+                        if (!acc[key]) {
+                          acc[key] = {
+                            name: mesh.name,
+                            nodeCount: mesh.nodeCount ?? null,
+                            elementCount: mesh.elementCount ?? null,
+                            formats: [],
+                          };
+                        }
+                        acc[key].formats.push(mesh);
+                        return acc;
+                      },
+                      {} as Record<
+                        string,
+                        {
+                          name: string;
+                          nodeCount: number | null;
+                          elementCount: number | null;
+                          formats: { id: number; name: string; format: string }[];
+                        }
+                      >
+                    )
+                  ).map((group) => (
+                    <div
+                      key={group.name}
+                      className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-muted/20 px-4 py-3"
+                    >
+                      <div>
+                        <p className="text-sm font-semibold text-foreground">
+                          {group.name}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Nodes: {" "} {group.nodeCount ?? "—"} <br/>
+                          Elements: {" "} {group.elementCount ?? "—"} <br/>
+                        </p>
+                      </div>
+                      <div className="flex flex-col flex-wrap items-center gap-2">
+                        {group.formats.map((item) => (
+                          <button
+                            key={item.id}
+                            type="button"
+                            className="flex items-center gap-2 rounded-full border border-border px-3 py-1 text-xs text-muted-foreground font-semibold hover:bg-primary/10 hover:text-primary"
+                            onClick={() =>
+                              handleDownloadMesh(item.id, item.name, item.format)
+                            }
+                          >
+                            <Download className="h-3.5 w-3.5" />
+                            {item.format.toUpperCase()}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                  <div className="rounded-lg border border-border bg-muted/20 p-3">
+                    {isLoadingMeshPreview ? (
+                      <p className="text-sm text-muted-foreground">Rendering mesh preview...</p>
+                    ) : meshPreviewError ? (
+                      <p className="text-sm text-destructive">{meshPreviewError}</p>
+                    ) : meshPreview ? (
+                      <div className="relative h-[240px]">
+                        {meshPreviewName && (                          
+                          <div className="flex items-center justify-between">
+                            <div className="text-[9px] font-semibold uppercase tracking-widest text-muted-foreground">
+                              Preview
+                            </div>
+                            {geometry?.name && (
+                              <span className="text-[9px] font-semibold uppercase tracking-wider text-foreground">
+                                {meshPreviewName}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                        <Plot
+                          data={[
+                            {
+                              type: "mesh3d",
+                              x: meshPreview.x,
+                              y: meshPreview.y,
+                              z: meshPreview.z,
+                              i: meshPreview.i,
+                              j: meshPreview.j,
+                              k: meshPreview.k,
+                              color: "#22c55e",
+                              opacity: 0.7,
+                            } as any,
+                          ]}
+                          layout={{
+                            margin: { l: 0, r: 0, t: 0, b: 0 },
+                            paper_bgcolor: "transparent",
+                            plot_bgcolor: "transparent",
+                            scene: {
+                              aspectmode: "data",
+                              xaxis: { visible: false },
+                              yaxis: { visible: false },
+                              zaxis: { visible: false },
+                            },
+                          }}
+                          style={{ width: "100%", height: "100%" }}
+                          config={{ displayModeBar: false }}
+                        />
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        Select a mesh to preview.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
             <div className="bg-card rounded-2xl border border-border p-6 space-y-4">
               <div className="flex items-center justify-between">
                 <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
@@ -613,19 +1122,22 @@ export default function SimulationDetail() {
                 }`}
               >
                 <div className="overflow-hidden">
-                  <div className="grid grid-cols-2 gap-4 pt-4">
+                  <div className="grid grid-cols-2 gap-4">
                     {metricsList.slice(4).map((metric) => (
                       <div key={metric.label} className={`${metric.bg} rounded-2xl p-4`}>
                         <div className="flex items-center justify-between text-xs font-semibold text-muted-foreground">
                           <span>{metric.label}</span>
-                          <span className="relative inline-flex items-center justify-center group">
+                          <span
+                            className="relative inline-flex items-center justify-center"
+                            onMouseEnter={(event) =>
+                              showInfoTooltip(event, metric.definition)
+                            }
+                            onMouseMove={(event) =>
+                              showInfoTooltip(event, metric.definition)
+                            }
+                            onMouseLeave={hideInfoTooltip}
+                          >
                             <Info className="h-3.5 w-3.5 text-muted-foreground/70" />
-                            <span className="pointer-events-none absolute bottom-full left-1/2 mb-3 w-max -translate-x-1/2 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-                              <span className="relative rounded-lg bg-slate-900 px-4 py-2 text-xs font-semibold text-white shadow-lg">
-                                {metric.definition}
-                                <span className="absolute left-1/2 top-full h-3 w-3 -translate-x-1/2 -translate-y-1/2 rotate-45 bg-slate-900" />
-                              </span>
-                            </span>
                           </span>
                         </div>
                         <p className={`mt-3 text-lg font-bold ${metric.color}`}>
@@ -1079,6 +1591,22 @@ export default function SimulationDetail() {
               </div>
             </TabsContent>
           </Tabs>
+        </div>
+      )}
+
+      {infoTooltip?.visible && (
+        <div
+          className="pointer-events-none fixed z-50"
+          style={{
+            left: infoTooltip.x,
+            top: infoTooltip.y,
+            transform: "translate(-50%, calc(-100% - 36px))",
+          }}
+        >
+          <div className="relative rounded-lg bg-slate-900 px-4 py-2 text-xs font-semibold text-white shadow-lg">
+            {infoTooltip.text}
+            <span className="absolute left-1/2 top-full h-3 w-3 -translate-x-1/2 -translate-y-1/2 rotate-45 bg-slate-900" />
+          </div>
         </div>
       )}
 
