@@ -19,6 +19,7 @@ import {
   Timer,
   Waves,
   AlertCircle,
+  ChevronRight,
 } from "lucide-react";
 import { Link } from "wouter";
 import {
@@ -206,6 +207,57 @@ export default function SimulationDetail() {
   const activeTime = activePoint?.time ?? 0;
   const activeStress = activePoint?.stress ?? 0;
   const activeDisplacement = activePoint?.displacement ?? 0;
+  const metricsList = [
+    {
+      label: "Max Stress",
+      value: `${formatNumber(maxStress)} MPa`,
+      definition: "Peak stress encountered during simulation.",
+      color: "text-primary",
+      bg: "bg-primary/10 dark:bg-primary/20",
+    },
+    {
+      label: "Min Stress",
+      value: `${formatNumber(minStress)} MPa`,
+      definition: "Baseline stress at zero strain.",
+      color: "text-indigo-500",
+      bg: "bg-indigo-100/70 dark:bg-indigo-500/20 dark:text-indigo-200",
+    },
+    {
+      label: "Avg Stress",
+      value: `${formatNumber(avgStress)} MPa`,
+      definition: "Mean stress across all strain points.",
+      color: "text-orange-500",
+      bg: "bg-orange-100/70 dark:bg-orange-500/20 dark:text-orange-200",
+    },
+    {
+      label: "Stress Range",
+      value: `${formatNumber(stressRange)} MPa`,
+      definition: "Total variation in stress values.",
+      color: "text-emerald-500",
+      bg: "bg-emerald-100/70 dark:bg-emerald-500/20 dark:text-emerald-200",
+    },
+    {
+      label: "Max Strain",
+      value: `${formatMicrostrain(results?.maxStrain)} με`,
+      definition: "Peak strain during simulation.",
+      color: "text-sky-500",
+      bg: "bg-sky-100/70 dark:bg-sky-500/20 dark:text-sky-200",
+    },
+    {
+      label: "Avg Strain",
+      value: `${formatMicrostrain(results?.avgStrain)} με`,
+      definition: "Mean strain across all points.",
+      color: "text-slate-500",
+      bg: "bg-slate-200/70 dark:bg-slate-500/20 dark:text-slate-200",
+    },
+    {
+      label: "Safety Factor",
+      value: formatNumber(results?.safetyFactor),
+      definition: "Estimated margin to failure.",
+      color: "text-emerald-600",
+      bg: "bg-emerald-100/70 dark:bg-emerald-500/20 dark:text-emerald-200",
+    },
+  ];
   const exportChartSvg = (chartId: string, filename: string) => {
     const container = document.getElementById(chartId);
     const svg = container?.querySelector("svg");
@@ -478,8 +530,14 @@ export default function SimulationDetail() {
                   </div>
                 ))}
               </div>
-              {showConfigDetails && secondaryConfigItems.length > 0 && (
-                <div className="space-y-3 pt-2">
+              <div
+                className={`grid transition-all duration-300 ease-out ${
+                  showConfigDetails && secondaryConfigItems.length > 0
+                    ? "grid-rows-[1fr] opacity-100 mt-2"
+                    : "grid-rows-[0fr] opacity-0"
+                }`}
+              >
+                <div className="space-y-3 overflow-hidden">
                   {secondaryConfigItems.map((item) => (
                     <div
                       key={item.label}
@@ -509,7 +567,7 @@ export default function SimulationDetail() {
                     </div>
                   ))}
                 </div>
-              )}
+              </div>
             </div>
 
             <div className="bg-card rounded-2xl border border-border p-6 space-y-4">
@@ -529,65 +587,35 @@ export default function SimulationDetail() {
                 </button>
               </div>
               <div className="grid grid-cols-2 gap-4">
-                {[
-                  {
-                    label: "Max Stress",
-                    value: `${formatNumber(maxStress)} MPa`,
-                    definition: "Peak stress encountered during simulation.",
-                    color: "text-primary",
-                    bg: "bg-primary/10 dark:bg-primary/20",
-                  },
-                  {
-                    label: "Min Stress",
-                    value: `${formatNumber(minStress)} MPa`,
-                    definition: "Baseline stress at zero strain.",
-                    color: "text-indigo-500",
-                    bg: "bg-indigo-100/70 dark:bg-indigo-500/20 dark:text-indigo-200",
-                  },
-                  {
-                    label: "Avg Stress",
-                    value: `${formatNumber(avgStress)} MPa`,
-                    definition: "Mean stress across all strain points.",
-                    color: "text-orange-500",
-                    bg: "bg-orange-100/70 dark:bg-orange-500/20 dark:text-orange-200",
-                  },
-                  {
-                    label: "Stress Range",
-                    value: `${formatNumber(stressRange)} MPa`,
-                    definition: "Total variation in stress values.",
-                    color: "text-emerald-500",
-                    bg: "bg-emerald-100/70 dark:bg-emerald-500/20 dark:text-emerald-200",
-                  },
-                  {
-                    label: "Max Strain",
-                    value: `${formatMicrostrain(results?.maxStrain)} με`,
-                    definition: "Peak strain during simulation.",
-                    color: "text-sky-500",
-                    bg: "bg-sky-100/70 dark:bg-sky-500/20 dark:text-sky-200",
-                  },
-                  {
-                    label: "Avg Strain",
-                    value: `${formatMicrostrain(results?.avgStrain)} με`,
-                    definition: "Mean strain across all points.",
-                    color: "text-slate-500",
-                    bg: "bg-slate-200/70 dark:bg-slate-500/20 dark:text-slate-200",
-                  },
-                  {
-                    label: "Safety Factor",
-                    value: formatNumber(results?.safetyFactor),
-                    definition: "Estimated margin to failure.",
-                    color: "text-emerald-600",
-                    bg: "bg-emerald-100/70 dark:bg-emerald-500/20 dark:text-emerald-200",
-                  },
-                ]
-                  .filter(Boolean)
-                  .map((metric, index) => {
-                    if (!showMetricsDetails && index > 3) return null;
-                    return (
-                      <div
-                        key={metric.label}
-                        className={`${metric.bg} rounded-2xl p-4`}
-                      >
+                {metricsList.slice(0, 4).map((metric) => (
+                  <div key={metric.label} className={`${metric.bg} rounded-2xl p-4`}>
+                    <div className="flex items-center justify-between text-xs font-semibold text-muted-foreground">
+                      <span>{metric.label}</span>
+                      <span className="relative inline-flex items-center justify-center group">
+                        <Info className="h-3.5 w-3.5 text-muted-foreground/70" />
+                        <span className="pointer-events-none absolute bottom-full left-1/2 mb-3 w-max -translate-x-1/2 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                          <span className="relative rounded-lg bg-slate-900 px-4 py-2 text-xs font-semibold text-white shadow-lg">
+                            {metric.definition}
+                            <span className="absolute left-1/2 top-full h-3 w-3 -translate-x-1/2 -translate-y-1/2 rotate-45 bg-slate-900" />
+                          </span>
+                        </span>
+                      </span>
+                    </div>
+                    <p className={`mt-3 text-lg font-bold ${metric.color}`}>
+                      {metric.value}
+                    </p>
+                  </div>
+                ))}
+              </div>
+              <div
+                className={`grid transition-all duration-300 ease-out ${
+                  showMetricsDetails ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+                }`}
+              >
+                <div className="overflow-hidden">
+                  <div className="grid grid-cols-2 gap-4 pt-4">
+                    {metricsList.slice(4).map((metric) => (
+                      <div key={metric.label} className={`${metric.bg} rounded-2xl p-4`}>
                         <div className="flex items-center justify-between text-xs font-semibold text-muted-foreground">
                           <span>{metric.label}</span>
                           <span className="relative inline-flex items-center justify-center group">
@@ -604,8 +632,9 @@ export default function SimulationDetail() {
                           {metric.value}
                         </p>
                       </div>
-                    );
-                  })}
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -632,6 +661,7 @@ export default function SimulationDetail() {
                   <Button
                     size="sm"
                     variant="outline"
+                    className="hover:bg-primary/10 hover:text-primary"
                     onClick={() =>
                       exportChartSvg(
                         "stress-strain-chart",
@@ -701,56 +731,68 @@ export default function SimulationDetail() {
                     <Button
                       size="sm"
                       variant="outline"
+                      className="hover:bg-primary/10 hover:text-primary"
                       onClick={() => setIsPlaying((prev) => !prev)}
                     >
                       {isPlaying ? (
                         <>
                           <Pause className="h-4 w-4" />
-                          Pause
                         </>
                       ) : (
                         <>
                           <Play className="h-4 w-4" />
-                          Play
                         </>
                       )}
                     </Button>
                     <Button
                       size="sm"
                       variant="outline"
+                      className="hover:bg-primary/10 hover:text-primary"
                       onClick={() =>
                         setPlayheadIndex((prev) => Math.max(prev - 1, 0))
                       }
                     >
-                      Prev
+                      <ChevronLeft className="h-4 w-4" />
                     </Button>
                     <Button
                       size="sm"
                       variant="outline"
+                      className="hover:bg-primary/10 hover:text-primary"
                       onClick={() =>
                         setPlayheadIndex((prev) =>
                           Math.min(prev + 1, Math.max(timeSeriesData.length - 1, 0))
                         )
                       }
                     >
-                      Next
+                      <ChevronRight className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>
                 <div className="flex flex-col gap-4 xl:flex-row xl:items-center">
                   <div className="flex-1 space-y-2">
-                    <div className="flex items-center justify-between text-sm text-muted-foreground">
-                      <span>Playback</span>
-                      <span>{formatTimeTick(Number(activeTime))} s</span>
+                    <div>
+                      <div className="flex items-center justify-between text-sm text-muted-foreground">
+                        <span>Playback</span>
+                        <span>{formatTimeTick(Number(activeTime))} s</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={0}
+                        max={Math.max(timeSeriesData.length - 1, 0)}
+                        value={playheadIndex}
+                        onChange={(event) => setPlayheadIndex(Number(event.target.value))}
+                        className="w-full accent-primary"
+                      />
                     </div>
-                    <input
-                      type="range"
-                      min={0}
-                      max={Math.max(timeSeriesData.length - 1, 0)}
-                      value={playheadIndex}
-                      onChange={(event) => setPlayheadIndex(Number(event.target.value))}
-                      className="w-full accent-primary"
-                    />
+                    <div className="flex items-center gap-3 text-sm">
+                      <Switch
+                        checked={overlayDisplacement}
+                        onCheckedChange={setOverlayDisplacement}
+                      />
+                      <span className="text-muted-foreground">
+                        Overlay displacement on stress chart
+                      </span>
+                    </div>
                   </div>
                   <div className="bg-muted/30 rounded-2xl px-6 py-4 min-w-[240px]">
                     <p className="text-xs uppercase tracking-widest text-muted-foreground">
@@ -772,15 +814,6 @@ export default function SimulationDetail() {
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-3 text-sm">
-                  <Switch
-                    checked={overlayDisplacement}
-                    onCheckedChange={setOverlayDisplacement}
-                  />
-                  <span className="text-muted-foreground">
-                    Overlay displacement on stress chart
-                  </span>
-                </div>
               </div>
 
               <div className="bg-card rounded-2xl border border-border p-6">
@@ -792,6 +825,7 @@ export default function SimulationDetail() {
                   <Button
                     size="sm"
                     variant="outline"
+                    className="hover:bg-primary/10 hover:text-primary"
                     onClick={() =>
                       exportChartSvg(
                         "stress-time-chart",
@@ -873,6 +907,7 @@ export default function SimulationDetail() {
                     <Button
                       size="sm"
                       variant="outline"
+                      className="hover:bg-primary/10 hover:text-primary"
                       onClick={() =>
                         exportChartSvg(
                           "displacement-time-chart",

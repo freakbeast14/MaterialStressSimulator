@@ -181,11 +181,23 @@ export default function Dashboard() {
                     </div>
                     <StatusBadge status={sim.status} />
                   </div>
-                  {sim.status === "running" && sim.progress && (
+                  {sim.status === "running" && sim.progress != null && (
                     <div className="mt-3 w-full">
                       <div className="flex justify-between items-center mb-1">
-                        <span className="text-xs font-mono text-muted-foreground">
-                          Progress
+                        <span
+                          className={`text-[10px] font-semibold px-3 py-0.5 rounded-full border ${
+                            sim.progress < 20
+                              ? "text-slate-900 bg-slate-200 border-slate-300"
+                              : sim.progress < 70
+                              ? "text-blue-900 bg-blue-200 border-blue-300"
+                              : "text-emerald-900 bg-emerald-200 border-emerald-300"
+                          }`}
+                        >
+                          {sim.progress < 20
+                            ? "Meshing"
+                            : sim.progress < 70
+                            ? "Solving"
+                            : "Post-processing"}
                         </span>
                         <span className="text-xs font-semibold text-primary">
                           {sim.progress}%

@@ -12,6 +12,17 @@ export function useSimulations() {
       if (!res.ok) throw new Error("Failed to fetch simulations");
       return api.simulations.list.responses[200].parse(await res.json());
     },
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
+    refetchIntervalInBackground: true,
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      if (!data) return false;
+      const hasActive = data.some(
+        (sim) => sim.status === "running" || sim.status === "pending",
+      );
+      return hasActive ? 3000 : false;
+    },
   });
 }
 
