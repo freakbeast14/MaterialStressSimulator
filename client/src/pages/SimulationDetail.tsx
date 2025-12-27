@@ -769,7 +769,7 @@ export default function SimulationDetail() {
                   </div>
                 </div>
                 <div className="flex flex-col gap-4 xl:flex-row xl:items-center">
-                  <div className="flex-1 space-y-2">
+                  <div className="flex-1 space-y-5">
                     <div>
                       <div className="flex items-center justify-between text-sm text-muted-foreground">
                         <span>Playback</span>
