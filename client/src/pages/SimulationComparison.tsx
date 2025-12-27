@@ -16,6 +16,7 @@ export default function SimulationComparison() {
 //   const scrollRef = useRef<number | null>(null);
   const initialRender = useRef(true);
   const [search, setSearch] = useState("");
+  const [weights, setWeights] = useState({ stress: 1, deformation: 1, safety: 1 });
 
   const getMaterialName = (id: number) => materials?.find(m => m.id === id)?.name || "Unknown";
 
@@ -67,71 +68,80 @@ export default function SimulationComparison() {
     safetyFactor: (sim.results as any)?.safetyFactor || 0,
   }));
 
-  const responseSurface = useMemo(() => {
-    if (selected.length < 2) return null;
-    const points = selected
-      .map((sim) => {
-        const r = sim.results as any;
-        const load = sim.appliedLoad ?? 0;
-        const temp = sim.temperature ?? 0;
-        const maxStress = r?.maxStress ?? 0;
-        return { load, temp, maxStress, name: sim.name };
-      })
-      .filter((p) => Number.isFinite(p.load) && Number.isFinite(p.temp));
-    if (points.length < 2) return null;
-
-    const loads = points.map((p) => p.load);
-    const temps = points.map((p) => p.temp);
-    const minLoad = Math.min(...loads);
-    const maxLoad = Math.max(...loads);
-    const minTemp = Math.min(...temps);
-    const maxTemp = Math.max(...temps);
-    const gridSize = 12;
-    const gridLoads = Array.from({ length: gridSize }, (_, i) =>
-      minLoad + (maxLoad - minLoad) * (i / (gridSize - 1))
+  const overlayTimeData = useMemo(() => {
+    const maxPoints = Math.max(
+      0,
+      ...selected.map((sim) => (sim.results as any)?.timeSeriesData?.length || 0),
     );
-    const gridTemps = Array.from({ length: gridSize }, (_, i) =>
-      minTemp + (maxTemp - minTemp) * (i / (gridSize - 1))
-    );
-    const gridZ = gridTemps.map((tempValue) =>
-      gridLoads.map((loadValue) => {
-        let weightSum = 0;
-        let valueSum = 0;
-        for (const point of points) {
-          const dx = loadValue - point.load;
-          const dy = tempValue - point.temp;
-          const distance = Math.max(Math.sqrt(dx * dx + dy * dy), 1e-6);
-          const weight = 1 / distance;
-          weightSum += weight;
-          valueSum += weight * point.maxStress;
-        }
-        return weightSum > 0 ? valueSum / weightSum : 0;
-      })
-    );
-
-    return {
-      gridLoads,
-      gridTemps,
-      gridZ,
-      points,
-    };
-  }, [selected]);
-
-  const trajectoryTraces = useMemo(() => {
-    return selected.map((sim, index) => {
-      const r = sim.results as any;
-      const series = r?.timeSeriesData || [];
-      return {
-        x: series.map((p: any) => p.time),
-        y: series.map((p: any) => p.stress),
-        z: series.map((p: any) => p.displacement),
-        mode: "lines",
-        type: "scatter3d",
-        name: sim.name,
-        line: { width: 4 },
-      } as any;
+    return Array.from({ length: maxPoints }, (_, idx) => {
+      const row: Record<string, number | null> = {};
+      selected.forEach((sim) => {
+        const series = (sim.results as any)?.timeSeriesData || [];
+        const point = series[idx];
+        row[`sim-${sim.id}`] = point ? point.stress : null;
+        if (point) row.time = point.time;
+      });
+      return row;
     });
   }, [selected]);
+
+  const overlayStrainData = useMemo(() => {
+    const maxPoints = Math.max(
+      0,
+      ...selected.map(
+        (sim) => (sim.results as any)?.stressStrainCurve?.length || 0,
+      ),
+    );
+    return Array.from({ length: maxPoints }, (_, idx) => {
+      const row: Record<string, number | null> = {};
+      selected.forEach((sim) => {
+        const curve = (sim.results as any)?.stressStrainCurve || [];
+        const point = curve[idx];
+        row[`sim-${sim.id}`] = point ? point.stress : null;
+        if (point) row.strain = point.strain;
+      });
+      return row;
+    });
+  }, [selected]);
+
+  const scoreData = useMemo(() => {
+    if (selected.length === 0) return [];
+    const stressValues = selected.map((sim) => (sim.results as any)?.maxStress || 0);
+    const defValues = selected.map((sim) => (sim.results as any)?.maxDeformation || 0);
+    const safetyValues = selected.map((sim) => (sim.results as any)?.safetyFactor || 0);
+    const stressMin = Math.min(...stressValues);
+    const stressMax = Math.max(...stressValues);
+    const defMin = Math.min(...defValues);
+    const defMax = Math.max(...defValues);
+    const safetyMin = Math.min(...safetyValues);
+    const safetyMax = Math.max(...safetyValues);
+    const normalize = (value: number, min: number, max: number) =>
+      max === min ? 0.5 : (value - min) / (max - min);
+
+    return selected.map((sim) => {
+      const r = sim.results as any;
+      const maxStress = r?.maxStress || 0;
+      const maxDef = r?.maxDeformation || 0;
+      const safety = r?.safetyFactor || 0;
+      const stressScore = 1 - normalize(maxStress, stressMin, stressMax);
+      const defScore = 1 - normalize(maxDef, defMin, defMax);
+      const safetyScore = normalize(safety, safetyMin, safetyMax);
+      const weighted =
+        stressScore * weights.stress +
+        defScore * weights.deformation +
+        safetyScore * weights.safety;
+      const denom = weights.stress + weights.deformation + weights.safety || 1;
+      return {
+        id: sim.id,
+        name: sim.name,
+        maxStress,
+        maxDef,
+        safety,
+        score: weighted / denom,
+      };
+    });
+  }, [selected, weights]);
+
 
 //   useLayoutEffect(() => {
 //     if (initialRender.current) {
@@ -161,13 +171,15 @@ export default function SimulationComparison() {
           <div className="flex items-center justify-between gap-3 mb-4">
             <h3 className="font-semibold">Available Simulations</h3>
             <div className="relative w-full max-w-[220px]">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search..."
-                className="pl-8 h-9 bg-background"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search..."
+                  className="pl-8 h-9 bg-background"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </div>
             </div>
           </div>
           <div className="space-y-2 max-h-96 overflow-y-auto">
@@ -241,28 +253,151 @@ export default function SimulationComparison() {
         >
           <TabsList className="w-full justify-start bg-transparent">
             <TabsTrigger value="comparison">Results Comparison</TabsTrigger>
+            <TabsTrigger value="overlay">Overlay Curves</TabsTrigger>
             <TabsTrigger value="heatmap">Heatmap</TabsTrigger>
             <TabsTrigger value="metrics">3D Metrics Space</TabsTrigger>
-            <TabsTrigger value="trajectories">3D Trajectories</TabsTrigger>
-            <TabsTrigger value="response-surface">3D Response Surface</TabsTrigger>
           </TabsList>
 
           <TabsContent value="comparison">
             <div className="bg-card rounded-2xl border border-border p-6">
-              <h3 className="font-semibold mb-4">Results Comparison</h3>
-              <ResponsiveContainer width="100%" height={300}>
-                <ComposedChart data={comparisonData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                  <XAxis dataKey="name" />
-                  <YAxis yAxisId="left" />
-                  <YAxis yAxisId="right" orientation="right" />
-                  <Tooltip />
-                  <Legend />
-                  <Bar yAxisId="left" dataKey="maxStress" fill="#3b82f6" name="Max Stress (MPa)" />
-                  <Bar yAxisId="left" dataKey="maxDeformationMicrons" fill="#8b5cf6" name="Deformation (μm)" />
-                  <Line yAxisId="right" type="monotone" dataKey="safetyFactor" stroke="#10b981" name="Safety Factor" />
-                </ComposedChart>
-              </ResponsiveContainer>
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <h3 className="font-semibold">Results Comparison</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Weighted score helps rank simulations by your priorities.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+                  <label className="flex items-center gap-2">
+                    Stress weight
+                    <input
+                      type="number"
+                      min={0}
+                      step={0.1}
+                      value={weights.stress}
+                      onChange={(event) =>
+                        setWeights((prev) => ({
+                          ...prev,
+                          stress: Number(event.target.value),
+                        }))
+                      }
+                      className="w-16 rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground"
+                    />
+                  </label>
+                  <label className="flex items-center gap-2">
+                    Deformation weight
+                    <input
+                      type="number"
+                      min={0}
+                      step={0.1}
+                      value={weights.deformation}
+                      onChange={(event) =>
+                        setWeights((prev) => ({
+                          ...prev,
+                          deformation: Number(event.target.value),
+                        }))
+                      }
+                      className="w-16 rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground"
+                    />
+                  </label>
+                  <label className="flex items-center gap-2">
+                    Safety weight
+                    <input
+                      type="number"
+                      min={0}
+                      step={0.1}
+                      value={weights.safety}
+                      onChange={(event) =>
+                        setWeights((prev) => ({
+                          ...prev,
+                          safety: Number(event.target.value),
+                        }))
+                      }
+                      className="w-16 rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground"
+                    />
+                  </label>
+                </div>
+              </div>
+              <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[2fr_1fr]">
+                <div className="rounded-xl border border-border p-4">
+                  <ResponsiveContainer width="100%" height={300}>
+                    <ComposedChart data={comparisonData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                      <XAxis dataKey="name" />
+                      <YAxis yAxisId="left" />
+                      <YAxis yAxisId="right" orientation="right" />
+                      <Tooltip />
+                      <Legend />
+                      <Bar yAxisId="left" dataKey="maxStress" fill="#3b82f6" name="Max Stress (MPa)" />
+                      <Bar yAxisId="left" dataKey="maxDeformationMicrons" fill="#8b5cf6" name="Deformation (μm)" />
+                      <Line yAxisId="right" type="monotone" dataKey="safetyFactor" stroke="#10b981" name="Safety Factor" />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="rounded-xl border border-border p-4">
+                  <h4 className="text-sm font-semibold text-muted-foreground">Weighted Ranking</h4>
+                  <div className="mt-3 space-y-2">
+                    {scoreData
+                      .slice()
+                      .sort((a, b) => b.score - a.score)
+                      .map((sim, idx) => (
+                        <div key={sim.id} className="flex items-center justify-between text-sm">
+                          <span className="truncate">{idx + 1}. {sim.name}</span>
+                          <span className="font-semibold">{sim.score.toFixed(2)}</span>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="overlay">
+            <div className="grid gap-6 lg:grid-cols-2">
+              <div className="bg-card rounded-2xl border border-border p-6">
+                <h3 className="font-semibold mb-4">Stress Over Time (Overlay)</h3>
+                <ResponsiveContainer width="100%" height={320}>
+                  <LineChart data={overlayTimeData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                    <XAxis dataKey="time" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    {selected.map((sim, idx) => (
+                      <Line
+                        key={sim.id}
+                        type="monotone"
+                        dataKey={`sim-${sim.id}`}
+                        stroke={`hsl(${(idx * 360) / Math.max(selected.length, 1)} 75% 55%)`}
+                        name={sim.name}
+                        dot={false}
+                      />
+                    ))}
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="bg-card rounded-2xl border border-border p-6">
+                <h3 className="font-semibold mb-4">Stress-Strain (Overlay)</h3>
+                <ResponsiveContainer width="100%" height={320}>
+                  <LineChart data={overlayStrainData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                    <XAxis dataKey="strain" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    {selected.map((sim, idx) => (
+                      <Line
+                        key={sim.id}
+                        type="monotone"
+                        dataKey={`sim-${sim.id}`}
+                        stroke={`hsl(${(idx * 360) / Math.max(selected.length, 1)} 75% 55%)`}
+                        name={sim.name}
+                        dot={false}
+                      />
+                    ))}
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
             </div>
           </TabsContent>
 
@@ -326,74 +461,6 @@ export default function SimulationComparison() {
                 }}
                 style={{ width: "100%" }}
               />
-            </div>
-          </TabsContent>
-          <TabsContent value="trajectories">
-            <div className="bg-card rounded-2xl border border-border p-6">
-              <h3 className="font-semibold mb-4">3D Stress-Displacement Trajectories</h3>
-              <Plot
-                data={trajectoryTraces}
-                layout={{
-                  scene: {
-                    xaxis: { title: "Time (s)" },
-                    yaxis: { title: "Stress (MPa)" },
-                    zaxis: { title: "Displacement (mm)" },
-                  },
-                  autosize: true,
-                  height: 520,
-                  paper_bgcolor: "transparent",
-                  plot_bgcolor: "transparent",
-                  font: { color: "var(--foreground)" },
-                }}
-                style={{ width: "100%" }}
-              />
-            </div>
-          </TabsContent>
-          <TabsContent value="response-surface">
-            <div className="bg-card rounded-2xl border border-border p-6">
-              <h3 className="font-semibold mb-4">3D Response Surface</h3>
-              {responseSurface ? (
-                <Plot
-                  data={[
-                    {
-                      x: responseSurface.gridLoads,
-                      y: responseSurface.gridTemps,
-                      z: responseSurface.gridZ,
-                      type: "surface",
-                      colorscale: "Viridis",
-                      opacity: 0.85,
-                      name: "Surface",
-                    } as any,
-                    {
-                      x: responseSurface.points.map((p) => p.load),
-                      y: responseSurface.points.map((p) => p.temp),
-                      z: responseSurface.points.map((p) => p.maxStress),
-                      type: "scatter3d",
-                      mode: "markers+text",
-                      text: responseSurface.points.map((p) => p.name),
-                      marker: { size: 5, color: "#f59e0b" },
-                      name: "Simulations",
-                    } as any,
-                  ]}
-                  layout={{
-                    scene: {
-                      xaxis: { title: "Applied Load (N)" },
-                      yaxis: { title: "Temperature (C)" },
-                      zaxis: { title: "Max Stress (MPa)" },
-                    },
-                    autosize: true,
-                    height: 520,
-                    paper_bgcolor: "transparent",
-                    plot_bgcolor: "transparent",
-                    font: { color: "var(--foreground)" },
-                  }}
-                  style={{ width: "100%" }}
-                />
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  Add simulations with load and temperature to build a response surface.
-                </p>
-              )}
             </div>
           </TabsContent>
         </Tabs>
