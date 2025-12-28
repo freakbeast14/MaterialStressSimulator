@@ -795,7 +795,7 @@ export function SimulationForm({
               size="lg"
               className="w-full md:w-auto font-semibold opacity-90 hover:opacity-100 disabled:pointer-events-auto disabled:hover:opacity-50 disabled:cursor-not-allowed"
               onClick={handleStartSimulation}
-              disabled={isCreating || !simName || !materialId}
+              disabled={isCreating || !simName || !materialId || bcWarnings.length > 0}
             >
               {isCreating ? (
                 <>
