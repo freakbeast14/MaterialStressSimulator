@@ -26,6 +26,7 @@ import {
   Timer,
   Waves,
   AlertCircle,
+  ChevronDown,
   ChevronRight,
 } from "lucide-react";
 import { Link } from "wouter";
@@ -61,6 +62,10 @@ export default function SimulationDetail() {
   const [overlayDisplacement, setOverlayDisplacement] = useState(false);
   const [playheadIndex, setPlayheadIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [fieldViewMode, setFieldViewMode] = useState<
+    "isosurface" | "slice" | "volume"
+  >("isosurface");
+  const [sliceAxis, setSliceAxis] = useState<"x" | "y" | "z">("z");
   const [fieldThreshold, setFieldThreshold] = useState(0.35);
   const [fieldSlice, setFieldSlice] = useState(0.5);
   const [geometryContent, setGeometryContent] = useState<string | null>(null);
@@ -412,6 +417,12 @@ export default function SimulationDetail() {
   }, [simulation?.id, timeSeriesData.length]);
 
   useEffect(() => {
+    if (!timeMax) return;
+    const normalized = Math.min(Math.max(activeTime / timeMax, 0), 1);
+    setFieldSlice(Number(normalized.toFixed(2)));
+  }, [activeTime, timeMax]);
+
+  useEffect(() => {
     if (!geometry?.id) {
       setGeometryContent(null);
       setGeometryFormat(null);
@@ -596,13 +607,91 @@ export default function SimulationDetail() {
     }
     return { x, y, z, value };
   }, [minStress, maxStress, fieldSlice]);
+  const fieldSpan = Math.max(maxStress - minStress, 1);
+  const clamp01 = (value: number) => Math.min(Math.max(value, 0), 1);
+  const playbackInfluence =
+    maxStress > 0 ? clamp01(activeStress / maxStress) : 0;
+  const modulatedThreshold = clamp01(
+    fieldThreshold * (0.7 + 0.6 * playbackInfluence)
+  );
+  const effectiveThreshold = modulatedThreshold;
+  const fieldIsoMin = minStress + fieldSpan * effectiveThreshold;
+  const fieldTrace =
+    fieldViewMode === "isosurface"
+      ? ({
+          x: fieldData.x,
+          y: fieldData.y,
+          z: fieldData.z,
+          value: fieldData.value,
+          type: "isosurface",
+          opacity: 0.7,
+          colorscale: "Turbo",
+          isomin: fieldIsoMin,
+          isomax: maxStress,
+          surface: { count: 4 },
+        } as any)
+      : ({
+          x: fieldData.x,
+          y: fieldData.y,
+          z: fieldData.z,
+          value: fieldData.value,
+          type: "volume",
+          opacity: fieldViewMode === "volume" ? 0.15 : 0.05,
+          colorscale: "Turbo",
+          isomin: fieldIsoMin,
+          isomax: maxStress,
+          surface: { count: fieldViewMode === "volume" ? 12 : 6 },
+          caps: { x: { show: false }, y: { show: false }, z: { show: false } },
+          slices:
+            fieldViewMode === "slice"
+              ? {
+                  x: { show: sliceAxis === "x", locations: [fieldSlice] },
+                  y: { show: sliceAxis === "y", locations: [fieldSlice] },
+                  z: { show: sliceAxis === "z", locations: [fieldSlice] },
+                }
+              : undefined,
+        } as any);
   const handleExportCsv = () => {
     if (!results) return;
+    const bcSummary = boundaryConditions?.length
+      ? boundaryConditions
+          .map((condition) => {
+            const label =
+              condition.type === "fixed" ? "Fixed" : "Load";
+            const magnitude =
+              condition.type === "pressure"
+                ? `${formatNumber(condition.magnitude ?? undefined)} ${condition.unit || "N"}`
+                : "0";
+            return `${label} ${condition.face} ${magnitude}`;
+          })
+          .join(" | ")
+      : "";
+    const meshRows = simulationMeshes.length
+      ? simulationMeshes.map((mesh) => [
+          mesh.name,
+          mesh.format,
+          mesh.nodeCount ?? "",
+          mesh.elementCount ?? "",
+        ])
+      : [];
+    const hotspotRows = Array.isArray(results?.hotspots)
+      ? results.hotspots.map((hotspot: any) => [
+          hotspot.type ?? "",
+          hotspot.value ?? "",
+          Array.isArray(hotspot.location)
+            ? hotspot.location.join(",")
+            : "",
+        ])
+      : [];
     const rows = [
       ["Simulation Name", simulation.name],
       ["Simulation ID", simulation.id],
       ["Material", material?.name || "Unknown"],
+      ["Geometry", geometry?.name || "Unknown"],
       ["Test Type", simulation.type],
+      ["Material Model", simulation.materialModel || "linear"],
+      ["Yield Strength (MPa)", simulation.yieldStrength ?? ""],
+      ["Hardening Modulus (MPa)", simulation.hardeningModulus ?? ""],
       ["Max Stress (MPa)", results.maxStress ?? ""],
       ["Min Stress (MPa)", results.minStress ?? ""],
       ["Avg Stress (MPa)", results.avgStress ?? ""],
@@ -611,6 +700,12 @@ export default function SimulationDetail() {
       ["Max Strain", results.maxStrain ?? ""],
       ["Avg Strain", results.avgStrain ?? ""],
       ["Safety Factor", results.safetyFactor ?? ""],
+      ["Boundary Conditions", bcSummary],
+      ["Solver Source", solverSource],
+      [],
+      ["Stress-Strain Curve"],
+      ["Strain", "Stress (MPa)"],
+      ...stressStrainData.map((point) => [point.strain, point.stress]),
       [],
       ["Time (s)", "Stress (MPa)", "Displacement (mm)"],
       ...(results.timeSeriesData || []).map((point: any) => [
@@ -618,6 +713,14 @@ export default function SimulationDetail() {
         point.stress,
         point.displacement,
       ]),
+      [],
+      ["Mesh Artifacts"],
+      ["Name", "Format", "Nodes", "Elements"],
+      ...meshRows,
+      [],
+      ["Hotspots"],
+      ["Type", "Value", "Location"],
+      ...hotspotRows,
     ];
     const csv = rows
       .map((row) =>
@@ -637,6 +740,112 @@ export default function SimulationDetail() {
     link.download = `${simulation.name || "simulation"}-results.csv`;
     link.click();
     URL.revokeObjectURL(url);
+  };
+
+  const handleExportPdf = () => {
+    if (!simulation || !results) return;
+    const metricRows = metricsList
+      .map(
+        (metric) =>
+          `<tr><td>${metric.label}</td><td style="text-align:right;">${metric.value}</td></tr>`
+      )
+      .join("");
+    const bcRows = bcItems.length
+      ? bcItems
+          .map(
+            (item) =>
+              `<tr><td>${item.label}</td><td>${item.face}</td><td>${item.value}</td></tr>`
+          )
+          .join("")
+      : `<tr><td colspan="3" style="text-align:center;color:#6b7280;">None</td></tr>`;
+    const html = `
+      <html>
+        <head>
+          <title>${simulation.name || "Simulation"} - Report</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 32px; color: #0f172a; }
+            h1 { margin: 0 0 8px; font-size: 24px; }
+            h2 { margin: 24px 0 8px; font-size: 16px; color: #334155; }
+            .meta { color: #64748b; font-size: 12px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+            th, td { border-bottom: 1px solid #e2e8f0; padding: 8px 6px; font-size: 12px; }
+            th { text-align: left; color: #475569; font-weight: 600; }
+            .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+            .card { border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; }
+          </style>
+        </head>
+        <body>
+          <h1>${simulation.name || "Simulation Report"}</h1>
+          <div class="meta">Simulation #${simulation.id} • ${runDate}</div>
+          <div class="grid" style="margin-top:16px;">
+            <div class="card">
+              <h2>Configuration</h2>
+              <table>
+                <tr><td>Material</td><td style="text-align:right;">${material?.name || "Unknown"}</td></tr>
+                <tr><td>Geometry</td><td style="text-align:right;">${geometry?.name || "Unknown"}</td></tr>
+                <tr><td>Test Type</td><td style="text-align:right;">${simulation.type}</td></tr>
+                <tr><td>Material Model</td><td style="text-align:right;">${simulation.materialModel || "linear"}</td></tr>
+              </table>
+            </div>
+            <div class="card">
+              <h2>Key Metrics</h2>
+              <table>${metricRows}</table>
+            </div>
+          </div>
+          <div class="card" style="margin-top:16px;">
+            <h2>Boundary Conditions</h2>
+            <table>
+              <tr><th>Type</th><th>Face</th><th>Value</th></tr>
+              ${bcRows}
+            </table>
+          </div>
+        </body>
+      </html>
+    `;
+    const iframe = document.createElement("iframe");
+    iframe.style.position = "fixed";
+    iframe.style.right = "0";
+    iframe.style.bottom = "0";
+    iframe.style.width = "0";
+    iframe.style.height = "0";
+    iframe.style.border = "0";
+    document.body.appendChild(iframe);
+    const frameWindow = iframe.contentWindow;
+    if (!frameWindow) {
+      toast({
+        title: "Export failed",
+        description: "Unable to open print window.",
+        variant: "destructive",
+      });
+      document.body.removeChild(iframe);
+      return;
+    }
+    frameWindow.document.open();
+    frameWindow.document.write(html);
+    frameWindow.document.close();
+    frameWindow.focus();
+    frameWindow.print();
+    setTimeout(() => {
+      document.body.removeChild(iframe);
+    }, 1000);
+  };
+
+  const findMeshByFormat = (format: string) =>
+    simulationMeshes.find(
+      (mesh) => mesh.format.toLowerCase() === format.toLowerCase()
+    );
+
+  const handleExportMeshFormat = async (format: string) => {
+    const mesh = findMeshByFormat(format);
+    if (!mesh) {
+      toast({
+        title: "Export unavailable",
+        description: `No ${format.toUpperCase()} artifact found for this simulation.`,
+        variant: "destructive",
+      });
+      return;
+    }
+    await handleDownloadMesh(mesh.id, mesh.name, mesh.format);
   };
 
   const handleShare = async () => {
@@ -816,6 +1025,10 @@ export default function SimulationDetail() {
               <Button variant="outline" onClick={handleExportCsv} className="hover:bg-primary/10 hover:text-primary">
                 <Download className="h-4 w-4" />
                 Export CSV
+              </Button>
+              <Button variant="outline" onClick={handleExportPdf} className="hover:bg-primary/10 hover:text-primary">
+                <Download className="h-4 w-4" />
+                Export PDF
               </Button>
             </div>
           )}
@@ -1228,8 +1441,8 @@ export default function SimulationDetail() {
           <Tabs defaultValue="stress-strain" className="space-y-6">
             <TabsList className="w-full justify-start bg-transparent">
               <TabsTrigger value="stress-strain">Stress-Strain Curve</TabsTrigger>
-              <TabsTrigger value="stress-distribution">Stress Distribution</TabsTrigger>
-              <TabsTrigger value="field-viewer">3D Field Viewer</TabsTrigger>
+              <TabsTrigger value="stress-distribution">Time-Series Playback</TabsTrigger>
+              <TabsTrigger value="field-viewer">3D Results Viewer</TabsTrigger>
               <TabsTrigger value="surface">3D Surface</TabsTrigger>
             </TabsList>
 
@@ -1318,6 +1531,16 @@ export default function SimulationDetail() {
                       size="sm"
                       variant="outline"
                       className="hover:bg-primary/10 hover:text-primary"
+                      onClick={() =>
+                        setPlayheadIndex((prev) => Math.max(prev - 1, 0))
+                      }
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="hover:bg-primary/10 hover:text-primary"
                       onClick={() => setIsPlaying((prev) => !prev)}
                     >
                       {isPlaying ? (
@@ -1329,16 +1552,6 @@ export default function SimulationDetail() {
                           <Play className="h-4 w-4" />
                         </>
                       )}
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="hover:bg-primary/10 hover:text-primary"
-                      onClick={() =>
-                        setPlayheadIndex((prev) => Math.max(prev - 1, 0))
-                      }
-                    >
-                      <ChevronLeft className="h-4 w-4" />
                     </Button>
                     <Button
                       size="sm"
@@ -1546,9 +1759,9 @@ export default function SimulationDetail() {
               <div className="bg-card rounded-2xl border border-border p-6 space-y-6">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                   <div>
-                    <h3 className="font-semibold">3D Field Viewer</h3>
+                    <h3 className="text-lg font-semibold">3D Results Viewer</h3>
                     <p className="text-sm text-muted-foreground">
-                      Explore volumetric stress intensity with adjustable thresholds and slices.
+                      Inspect iso-surfaces or take planar slices through the stress field.
                     </p>
                   </div>
                   <Button size="sm" variant="outline" onClick={handleExportField}>
@@ -1556,53 +1769,124 @@ export default function SimulationDetail() {
                     Export View
                   </Button>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-xs text-muted-foreground">
-                      <span>Intensity Threshold</span>
-                      <span>{Math.round(fieldThreshold * 100)}%</span>
-                    </div>
-                    <input
-                      type="range"
-                      min={0.1}
-                      max={0.9}
-                      step={0.05}
-                      value={fieldThreshold}
-                      onChange={(event) => setFieldThreshold(Number(event.target.value))}
-                      className="w-full accent-primary"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-xs text-muted-foreground">
-                      <span>Depth Slice</span>
-                      <span>{Math.round(fieldSlice * 100)}%</span>
+                <div className="grid grid-cols-1 xl:grid-cols-[1.2fr_1fr] gap-4">
+                  <div className="rounded-2xl border border-border bg-muted/20 px-5 py-4 space-y-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+                      <div className="flex flex-col gap-1">
+                        <span className="text-xs text-muted-foreground">
+                            Playback
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                            {formatTimeTick(Number(activeTime))} s
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="hover:bg-primary/10 hover:text-primary"
+                          onClick={() =>
+                            setPlayheadIndex((prev) => Math.max(prev - 1, 0))
+                          }
+                          disabled={timeSeriesData.length === 0}
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="hover:bg-primary/10 hover:text-primary"
+                          onClick={() => setIsPlaying((prev) => !prev)}
+                          disabled={timeSeriesData.length === 0}
+                        >
+                          {isPlaying ? (
+                            <Pause className="h-4 w-4" />
+                          ) : (
+                            <Play className="h-4 w-4" />
+                          )}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="hover:bg-primary/10 hover:text-primary"
+                          onClick={() =>
+                            setPlayheadIndex((prev) =>
+                              Math.min(prev + 1, Math.max(timeSeriesData.length - 1, 0))
+                            )
+                          }
+                          disabled={timeSeriesData.length === 0}
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                     <input
                       type="range"
                       min={0}
-                      max={1}
-                      step={0.05}
-                      value={fieldSlice}
-                      onChange={(event) => setFieldSlice(Number(event.target.value))}
+                      max={Math.max(timeSeriesData.length - 1, 0)}
+                      value={playheadIndex}
+                      onChange={(event) => setPlayheadIndex(Number(event.target.value))}
                       className="w-full accent-primary"
+                      disabled={timeSeriesData.length === 0}
                     />
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-xs text-muted-foreground">
+                        <span>Intensity Threshold</span>
+                        <span>{Math.round(fieldThreshold * 100)}%</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={0.1}
+                        max={0.9}
+                        step={0.05}
+                        value={fieldThreshold}
+                        onChange={(event) => setFieldThreshold(Number(event.target.value))}
+                        className="w-full accent-primary"
+                      />
+                    </div>
+                  </div>
+                  <div className="rounded-2xl border border-border bg-muted/10 px-5 py-4 space-y-4">
+                    <div className="space-y-2">
+                      <div className="text-xs text-muted-foreground">View Mode</div>
+                    <div className="relative">
+                      <select
+                        className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-card px-3 py-2 pr-10 text-sm text-foreground ring-offset-background shadow-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 appearance-none"
+                        value={fieldViewMode}
+                        onChange={(event) =>
+                          setFieldViewMode(
+                            event.target.value as "isosurface" | "slice" | "volume"
+                          )
+                        }
+                      >
+                        <option value="isosurface">Iso-surface</option>
+                        <option value="slice">Slice</option>
+                        <option value="volume">Volume</option>
+                      </select>
+                      <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    </div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="text-xs text-muted-foreground">Slice Axis</div>
+                    <div className="relative">
+                      <select
+                        className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-card px-3 py-2 pr-10 text-sm text-foreground ring-offset-background shadow-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 appearance-none disabled:cursor-not-allowed disabled:opacity-50"
+                        value={sliceAxis}
+                        onChange={(event) =>
+                          setSliceAxis(event.target.value as "x" | "y" | "z")
+                        }
+                        disabled={fieldViewMode !== "slice"}
+                      >
+                        <option value="x">X axis</option>
+                        <option value="y">Y axis</option>
+                        <option value="z">Z axis</option>
+                      </select>
+                      <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    </div>
+                    </div>
                   </div>
                 </div>
                 <Plot
-                  data={[
-                    {
-                      x: fieldData.x,
-                      y: fieldData.y,
-                      z: fieldData.z,
-                      value: fieldData.value,
-                      type: "volume",
-                      opacity: 0.15,
-                      surface: { count: 12 },
-                      colorscale: "Turbo",
-                      isomin: minStress + (maxStress - minStress) * fieldThreshold,
-                      isomax: maxStress,
-                    } as any,
-                  ]}
+                  data={[fieldTrace]}
                   onInitialized={(_, graphDiv) => {
                     plotRef.current = graphDiv;
                   }}
@@ -1610,7 +1894,12 @@ export default function SimulationDetail() {
                     plotRef.current = graphDiv;
                   }}
                   layout={{
-                    title: "Stress Field (normalized)",
+                    title:
+                      fieldViewMode === "isosurface"
+                        ? "Stress Iso-surface"
+                        : fieldViewMode === "slice"
+                        ? "Stress Slice"
+                        : "Stress Volume",
                     scene: {
                       xaxis: { title: "X" },
                       yaxis: { title: "Y" },
@@ -1629,7 +1918,10 @@ export default function SimulationDetail() {
             </TabsContent>
             <TabsContent value="surface">
               <div className="bg-card rounded-2xl border border-border p-6">
-                <h3 className="font-semibold mb-4">3D Stress-Displacement Surface</h3>
+                <h3 className="text-lg font-semibold">3D Stress-Displacement Surface</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Shows stress and displacement trends across time on a single surface.
+                </p>
                 <Plot
                   data={[
                     {

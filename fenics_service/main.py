@@ -346,6 +346,7 @@ def _solve_with_fenics(
         if progress_cb:
             progress_cb(95)
 
+
     log_text = log_buffer.getvalue().strip()
     if log_text:
         if not mesh_artifacts:
