@@ -76,6 +76,22 @@ export default function CreateSimulation() {
     const selectedMaterialId = parseInt(materialId || "0");
     if (!selectedMaterialId) return;
     const loadMagnitude = parseFloat(appliedLoad);
+    const resolvedYieldStrength =
+      materialModel === "plastic"
+        ? (() => {
+            const parsed = parseFloat(yieldStrength);
+            if (yieldStrength.trim() === "" || !Number.isFinite(parsed)) return 250;
+            return parsed;
+          })()
+        : null;
+    const resolvedHardeningModulus =
+      materialModel === "plastic"
+        ? (() => {
+            const parsed = parseFloat(hardeningModulus);
+            if (hardeningModulus.trim() === "" || !Number.isFinite(parsed)) return 100;
+            return parsed;
+          })()
+        : null;
     const preparedBoundaryConditions = boundaryConditions.map((condition) => {
       if (condition.type === "pressure") {
         const magnitude =
@@ -103,14 +119,8 @@ export default function CreateSimulation() {
         dampingRatio: parseFloat(dampingRatio),
         geometryId: geometryId ? parseInt(geometryId, 10) : undefined,
         materialModel,
-        yieldStrength:
-          materialModel === "plastic" && yieldStrength.trim() !== ""
-            ? parseFloat(yieldStrength)
-            : null,
-        hardeningModulus:
-          materialModel === "plastic" && hardeningModulus.trim() !== ""
-            ? parseFloat(hardeningModulus)
-            : null,
+        yieldStrength: resolvedYieldStrength,
+        hardeningModulus: resolvedHardeningModulus,
         boundaryConditions: preparedBoundaryConditions,
       },
       {
