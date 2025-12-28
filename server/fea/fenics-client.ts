@@ -38,6 +38,15 @@ export type FenicsJobInput = {
   duration?: number | null;
   frequency?: number | null;
   dampingRatio?: number | null;
+  materialModel?: string | null;
+  yieldStrength?: number | null;
+  hardeningModulus?: number | null;
+  boundaryConditions?: {
+    type: "fixed" | "pressure";
+    face: "x+" | "x-" | "y+" | "y-" | "z+" | "z-";
+    magnitude?: number | null;
+    unit?: string | null;
+  }[];
   geometry?: FenicsGeometry;
   material: FenicsMaterial;
 };

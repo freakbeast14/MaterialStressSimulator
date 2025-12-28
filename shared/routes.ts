@@ -7,7 +7,15 @@ import {
   geometries,
   insertGeometrySchema,
   simulationMeshes,
+  simulationBoundaryConditions,
 } from './schema';
+
+const boundaryConditionSchema = z.object({
+  type: z.enum(["fixed", "pressure"]),
+  face: z.enum(["x+", "x-", "y+", "y-", "z+", "z-"]),
+  magnitude: z.number().nullable().optional(),
+  unit: z.string().optional(),
+});
 
 // ============================================
 // SHARED ERROR SCHEMAS
@@ -76,6 +84,11 @@ export const api = {
         duration: true,
         frequency: true,
         dampingRatio: true,
+        materialModel: true,
+        yieldStrength: true,
+        hardeningModulus: true,
+      }).extend({
+        boundaryConditions: z.array(boundaryConditionSchema).optional(),
       }),
       responses: {
         201: z.custom<typeof simulations.$inferSelect>(),
@@ -159,6 +172,25 @@ export const api = {
           format: z.string(),
           contentBase64: z.string(),
         }),
+        404: errorSchemas.notFound,
+      },
+    },
+  },
+  simulationBoundaryConditions: {
+    listBySimulation: {
+      method: 'GET' as const,
+      path: '/api/simulations/:id/boundary-conditions',
+      responses: {
+        200: z.array(z.custom<typeof simulationBoundaryConditions.$inferSelect>()),
+      },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/simulations/:id/boundary-conditions',
+      input: boundaryConditionSchema,
+      responses: {
+        201: z.custom<typeof simulationBoundaryConditions.$inferSelect>(),
+        400: errorSchemas.validation,
         404: errorSchemas.notFound,
       },
     },

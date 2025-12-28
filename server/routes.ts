@@ -68,9 +68,23 @@ export async function registerRoutes(
   app.post(api.simulations.create.path, async (req, res) => {
     try {
       const input = api.simulations.create.input.parse(req.body);
-      const simulation = await storage.createSimulation(input);
+      const { boundaryConditions, ...simulationInput } = input;
+      const simulation = await storage.createSimulation(simulationInput);
       
       if (simulation) {
+        if (boundaryConditions?.length) {
+          await Promise.all(
+            boundaryConditions.map((condition) =>
+              storage.createBoundaryCondition({
+                simulationId: simulation.id,
+                type: condition.type,
+                face: condition.face,
+                magnitude: condition.magnitude ?? null,
+                unit: condition.unit ?? null,
+              })
+            )
+          );
+        }
         enqueueSimulation(simulation.id, input);
       }
 
@@ -167,6 +181,44 @@ export async function registerRoutes(
       format: mesh.format,
       contentBase64: buffer.toString("base64"),
     });
+  });
+
+  // === Simulation Boundary Conditions ===
+  app.get(api.simulationBoundaryConditions.listBySimulation.path, async (req, res) => {
+    const simulationId = Number(req.params.id);
+    const simulation = await storage.getSimulation(simulationId);
+    if (!simulation) {
+      return res.status(404).json({ message: "Simulation not found" });
+    }
+    const conditions = await storage.getBoundaryConditions(simulationId);
+    res.json(conditions);
+  });
+
+  app.post(api.simulationBoundaryConditions.create.path, async (req, res) => {
+    try {
+      const simulationId = Number(req.params.id);
+      const simulation = await storage.getSimulation(simulationId);
+      if (!simulation) {
+        return res.status(404).json({ message: "Simulation not found" });
+      }
+      const input = api.simulationBoundaryConditions.create.input.parse(req.body);
+      const condition = await storage.createBoundaryCondition({
+        simulationId,
+        type: input.type,
+        face: input.face,
+        magnitude: input.magnitude ?? null,
+        unit: input.unit ?? null,
+      });
+      res.status(201).json(condition);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({
+          message: err.errors[0].message,
+          field: err.errors[0].path.join("."),
+        });
+      }
+      throw err;
+    }
   });
 
   // Seed if empty
