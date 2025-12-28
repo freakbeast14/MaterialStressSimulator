@@ -5,8 +5,7 @@ import {
   type FenicsJobInput,
   type FenicsMeshArtifact,
 } from "./fenics-client";
-import fs from "fs/promises";
-import path from "path";
+import { readStoragePath, saveMeshFile } from "../storage-backend";
 
 type SimulationJob = {
   id: number;
@@ -52,7 +51,7 @@ async function runJob(job: SimulationJob): Promise<void> {
         await storage.updateSimulationStatus(job.id, "failed", { message: "Geometry not found" }, 0);
         return;
       }
-      const fileBuffer = await fs.readFile(geometry.storagePath);
+      const fileBuffer = await readStoragePath(geometry.storagePath);
       geometryPayload = {
         name: geometry.name,
         format: geometry.format,
@@ -115,23 +114,19 @@ async function persistMeshArtifacts(
   geometryId: number | null | undefined,
   meshes: FenicsMeshArtifact[],
 ): Promise<void> {
-  const storageRoot = path.resolve(process.cwd(), "storage", "meshes", String(simulationId));
-  await fs.mkdir(storageRoot, { recursive: true });
-
   for (const [index, mesh] of meshes.entries()) {
     const safeName = (mesh.name || "mesh").replace(/[^a-z0-9-_]+/gi, "_");
     const safeFormat = mesh.format.replace(".", "").toLowerCase();
     const fileName = `${safeName}-${index}.${safeFormat}`;
-    const storagePath = path.join(storageRoot, fileName);
     const buffer = Buffer.from(mesh.contentBase64, "base64");
-    await fs.writeFile(storagePath, buffer);
+    const saved = await saveMeshFile(simulationId, fileName, buffer);
     await storage.createSimulationMesh({
       simulationId,
       geometryId: geometryId ?? null,
       name: safeName,
       format: safeFormat,
-      storagePath,
-      sizeBytes: buffer.length,
+      storagePath: saved.storagePath,
+      sizeBytes: saved.sizeBytes,
       nodeCount: mesh.nodeCount ?? null,
       elementCount: mesh.elementCount ?? null,
     });
