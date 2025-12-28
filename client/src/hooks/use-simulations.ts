@@ -105,6 +105,9 @@ export function useUpdateSimulation() {
       queryClient.invalidateQueries({
         queryKey: [api.simulations.get.path, variables.id],
       });
+      queryClient.invalidateQueries({
+        queryKey: [api.simulationBoundaryConditions.listBySimulation.path, variables.id],
+      });
     },
   });
 }

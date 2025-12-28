@@ -1099,7 +1099,16 @@ export async function registerRoutes(
     if (!mesh) {
       return res.status(404).json({ message: "Simulation mesh not found" });
     }
-    const buffer = await readStoragePath(mesh.storagePath);
+    let buffer: Buffer;
+    try {
+      buffer = await readStoragePath(mesh.storagePath);
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException)?.code;
+      if (code === "ENOENT") {
+        return res.status(404).json({ message: "Mesh file missing on disk" });
+      }
+      return res.status(500).json({ message: "Failed to read mesh file" });
+    }
     res.json({
       name: mesh.name,
       format: mesh.format,
