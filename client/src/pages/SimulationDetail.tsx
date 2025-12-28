@@ -5,6 +5,7 @@ import { useMaterial } from "@/hooks/use-materials";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Plot from "react-plotly.js";
 import { useGeometries } from "@/hooks/use-geometries";
+import { useBoundaryConditions } from "@/hooks/use-boundary-conditions";
 import { StatusBadge } from "@/components/StatusBadge";
 import {
   Activity,
@@ -14,8 +15,11 @@ import {
   Download,
   Gauge,
   Info,
+  Layers,
   Pause,
   Play,
+  ShieldCheck,
+  Sparkles,
   Ruler,
   Share2,
   Thermometer,
@@ -51,6 +55,7 @@ export default function SimulationDetail() {
   const { data: simulation, isLoading } = useSimulation(parseInt(id || "0"));
   const { data: material } = useMaterial(simulation?.materialId || 0);
   const { data: geometries } = useGeometries();
+  const { data: boundaryConditions } = useBoundaryConditions(simulation?.id);
   const [showConfigDetails, setShowConfigDetails] = useState(false);
   const [showMetricsDetails, setShowMetricsDetails] = useState(false);
   const [overlayDisplacement, setOverlayDisplacement] = useState(false);
@@ -149,12 +154,22 @@ export default function SimulationDetail() {
       [
         { label: "Material", value: material?.name || "Unknown", icon: Box },
         { label: "Test Type", value: simulation?.type || "Unknown", icon: Activity },
+        simulation?.materialModel
+          ? {
+              label: "Material Model",
+              value:
+                simulation.materialModel === "plastic"
+                  ? "Elastic-Plastic"
+                  : "Linear Elastic",
+              icon: Layers,
+            }
+          : null,
       ] as {
         label: string;
         value: string;
         icon: ElementType;
       }[],
-    [geometry?.name, material?.name, simulation?.type]
+    [geometry?.name, material?.name, simulation?.type, simulation?.materialModel]
   );
 
   const secondaryConfigItems = useMemo(
@@ -195,6 +210,20 @@ export default function SimulationDetail() {
               icon: Waves,
             }
           : null,
+        simulation?.yieldStrength != null
+          ? {
+              label: "Yield Strength",
+              value: `${formatNumber(simulation.yieldStrength)} MPa`,
+              icon: ShieldCheck,
+            }
+          : null,
+        simulation?.hardeningModulus != null
+          ? {
+              label: "Hardening Modulus",
+              value: `${formatNumber(simulation.hardeningModulus)} MPa`,
+              icon: Sparkles,
+            }
+          : null,
       ].filter(Boolean) as {
         label: string;
         value: string;
@@ -206,8 +235,29 @@ export default function SimulationDetail() {
       simulation?.temperature,
       simulation?.duration,
       simulation?.frequency,
+      simulation?.materialModel,
+      simulation?.yieldStrength,
+      simulation?.hardeningModulus,
     ]
   );
+
+  const bcItems = useMemo(() => {
+    if (!boundaryConditions?.length) return [];
+    return boundaryConditions.map((condition) => {
+      const label =
+        condition.type === "fixed" ? "Fixed Support" : "Applied Load";
+      const value =
+        condition.type === "pressure"
+          ? `${formatNumber(condition.magnitude ?? undefined)} ${condition.unit || "N"}`
+          : "0";
+      return {
+        id: condition.id,
+        label,
+        face: condition.face,
+        value,
+      };
+    });
+  }, [boundaryConditions]);
 
   const progressStage =
     (simulation?.progress ?? 0) < 20
@@ -906,14 +956,38 @@ export default function SimulationDetail() {
                   </div>
                 ))}
               </div>
+              {bcItems.length > 0 && (
+                <div className="rounded-xl border border-border bg-muted/20 px-4 py-3 space-y-2">
+                  <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+                    Boundary Conditions
+                  </p>
+                  {bcItems.map((item) => (
+                    <div
+                      key={item.id}
+                      className="flex items-center justify-between text-xs text-muted-foreground"
+                    >
+                      <span>{item.label}</span>
+                      <span className="font-semibold text-foreground">
+                        {item.face} {item.value}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
               <div
                 className={`grid transition-all duration-300 ease-out ${
                   showConfigDetails && secondaryConfigItems.length > 0
-                    ? "grid-rows-[1fr] opacity-100 mt-2"
+                    ? "grid-rows-[1fr] opacity-100"
                     : "grid-rows-[0fr] opacity-0"
                 }`}
+                style={{ marginTop: 0 }}
               >
-                <div className="space-y-3 overflow-hidden">
+                <div className={`space-y-3 overflow-hidden ${
+                  showConfigDetails && secondaryConfigItems.length > 0
+                    ? "mt-4"
+                    : ""
+                  }`}
+                >
                   {secondaryConfigItems.map((item) => (
                     <div
                       key={item.label}

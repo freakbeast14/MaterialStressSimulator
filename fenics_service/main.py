@@ -13,6 +13,7 @@ import os
 import tempfile
 import subprocess
 import base64
+import numpy as np
 
 app = FastAPI(title="FEniCS Solver Service")
 
@@ -30,6 +31,13 @@ class Material(BaseModel):
     stressStrainCurve: List[StressPoint] = Field(default_factory=list)
 
 
+class BoundaryCondition(BaseModel):
+    type: str
+    face: str
+    magnitude: Optional[float] = None
+    unit: Optional[str] = None
+
+
 class SimulationRequest(BaseModel):
     name: str
     materialId: int
@@ -39,8 +47,12 @@ class SimulationRequest(BaseModel):
     duration: Optional[float] = None
     frequency: Optional[float] = None
     dampingRatio: Optional[float] = None
+    materialModel: Optional[str] = None
+    yieldStrength: Optional[float] = None
+    hardeningModulus: Optional[float] = None
     material: Material
     geometry: Optional[Dict[str, str]] = None
+    boundaryConditions: Optional[List[BoundaryCondition]] = None
 
 
 class JobStatus(BaseModel):
@@ -114,7 +126,6 @@ def _solve_with_fenics(
     payload: SimulationRequest,
     progress_cb: Optional[Callable[[int], None]] = None,
 ) -> Tuple[Dict[str, float | int | list | str], Optional[Dict[str, list]]]:
-    import numpy as np
     import dolfin as df
 
     log_buffer = StringIO()
@@ -144,64 +155,132 @@ def _solve_with_fenics(
             return 2.0 * mu * eps(u_field) + lmbda * df.tr(eps(u_field)) * df.Identity(3)
 
         applied_load = payload.appliedLoad if payload.appliedLoad is not None else 1000.0
-        traction = applied_load / 1000.0
-        t = df.Constant((0.0, 0.0, float(traction)))
         boundaries = df.MeshFunction("size_t", mesh, mesh.topology().dim() - 1, 0)
-        for facet in df.facets(mesh):
-            if not facet.exterior():
-                continue
-            nz = facet.normal().z()
-            if nz >= 0.2:
-                boundaries[facet] = 1
-            elif nz <= -0.2:
-                boundaries[facet] = 2
-
-        top_count = int((boundaries.array() == 1).sum())
-        bottom_count = int((boundaries.array() == 2).sum())
-        if top_count == 0 or bottom_count == 0:
-            coords = mesh.coordinates()
-            if coords.size > 0:
-                min_z = float(coords[:, 2].min())
-                max_z = float(coords[:, 2].max())
-            else:
-                min_z, max_z = 0.0, 1.0
-            tol = max(1e-6, (max_z - min_z) * 1e-6)
-
-            def top_boundary(x, on_boundary):
-                return on_boundary and df.near(x[2], max_z, tol)
-
-            def bottom_boundary(x, on_boundary):
-                return on_boundary and df.near(x[2], min_z, tol)
-
-            boundaries = df.MeshFunction(
-                "size_t", mesh, mesh.topology().dim() - 1, 0
-            )
-            df.AutoSubDomain(top_boundary).mark(boundaries, 1)
-            df.AutoSubDomain(bottom_boundary).mark(boundaries, 2)
-            top_count = int((boundaries.array() == 1).sum())
-            bottom_count = int((boundaries.array() == 2).sum())
-
-        if top_count == 0 or bottom_count == 0:
-            warning = (
-                "Boundary condition facets not found "
-                f"(top={top_count}, bottom={bottom_count})."
-            )
-            if not mesh_artifacts:
-                mesh_artifacts = {"logs": [warning]}
-            else:
-                logs = mesh_artifacts.setdefault("logs", [])
-                logs.append(warning)
-
-        bc = df.DirichletBC(V, df.Constant((0.0, 0.0, 0.0)), boundaries, 2)
         ds = df.Measure("ds", domain=mesh, subdomain_data=boundaries)
+        logs = []
+
+        def _mark_face(face_key: str, marker_id: int) -> int:
+            count = 0
+            for facet in df.facets(mesh):
+                if not facet.exterior():
+                    continue
+                normal = facet.normal()
+                if face_key == "z+" and normal.z() >= 0.2:
+                    boundaries[facet] = marker_id
+                elif face_key == "z-" and normal.z() <= -0.2:
+                    boundaries[facet] = marker_id
+                elif face_key == "x+" and normal.x() >= 0.2:
+                    boundaries[facet] = marker_id
+                elif face_key == "x-" and normal.x() <= -0.2:
+                    boundaries[facet] = marker_id
+                elif face_key == "y+" and normal.y() >= 0.2:
+                    boundaries[facet] = marker_id
+                elif face_key == "y-" and normal.y() <= -0.2:
+                    boundaries[facet] = marker_id
+                else:
+                    continue
+                count += 1
+            if count > 0:
+                return count
+
+            coords = mesh.coordinates()
+            if coords.size == 0:
+                return 0
+            axis_map = {"x": 0, "y": 1, "z": 2}
+            axis = axis_map.get(face_key[0])
+            if axis is None:
+                return 0
+            min_val = float(coords[:, axis].min())
+            max_val = float(coords[:, axis].max())
+            tol = max(1e-6, (max_val - min_val) * 1e-6)
+            target = max_val if face_key[1] == "+" else min_val
+
+            def on_face(x, on_boundary):
+                return on_boundary and df.near(x[axis], target, tol)
+
+            df.AutoSubDomain(on_face).mark(boundaries, marker_id)
+            return int((boundaries.array() == marker_id).sum())
+
+        boundary_conditions = payload.boundaryConditions or [
+            BoundaryCondition(type="fixed", face="z-"),
+            BoundaryCondition(
+                type="pressure",
+                face="z+",
+                magnitude=applied_load,
+                unit="N",
+            ),
+        ]
+
+        bcs = []
+        pressure_terms = []
+        marker_id = 1
+        for condition in boundary_conditions:
+            marker_id += 1
+            face_count = _mark_face(condition.face, marker_id)
+            if face_count == 0:
+                logs.append(
+                    f"Boundary condition facets not found (face={condition.face})."
+                )
+                continue
+            if condition.type == "fixed":
+                bcs.append(
+                    df.DirichletBC(V, df.Constant((0.0, 0.0, 0.0)), boundaries, marker_id)
+                )
+            elif condition.type == "pressure":
+                magnitude = (
+                    condition.magnitude
+                    if condition.magnitude is not None
+                    else applied_load
+                )
+                traction = float(magnitude) / 1000.0
+                if condition.face == "x+":
+                    direction = (1.0, 0.0, 0.0)
+                elif condition.face == "x-":
+                    direction = (-1.0, 0.0, 0.0)
+                elif condition.face == "y+":
+                    direction = (0.0, 1.0, 0.0)
+                elif condition.face == "y-":
+                    direction = (0.0, -1.0, 0.0)
+                elif condition.face == "z-":
+                    direction = (0.0, 0.0, -1.0)
+                else:
+                    direction = (0.0, 0.0, 1.0)
+                pressure_terms.append(
+                    df.dot(df.Constant(tuple(traction * d for d in direction)), v)
+                    * ds(marker_id)
+                )
+
+        if not bcs:
+            marker_id += 1
+            fallback_count = _mark_face("z-", marker_id)
+            if fallback_count == 0:
+                logs.append("No fixed boundary faces found; solution may be unstable.")
+            else:
+                bcs.append(
+                    df.DirichletBC(
+                        V, df.Constant((0.0, 0.0, 0.0)), boundaries, marker_id
+                    )
+                )
+
+        if logs:
+            if not mesh_artifacts:
+                mesh_artifacts = {"logs": logs}
+            else:
+                mesh_artifacts.setdefault("logs", []).extend(logs)
 
         a = df.inner(sigma(u), eps(v)) * df.dx
-        L = df.dot(t, v) * ds(1)
+        if pressure_terms:
+            L = sum(pressure_terms)
+        else:
+            L = df.Constant(0.0) * df.inner(v, df.Constant((1.0, 1.0, 1.0))) * df.dx
 
         u_solution = df.Function(V)
         if progress_cb:
             progress_cb(35)
-        df.solve(a == L, u_solution, bc)
+        if bcs:
+            df.solve(a == L, u_solution, bcs)
+        else:
+            df.solve(a == L, u_solution)
         if progress_cb:
             progress_cb(55)
 
@@ -218,6 +297,26 @@ def _solve_with_fenics(
 
         stress_values = stress_field.vector().get_local()
         strain_values = strain_field.vector().get_local()
+
+        material_model = (payload.materialModel or "linear").lower()
+        yield_strength = payload.yieldStrength
+        hardening_modulus = payload.hardeningModulus
+        if material_model == "plastic":
+            corrected, plastic_logs = _apply_plastic_correction(
+                stress_values,
+                strain_values,
+                youngs_modulus,
+                yield_strength,
+                hardening_modulus,
+            )
+            if plastic_logs:
+                logs = mesh_artifacts.setdefault("logs", []) if mesh_artifacts else plastic_logs
+                if mesh_artifacts:
+                    logs.extend(plastic_logs)
+                else:
+                    mesh_artifacts = {"logs": logs}
+            stress_values = corrected
+
         max_stress = float(np.max(stress_values))
         min_stress = float(np.min(stress_values))
         avg_stress = float(np.mean(stress_values))
@@ -362,6 +461,8 @@ def _build_stress_strain_curve(
     payload: SimulationRequest,
     max_stress: Optional[float],
 ) -> List[Dict[str, float]]:
+    if (payload.materialModel or "linear").lower() == "plastic":
+        return _build_bilinear_curve(payload)
     curve = payload.material.stressStrainCurve
     if not curve:
         return [{"strain": 0.0, "stress": 0.0}]
@@ -383,6 +484,46 @@ def _build_stress_strain_curve(
             }
         )
     return dense_curve
+
+
+def _build_bilinear_curve(payload: SimulationRequest) -> List[Dict[str, float]]:
+    youngs_modulus = payload.material.youngsModulus * 1000.0
+    yield_strength = payload.yieldStrength or 0.0
+    hardening = payload.hardeningModulus or 0.0
+    if yield_strength <= 0 or youngs_modulus <= 0:
+        return [{"strain": 0.0, "stress": 0.0}]
+    yield_strain = yield_strength / youngs_modulus
+    end_strain = max(yield_strain * 4, yield_strain + 0.01)
+    end_stress = yield_strength + hardening * (end_strain - yield_strain)
+    return [
+        {"strain": 0.0, "stress": 0.0},
+        {"strain": yield_strain, "stress": yield_strength},
+        {"strain": end_strain, "stress": max(end_stress, yield_strength)},
+    ]
+
+
+def _apply_plastic_correction(
+    stress_values,
+    strain_values,
+    youngs_modulus: float,
+    yield_strength: Optional[float],
+    hardening_modulus: Optional[float],
+) -> Tuple["np.ndarray", List[str]]:
+    logs: List[str] = []
+    if yield_strength is None or yield_strength <= 0:
+        logs.append("Plastic model selected but yield strength is missing; using elastic stress.")
+        return stress_values, logs
+    hardening = hardening_modulus or 0.0
+    yield_strain = yield_strength / max(youngs_modulus, 1e-9)
+    corrected = stress_values.copy()
+    for idx, stress in enumerate(stress_values):
+        if stress <= yield_strength:
+            continue
+        strain = strain_values[idx]
+        if strain <= yield_strain:
+            continue
+        corrected[idx] = yield_strength + hardening * (strain - yield_strain)
+    return corrected, logs
 
 
 def _mesh_resolution(payload: SimulationRequest) -> int:
@@ -503,6 +644,9 @@ def _load_geometry_mesh(
 
 
 def _estimate_allowable_stress(payload: SimulationRequest, max_stress: float) -> float:
+    if (payload.materialModel or "linear").lower() == "plastic":
+        if payload.yieldStrength and payload.yieldStrength > 0:
+            return payload.yieldStrength
     curve = payload.material.stressStrainCurve
     if curve:
         ultimate = max(point.stress for point in curve)

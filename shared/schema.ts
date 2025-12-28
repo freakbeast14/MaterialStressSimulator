@@ -37,6 +37,9 @@ export const simulations = pgTable("simulations", {
   duration: doublePrecision("duration"), // seconds
   frequency: doublePrecision("frequency"), // Hz (for fatigue)
   dampingRatio: doublePrecision("damping_ratio"), // unitless
+  materialModel: text("material_model").default("linear"), // linear, plastic
+  yieldStrength: doublePrecision("yield_strength"), // MPa
+  hardeningModulus: doublePrecision("hardening_modulus"), // MPa
   
   // Progress tracking
   progress: integer("progress").default(0), // 0-100%
@@ -76,11 +79,22 @@ export const simulationMeshes = pgTable("simulation_meshes", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const simulationBoundaryConditions = pgTable("simulation_boundary_conditions", {
+  id: serial("id").primaryKey(),
+  simulationId: integer("simulation_id").notNull(),
+  type: text("type").notNull(), // fixed, pressure
+  face: text("face").notNull(), // x+, x-, y+, y-, z+, z-
+  magnitude: doublePrecision("magnitude"),
+  unit: text("unit"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // === BASE SCHEMAS ===
 export const insertMaterialSchema = createInsertSchema(materials).omit({ id: true, createdAt: true });
 export const insertSimulationSchema = createInsertSchema(simulations).omit({ id: true, createdAt: true, completedAt: true, results: true, progress: true });
 export const insertGeometrySchema = createInsertSchema(geometries).omit({ id: true, createdAt: true });
 export const insertSimulationMeshSchema = createInsertSchema(simulationMeshes).omit({ id: true, createdAt: true });
+export const insertSimulationBoundaryConditionSchema = createInsertSchema(simulationBoundaryConditions).omit({ id: true, createdAt: true });
 
 // === EXPLICIT API CONTRACT TYPES ===
 export type Material = typeof materials.$inferSelect;
@@ -92,6 +106,8 @@ export type Geometry = typeof geometries.$inferSelect;
 export type InsertGeometry = z.infer<typeof insertGeometrySchema>;
 export type SimulationMesh = typeof simulationMeshes.$inferSelect;
 export type InsertSimulationMesh = z.infer<typeof insertSimulationMeshSchema>;
+export type SimulationBoundaryCondition = typeof simulationBoundaryConditions.$inferSelect;
+export type InsertSimulationBoundaryCondition = z.infer<typeof insertSimulationBoundaryConditionSchema>;
 
 export type CreateSimulationRequest = {
   name: string;

@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Play } from "lucide-react";
+import { AlertCircle, Loader2, Play, MinusCircle, PlusCircle } from "lucide-react";
 import Plot from "react-plotly.js";
 
 export default function CreateSimulation() {
@@ -40,6 +40,21 @@ export default function CreateSimulation() {
   const [duration, setDuration] = useState("10");
   const [frequency, setFrequency] = useState("1");
   const [dampingRatio, setDampingRatio] = useState("0.05");
+  const [materialModel, setMaterialModel] = useState("linear");
+  const [yieldStrength, setYieldStrength] = useState("");
+  const [hardeningModulus, setHardeningModulus] = useState("");
+  const [boundaryConditions, setBoundaryConditions] = useState<
+    {
+      id: string;
+      type: "fixed" | "pressure";
+      face: "x+" | "x-" | "y+" | "y-" | "z+" | "z-";
+      magnitude: string;
+      unit: string;
+    }[]
+  >([
+    { id: "fixed-1", type: "fixed", face: "z-", magnitude: "", unit: "" },
+    { id: "pressure-1", type: "pressure", face: "z+", magnitude: "1000", unit: "N" },
+  ]);
 
   const sortedGeometries = useMemo(() => {
     if (!geometries) return [];
@@ -60,6 +75,22 @@ export default function CreateSimulation() {
   const handleStartSimulation = () => {
     const selectedMaterialId = parseInt(materialId || "0");
     if (!selectedMaterialId) return;
+    const loadMagnitude = parseFloat(appliedLoad);
+    const preparedBoundaryConditions = boundaryConditions.map((condition) => {
+      if (condition.type === "pressure") {
+        const magnitude =
+          condition.magnitude.trim() === ""
+            ? loadMagnitude
+            : parseFloat(condition.magnitude);
+        return {
+          type: condition.type,
+          face: condition.face,
+          magnitude: Number.isFinite(magnitude) ? magnitude : null,
+          unit: condition.unit || "N",
+        };
+      }
+      return { type: condition.type, face: condition.face };
+    });
     createSimulation(
       {
         name: simName,
@@ -71,6 +102,16 @@ export default function CreateSimulation() {
         frequency: parseFloat(frequency),
         dampingRatio: parseFloat(dampingRatio),
         geometryId: geometryId ? parseInt(geometryId, 10) : undefined,
+        materialModel,
+        yieldStrength:
+          materialModel === "plastic" && yieldStrength.trim() !== ""
+            ? parseFloat(yieldStrength)
+            : null,
+        hardeningModulus:
+          materialModel === "plastic" && hardeningModulus.trim() !== ""
+            ? parseFloat(hardeningModulus)
+            : null,
+        boundaryConditions: preparedBoundaryConditions,
       },
       {
         onSuccess: (data) => {
@@ -232,6 +273,68 @@ export default function CreateSimulation() {
     return { x, y, z, i, j, k };
   }, [geometryContent, geometryFormat]);
 
+  useEffect(() => {
+    setBoundaryConditions((prev) =>
+      prev.map((condition) => {
+        if (condition.type !== "pressure") return condition;
+        if (condition.magnitude.trim() !== "" && condition.magnitude !== appliedLoad) {
+          return condition;
+        }
+        return { ...condition, magnitude: appliedLoad };
+      })
+    );
+  }, [appliedLoad]);
+
+  const updateBoundaryCondition = (
+    id: string,
+    patch: Partial<typeof boundaryConditions[number]>,
+  ) => {
+    setBoundaryConditions((prev) =>
+      prev.map((condition) =>
+        condition.id === id ? { ...condition, ...patch } : condition
+      )
+    );
+  };
+
+  const addBoundaryCondition = () => {
+    const id = `bc-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    setBoundaryConditions((prev) => [
+      ...prev,
+      { id, type: "pressure", face: "z+", magnitude: appliedLoad, unit: "N" },
+    ]);
+  };
+
+  const removeBoundaryCondition = (id: string) => {
+    setBoundaryConditions((prev) => prev.filter((condition) => condition.id !== id));
+  };
+
+  const bcWarnings = useMemo(() => {
+    const warnings: string[] = [];
+    const fixed = boundaryConditions.filter((condition) => condition.type === "fixed");
+    const loads = boundaryConditions.filter((condition) => condition.type === "pressure");
+    if (fixed.length === 0) {
+      warnings.push("Add at least one fixed support to prevent rigid-body motion.");
+    }
+    if (loads.length === 0) {
+      warnings.push("Add at least one applied load so the solver has forcing.");
+    }
+    const loadFaces = new Set(loads.map((condition) => condition.face));
+    fixed.forEach((condition) => {
+      if (loadFaces.has(condition.face)) {
+        warnings.push(`Fixed and load are both applied on ${condition.face}.`);
+      }
+    });
+    loads.forEach((condition) => {
+      const magnitude = condition.magnitude.trim();
+      if (magnitude === "") {
+        warnings.push(`Load on ${condition.face} has no magnitude.`);
+      } else if (!Number.isFinite(Number(magnitude))) {
+        warnings.push(`Load on ${condition.face} has an invalid magnitude.`);
+      }
+    });
+    return warnings;
+  }, [boundaryConditions]);
+
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
       <div>
@@ -245,7 +348,7 @@ export default function CreateSimulation() {
 
       <div className="bg-card rounded-2xl border border-border shadow-sm p-8">
         <div className="space-y-5">
-          <div className="space-y-3 pb-4 border-b border-border">
+          <div className="space-y-3 pb-4 border-border">
             <h4 className="text-sm font-semibold text-foreground">
               Basic Information
             </h4>
@@ -381,7 +484,7 @@ export default function CreateSimulation() {
             </div>
           </div>
 
-          <div className="space-y-3 pb-4 border-b border-border">
+          <div className="space-y-3 pb-4 border-border">
             <h4 className="text-sm font-semibold text-foreground">
               Load & Environment
             </h4>
@@ -407,8 +510,157 @@ export default function CreateSimulation() {
             </div>
           </div>
 
-          <div className="space-y-3">
+          <div className="space-y-3 pb-4 border-border">
+            <div className="flex items-center justify-between">
+              <h4 className="text-sm font-semibold text-foreground">
+                Boundary Conditions
+              </h4>
+              <Button
+                type="button"
+                variant="ghost"
+                className="h-8 w-8 rounded-full text-emerald-600 hover:text-emerald-600 hover:bg-emerald-500/10"
+                onClick={addBoundaryCondition}
+                aria-label="Add boundary condition"
+              >
+                <PlusCircle className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="space-y-3">
+              {boundaryConditions.map((condition, index) => (
+                <div key={condition.id} className="rounded-xl border border-border bg-muted/20 p-4">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-semibold text-muted-foreground">
+                      Condition {index + 1}
+                    </p>
+                    {boundaryConditions.length > 1 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        className="h-7 w-7 rounded-full text-red-500 hover:text-red-500 hover:bg-red-500/10"
+                        onClick={() => removeBoundaryCondition(condition.id)}
+                        aria-label="Remove boundary condition"
+                      >
+                        <MinusCircle className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                  <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div className="space-y-2">
+                      <Label className="text-sm">Type</Label>
+                      <Select
+                        value={condition.type}
+                        onValueChange={(value) =>
+                          updateBoundaryCondition(condition.id, {
+                            type: value as "fixed" | "pressure",
+                          })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="fixed">Fixed Support</SelectItem>
+                          <SelectItem value="pressure">Applied Load</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm">Face</Label>
+                      <Select
+                        value={condition.face}
+                        onValueChange={(value) =>
+                          updateBoundaryCondition(condition.id, {
+                            face: value as typeof condition.face,
+                          })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="z-">Bottom (z-)</SelectItem>
+                          <SelectItem value="z+">Top (z+)</SelectItem>
+                          <SelectItem value="x-">Left (x-)</SelectItem>
+                          <SelectItem value="x+">Right (x+)</SelectItem>
+                          <SelectItem value="y-">Back (y-)</SelectItem>
+                          <SelectItem value="y+">Front (y+)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm">Magnitude (N)</Label>
+                      <Input
+                        type="number"
+                        placeholder="1000"
+                        value={condition.magnitude}
+                        disabled={condition.type === "fixed"}
+                        onChange={(event) =>
+                          updateBoundaryCondition(condition.id, {
+                            magnitude: event.target.value,
+                          })
+                        }
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {bcWarnings.length > 0 && (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
+                  <div className="flex items-center gap-2 font-semibold">
+                    <AlertCircle className="h-4 w-4" />
+                    Boundary condition checks
+                  </div>
+                  <ul className="mt-2 space-y-1">
+                    {bcWarnings.map((warning) => (
+                      <li key={warning}>{warning}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-3 pb-4 border-border">
             <h4 className="text-sm font-semibold text-foreground">
+              Material Model
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="space-y-2">
+                <Label className="text-sm">Model Type</Label>
+                <Select value={materialModel} onValueChange={setMaterialModel}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="linear">Linear Elastic</SelectItem>
+                    <SelectItem value="plastic">Elastic-Plastic</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-sm">Yield Strength (MPa)</Label>
+                <Input
+                  type="number"
+                  placeholder="250"
+                  value={yieldStrength}
+                  disabled={materialModel !== "plastic"}
+                  onChange={(event) => setYieldStrength(event.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-sm">Hardening Modulus (MPa)</Label>
+                <Input
+                  type="number"
+                  placeholder="100"
+                  value={hardeningModulus}
+                  disabled={materialModel !== "plastic"}
+                  onChange={(event) => setHardeningModulus(event.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+          <div className="space-y-3">
+            <h4 className="text-sm font-semibold">
               Time & Dynamics
             </h4>
             <div className="grid grid-cols-3 gap-3">
@@ -443,7 +695,7 @@ export default function CreateSimulation() {
               </div>
             </div>
           </div>
-          <div className="pt-4 flex justify-end">
+          <div className="pt-2 flex justify-end">
             <Button
               size="lg"
               className="w-full md:w-auto font-semibold shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all"

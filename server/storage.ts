@@ -4,6 +4,7 @@ import {
   simulations,
   geometries,
   simulationMeshes,
+  simulationBoundaryConditions,
   type Material,
   type InsertMaterial,
   type Simulation,
@@ -12,6 +13,8 @@ import {
   type InsertGeometry,
   type SimulationMesh,
   type InsertSimulationMesh,
+  type SimulationBoundaryCondition,
+  type InsertSimulationBoundaryCondition,
 } from "@shared/schema";
 import { eq, desc } from "drizzle-orm";
 
@@ -37,6 +40,10 @@ export interface IStorage {
   getSimulationMeshes(simulationId: number): Promise<SimulationMesh[]>;
   getSimulationMesh(id: number): Promise<SimulationMesh | undefined>;
   createSimulationMesh(mesh: InsertSimulationMesh): Promise<SimulationMesh>;
+
+  // Boundary conditions
+  getBoundaryConditions(simulationId: number): Promise<SimulationBoundaryCondition[]>;
+  createBoundaryCondition(condition: InsertSimulationBoundaryCondition): Promise<SimulationBoundaryCondition>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -123,6 +130,24 @@ export class DatabaseStorage implements IStorage {
   async createSimulationMesh(insertMesh: InsertSimulationMesh): Promise<SimulationMesh> {
     const [mesh] = await db.insert(simulationMeshes).values(insertMesh).returning();
     return mesh;
+  }
+
+  async getBoundaryConditions(simulationId: number): Promise<SimulationBoundaryCondition[]> {
+    return await db
+      .select()
+      .from(simulationBoundaryConditions)
+      .where(eq(simulationBoundaryConditions.simulationId, simulationId))
+      .orderBy(desc(simulationBoundaryConditions.createdAt));
+  }
+
+  async createBoundaryCondition(
+    insertCondition: InsertSimulationBoundaryCondition,
+  ): Promise<SimulationBoundaryCondition> {
+    const [condition] = await db
+      .insert(simulationBoundaryConditions)
+      .values(insertCondition)
+      .returning();
+    return condition;
   }
 }
 
