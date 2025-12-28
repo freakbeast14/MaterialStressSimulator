@@ -2,6 +2,7 @@ import { Link, useLocation } from "wouter";
 import {
   Activity,
   Layers,
+  Box,
   BarChart2,
   Zap,
   Settings,
@@ -27,7 +28,8 @@ export function Layout({ children }: LayoutProps) {
     { label: "Create Simulation", href: "/simulations/create", icon: Zap, exact: true },
     { label: "History", href: "/simulations", icon: History, exclude: ["/simulations/create"] },
     { label: "Compare Simulations", href: "/compare-simulations", icon: BarChart2, exact: true },
-    { label: "Materials", href: "/materials", icon: Layers }
+    { label: "Materials", href: "/materials", icon: Layers },
+    { label: "Geometries", href: "/geometries", icon: Box }
   ];
 
   const NavContent = () => (

@@ -1,19 +1,177 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
-import { useMaterials } from "@/hooks/use-materials";
-import { Search, Filter, ArrowRight } from "lucide-react";
+import { useMaterials, useUpdateMaterial, useDeleteMaterial } from "@/hooks/use-materials";
+import { useCreateMaterial } from "@/hooks/use-materials";
+import { useToast } from "@/hooks/use-toast";
+import { Search, ArrowRight, Pencil, Plus, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import Compare from "@/pages/Compare";
 
 export default function Materials() {
   const { data: materials, isLoading } = useMaterials();
+  const { mutateAsync: createMaterial, isPending } = useCreateMaterial();
+  const { mutateAsync: updateMaterial, isPending: isUpdating } = useUpdateMaterial();
+  const { mutateAsync: deleteMaterial, isPending: isDeleting } = useDeleteMaterial();
+  const { toast } = useToast();
   const [search, setSearch] = useState("");
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [activeMaterialId, setActiveMaterialId] = useState<number | null>(null);
+  const [name, setName] = useState("");
+  const [category, setCategory] = useState("Metal");
+  const [description, setDescription] = useState("");
+  const [density, setDensity] = useState("");
+  const [youngsModulus, setYoungsModulus] = useState("");
+  const [poissonRatio, setPoissonRatio] = useState("");
+  const [thermalConductivity, setThermalConductivity] = useState("");
+  const [meltingPoint, setMeltingPoint] = useState("");
+  const [stressStrainCurve, setStressStrainCurve] = useState(
+    '[{"strain":0,"stress":0},{"strain":0.01,"stress":100}]'
+  );
+  const [thermalExpansionCurve, setThermalExpansionCurve] = useState(
+    '[{"temperature":20,"coefficient":12},{"temperature":100,"coefficient":13}]'
+  );
 
   const filteredMaterials = materials?.filter(m => 
     m.name.toLowerCase().includes(search.toLowerCase()) || 
     m.category.toLowerCase().includes(search.toLowerCase())
   );
+
+  const activeMaterial = useMemo(
+    () => materials?.find((material) => material.id === activeMaterialId) || null,
+    [materials, activeMaterialId]
+  );
+
+  const parsedCurves = useMemo(() => {
+    const parseJson = (value: string) => JSON.parse(value);
+    try {
+      return {
+        stress: parseJson(stressStrainCurve),
+        thermal: parseJson(thermalExpansionCurve),
+      };
+    } catch {
+      return null;
+    }
+  }, [stressStrainCurve, thermalExpansionCurve]);
+
+  const handleCreateMaterial = async () => {
+    if (!parsedCurves) {
+      toast({
+        title: "Invalid curve JSON",
+        description: "Please fix the stress-strain or thermal expansion JSON.",
+        variant: "destructive",
+      });
+      return;
+    }
+    try {
+      await createMaterial({
+        name,
+        category,
+        description,
+        density: Number(density),
+        youngsModulus: Number(youngsModulus),
+        poissonRatio: Number(poissonRatio),
+        thermalConductivity: Number(thermalConductivity),
+        meltingPoint: Number(meltingPoint),
+        stressStrainCurve: parsedCurves.stress,
+        thermalExpansionCurve: parsedCurves.thermal,
+      });
+      toast({ title: "Material created", description: "New material added to the library." });
+      setName("");
+      setDescription("");
+      setIsDialogOpen(false);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to create material.";
+      toast({ title: "Creation failed", description: message, variant: "destructive" });
+    }
+  };
+
+  const handleOpenCreate = () => {
+    setName("");
+    setCategory("Metal");
+    setDescription("");
+    setDensity("");
+    setYoungsModulus("");
+    setPoissonRatio("");
+    setThermalConductivity("");
+    setMeltingPoint("");
+    setStressStrainCurve('[{"strain":0,"stress":0},{"strain":0.01,"stress":100}]');
+    setThermalExpansionCurve('[{"temperature":20,"coefficient":12},{"temperature":100,"coefficient":13}]');
+    setIsDialogOpen(true);
+  };
+
+  const handleOpenEdit = (material: typeof materials[number]) => {
+    setActiveMaterialId(material.id);
+    setName(material.name);
+    setCategory(material.category);
+    setDescription(material.description);
+    setDensity(String(material.density));
+    setYoungsModulus(String(material.youngsModulus));
+    setPoissonRatio(String(material.poissonRatio));
+    setThermalConductivity(String(material.thermalConductivity));
+    setMeltingPoint(String(material.meltingPoint));
+    setStressStrainCurve(JSON.stringify(material.stressStrainCurve ?? [], null, 2));
+    setThermalExpansionCurve(JSON.stringify(material.thermalExpansionCurve ?? [], null, 2));
+    setIsEditOpen(true);
+  };
+
+  const handleUpdateMaterial = async () => {
+    if (!activeMaterialId) return;
+    if (!parsedCurves) {
+      toast({
+        title: "Invalid curve JSON",
+        description: "Please fix the stress-strain or thermal expansion JSON.",
+        variant: "destructive",
+      });
+      return;
+    }
+    try {
+      await updateMaterial({
+        id: activeMaterialId,
+        data: {
+          name,
+          category,
+          description,
+          density: Number(density),
+          youngsModulus: Number(youngsModulus),
+          poissonRatio: Number(poissonRatio),
+          thermalConductivity: Number(thermalConductivity),
+          meltingPoint: Number(meltingPoint),
+          stressStrainCurve: parsedCurves.stress,
+          thermalExpansionCurve: parsedCurves.thermal,
+        },
+      });
+      toast({ title: "Material updated", description: "Material saved successfully." });
+      setIsEditOpen(false);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to update material.";
+      toast({ title: "Update failed", description: message, variant: "destructive" });
+    }
+  };
+
+  const handleDeleteMaterial = async (id: number, name: string) => {
+    const confirmed = window.confirm(`Delete "${name}"? This cannot be undone.`);
+    if (!confirmed) return;
+    try {
+      await deleteMaterial(id);
+      toast({ title: "Material deleted", description: "Material removed from the library." });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to delete material.";
+      toast({ title: "Delete failed", description: message, variant: "destructive" });
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -53,7 +211,34 @@ export default function Materials() {
                   <div className="px-2.5 py-1 rounded-md bg-secondary text-xs font-semibold uppercase tracking-wider text-secondary-foreground">
                     {material.category}
                   </div>
-                  <ArrowRight className="h-5 w-5 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all" />
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      className="rounded-full p-1 text-muted-foreground hover:text-primary hover:bg-primary/10 transition"
+                      onClick={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        handleOpenEdit(material);
+                      }}
+                      aria-label={`Edit ${material.name}`}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      className="rounded-full p-1 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition"
+                      onClick={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        handleDeleteMaterial(material.id, material.name);
+                      }}
+                      aria-label={`Delete ${material.name}`}
+                      disabled={isDeleting}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                    <ArrowRight className="h-5 w-5 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all" />
+                  </div>
                 </div>
                 
                 <h3 className="text-xl font-bold font-display text-foreground mb-2">{material.name}</h3>
@@ -74,6 +259,16 @@ export default function Materials() {
               </motion.div>
             </Link>
           ))}
+          <motion.button
+            type="button"
+            onClick={handleOpenCreate}
+            className="bg-card hover:bg-muted/30 border border-dashed border-border hover:border-primary/40 rounded-2xl p-6 shadow-sm transition-all duration-300 group h-full flex flex-col items-center justify-center text-muted-foreground hover:text-primary"
+          >
+            <div className="h-14 w-14 rounded-full border border-border/60 flex items-center justify-center group-hover:border-primary/60">
+              <Plus className="h-7 w-7" />
+            </div>
+            <span className="mt-3 text-sm font-semibold">Add new material</span>
+          </motion.button>
           {filteredMaterials?.length === 0 && (
             <div className="col-span-full py-12 text-center text-muted-foreground">
               No materials found matching your search.
@@ -81,6 +276,180 @@ export default function Materials() {
           )}
         </div>
       )}
+
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Add New Material</DialogTitle>
+            <DialogDescription>
+              Provide full material properties and curves.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Material Name</Label>
+                <Input value={name} onChange={(e) => setName(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>Category</Label>
+                <Select value={category} onValueChange={setCategory}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Metal">Metal</SelectItem>
+                    <SelectItem value="Polymer">Polymer</SelectItem>
+                    <SelectItem value="Composite">Composite</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Description</Label>
+              <Textarea value={description} onChange={(e) => setDescription(e.target.value)} />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label>Density (kg/m³)</Label>
+                <Input value={density} onChange={(e) => setDensity(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>Young's Modulus (GPa)</Label>
+                <Input value={youngsModulus} onChange={(e) => setYoungsModulus(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>Poisson's Ratio</Label>
+                <Input value={poissonRatio} onChange={(e) => setPoissonRatio(e.target.value)} />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Thermal Conductivity (W/m·K)</Label>
+                <Input value={thermalConductivity} onChange={(e) => setThermalConductivity(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>Melting Point (°C)</Label>
+                <Input value={meltingPoint} onChange={(e) => setMeltingPoint(e.target.value)} />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Stress-Strain Curve (JSON)</Label>
+              <Textarea
+                value={stressStrainCurve}
+                onChange={(e) => setStressStrainCurve(e.target.value)}
+                className={parsedCurves ? "" : "border-destructive"}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Thermal Expansion Curve (JSON)</Label>
+              <Textarea
+                value={thermalExpansionCurve}
+                onChange={(e) => setThermalExpansionCurve(e.target.value)}
+                className={parsedCurves ? "" : "border-destructive"}
+              />
+            </div>
+
+            <div className="flex justify-end">
+              <Button onClick={handleCreateMaterial} disabled={isPending || !name}>
+                {isPending ? "Saving..." : "Add Material"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Edit Material</DialogTitle>
+            <DialogDescription>
+              Update material properties and curves.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Material Name</Label>
+                <Input value={name} onChange={(e) => setName(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>Category</Label>
+                <Select value={category} onValueChange={setCategory}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Metal">Metal</SelectItem>
+                    <SelectItem value="Polymer">Polymer</SelectItem>
+                    <SelectItem value="Composite">Composite</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Description</Label>
+              <Textarea value={description} onChange={(e) => setDescription(e.target.value)} />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label>Density (kg/m³)</Label>
+                <Input value={density} onChange={(e) => setDensity(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>Young's Modulus (GPa)</Label>
+                <Input value={youngsModulus} onChange={(e) => setYoungsModulus(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>Poisson's Ratio</Label>
+                <Input value={poissonRatio} onChange={(e) => setPoissonRatio(e.target.value)} />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Thermal Conductivity (W/m·K)</Label>
+                <Input value={thermalConductivity} onChange={(e) => setThermalConductivity(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>Melting Point (°C)</Label>
+                <Input value={meltingPoint} onChange={(e) => setMeltingPoint(e.target.value)} />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Stress-Strain Curve (JSON)</Label>
+              <Textarea
+                value={stressStrainCurve}
+                onChange={(e) => setStressStrainCurve(e.target.value)}
+                className={parsedCurves ? "" : "border-destructive"}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Thermal Expansion Curve (JSON)</Label>
+              <Textarea
+                value={thermalExpansionCurve}
+                onChange={(e) => setThermalExpansionCurve(e.target.value)}
+                className={parsedCurves ? "" : "border-destructive"}
+              />
+            </div>
+
+            <div className="flex justify-end">
+              <Button onClick={handleUpdateMaterial} disabled={isUpdating || !name || !activeMaterial}>
+                {isUpdating ? "Saving..." : "Save Changes"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <section className="pt-10 border-t border-border/60">
         <Compare embedded />
