@@ -8,6 +8,7 @@ import { ArrowDown, ArrowUp, ArrowUpDown, Eye, Filter, Pause, Pencil, Play, Sear
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
@@ -20,6 +21,7 @@ import {
 import Plot from "react-plotly.js";
 
 export default function Simulations() {
+  const queryClient = useQueryClient();
   const { data: simulations, isLoading } = useSimulations();
   const { mutateAsync: deleteSimulation, isPending: isDeleting } = useDeleteSimulation();
   const { mutateAsync: updateSimulation, isPending: isUpdating } = useUpdateSimulation();
@@ -519,6 +521,9 @@ export default function Simulations() {
         run,
       },
     });
+    queryClient.invalidateQueries({ queryKey: ["/api/simulations"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/simulations/:id", activeSimulationId] });
+    queryClient.refetchQueries({ queryKey: ["/api/simulations/:id", activeSimulationId] });
     setIsEditOpen(false);
   };
 
@@ -541,6 +546,9 @@ export default function Simulations() {
         run: true,
       },
     });
+    queryClient.invalidateQueries({ queryKey: ["/api/simulations"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/simulations/:id", sim.id] });
+    queryClient.refetchQueries({ queryKey: ["/api/simulations/:id", sim.id] });
   };
 
   const handleCancel = async (sim: typeof simulations[number]) => {

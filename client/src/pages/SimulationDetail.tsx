@@ -453,7 +453,9 @@ export default function SimulationDetail() {
     }
     setIsLoadingGeometry(true);
     setGeometryError(null);
-    fetch(`/api/geometries/${geometry.id}/content`)
+    fetch(`/api/geometries/${geometry.id}/content?ts=${Date.now()}`, {
+      cache: "no-store",
+    })
       .then((res) => {
         if (!res.ok) throw new Error("Failed to load geometry");
         return res.json();
@@ -468,7 +470,7 @@ export default function SimulationDetail() {
         setGeometryFormat(null);
       })
       .finally(() => setIsLoadingGeometry(false));
-  }, [geometry?.id]);
+  }, [geometry?.id, (geometry as any)?.updatedAt]);
 
   useEffect(() => {
     if (!simulation?.id) {
@@ -479,7 +481,9 @@ export default function SimulationDetail() {
     setIsLoadingMeshes(true);
     setMeshError(null);
     const fetchMeshes = () =>
-      fetch(`/api/simulations/${simulation.id}/meshes`)
+      fetch(`/api/simulations/${simulation.id}/meshes?ts=${Date.now()}`, {
+        cache: "no-store",
+      })
         .then((res) => {
           if (!res.ok) throw new Error("Failed to load meshes");
           return res.json();
@@ -499,7 +503,7 @@ export default function SimulationDetail() {
     if (!isRunning) return;
     const interval = window.setInterval(fetchMeshes, 2000);
     return () => window.clearInterval(interval);
-  }, [simulation?.id, isRunning]);
+  }, [simulation?.id, (simulation as any)?.updatedAt, simulation?.completedAt, isRunning]);
 
   const meshArtifacts = useMemo(
     () =>
@@ -510,6 +514,12 @@ export default function SimulationDetail() {
       ),
     [simulationMeshes]
   );
+
+  useEffect(() => {
+    setMeshPreview(null);
+    setMeshPreviewName(null);
+    setMeshPreviewError(null);
+  }, [simulation?.id, (simulation as any)?.updatedAt, simulation?.completedAt]);
 
   useEffect(() => {
     if (!meshArtifacts.length) return;
@@ -950,7 +960,10 @@ export default function SimulationDetail() {
       if (mesh.format.toLowerCase() !== "xml") {
         throw new Error("Preview available for XML mesh only.");
       }
-      const response = await fetch(`/api/simulation-meshes/${mesh.id}/content`);
+      const response = await fetch(
+        `/api/simulation-meshes/${mesh.id}/content?ts=${Date.now()}`,
+        { cache: "no-store" }
+      );
       if (!response.ok) throw new Error("Failed to load mesh content.");
       const data = await response.json();
       const decoded = atob(data.contentBase64 || "");
@@ -965,7 +978,10 @@ export default function SimulationDetail() {
 
   const handleDownloadMesh = async (meshId: number, name: string, format: string) => {
     try {
-      const response = await fetch(`/api/simulation-meshes/${meshId}/content`);
+      const response = await fetch(
+        `/api/simulation-meshes/${meshId}/content?ts=${Date.now()}`,
+        { cache: "no-store" }
+      );
       if (!response.ok) throw new Error("Failed to download mesh");
       const data = await response.json();
       const buffer = Uint8Array.from(atob(data.contentBase64 || ""), (c) => c.charCodeAt(0));
