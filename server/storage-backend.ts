@@ -106,6 +106,24 @@ export async function readStoragePath(storagePath: string): Promise<Buffer> {
   return fs.readFile(storagePath);
 }
 
+export async function deleteStoragePath(storagePath: string): Promise<void> {
+  if (storagePath.startsWith("supabase:")) {
+    ensureSupabase();
+    const { bucket, key } = parseSupabasePath(storagePath);
+    const { error } = await supabase!.storage.from(bucket).remove([key]);
+    if (error) {
+      throw new Error(error.message);
+    }
+    return;
+  }
+  try {
+    await fs.unlink(storagePath);
+  } catch (err: any) {
+    if (err?.code === "ENOENT") return;
+    throw err;
+  }
+}
+
 export async function ensureLocalStorageRoot(): Promise<void> {
   if (STORAGE_BACKEND === "supabase") return;
   await fs.mkdir(STORAGE_ROOT, { recursive: true });

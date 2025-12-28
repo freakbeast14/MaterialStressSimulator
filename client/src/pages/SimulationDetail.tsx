@@ -1,6 +1,6 @@
 import { useParams } from "wouter";
 import type { ElementType, MouseEvent } from "react";
-import { useSimulation } from "@/hooks/use-simulations";
+import { useSimulation, useUpdateSimulation } from "@/hooks/use-simulations";
 import { useMaterial } from "@/hooks/use-materials";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Plot from "react-plotly.js";
@@ -28,6 +28,7 @@ import {
   AlertCircle,
   ChevronDown,
   ChevronRight,
+  RefreshCcw,
 } from "lucide-react";
 import { Link } from "wouter";
 import {
@@ -54,6 +55,7 @@ import Plotly from "plotly.js-dist-min";
 export default function SimulationDetail() {
   const { id } = useParams();
   const { data: simulation, isLoading } = useSimulation(parseInt(id || "0"));
+  const { mutateAsync: updateSimulation } = useUpdateSimulation();
   const { data: material } = useMaterial(simulation?.materialId || 0);
   const { data: geometries } = useGeometries();
   const { data: boundaryConditions } = useBoundaryConditions(simulation?.id);
@@ -139,12 +141,13 @@ export default function SimulationDetail() {
     typeof value === "number" && Number.isFinite(value)
       ? (value * 1_000_000).toFixed(2)
       : "N/A";
-  const runDate = simulation?.createdAt
-    ? new Date(simulation.createdAt).toLocaleString("en-US", {
+  const rawRunDate = simulation?.completedAt || simulation?.createdAt;
+  const runDate = rawRunDate
+    ? new Date(rawRunDate).toLocaleString("en-US", {
         month: "short",
         day: "2-digit",
         year: "numeric",
-        hour: "2-digit",
+        hour: "numeric",
         minute: "2-digit",
       })
     : "N/A";
@@ -498,16 +501,26 @@ export default function SimulationDetail() {
     return () => window.clearInterval(interval);
   }, [simulation?.id, isRunning]);
 
+  const meshArtifacts = useMemo(
+    () =>
+      simulationMeshes.filter(
+        (mesh) =>
+          ["xml", "vtu"].includes(mesh.format.toLowerCase()) &&
+          mesh.name.toLowerCase() !== "results"
+      ),
+    [simulationMeshes]
+  );
+
   useEffect(() => {
-    if (!simulationMeshes.length) return;
+    if (!meshArtifacts.length) return;
     if (meshPreview || isLoadingMeshPreview) return;
-    const xmlMesh = simulationMeshes.find(
+    const xmlMesh = meshArtifacts.find(
       (mesh) => mesh.format.toLowerCase() === "xml"
     );
     if (xmlMesh) {
       void handlePreviewMesh(xmlMesh);
     }
-  }, [simulationMeshes, meshPreview, isLoadingMeshPreview]);
+  }, [meshArtifacts, meshPreview, isLoadingMeshPreview]);
 
   const geometryMesh = useMemo(() => {
     if (!geometryContent || !geometryFormat) return null;
@@ -644,8 +657,8 @@ export default function SimulationDetail() {
           })
           .join(" | ")
       : "";
-    const meshRows = simulationMeshes.length
-      ? simulationMeshes.map((mesh) => [
+    const meshRows = meshArtifacts.length
+      ? meshArtifacts.map((mesh) => [
           mesh.name,
           mesh.format,
           mesh.nodeCount ?? "",
@@ -809,7 +822,7 @@ export default function SimulationDetail() {
   };
 
   const findMeshByFormat = (format: string) =>
-    simulationMeshes.find(
+    meshArtifacts.find(
       (mesh) => mesh.format.toLowerCase() === format.toLowerCase()
     );
 
@@ -841,6 +854,16 @@ export default function SimulationDetail() {
         variant: "destructive",
       });
     }
+  };
+
+  const handleRerunUpdated = async () => {
+    if (!simulation?.id) return;
+    await updateSimulation({
+      id: simulation.id,
+      data: {
+        run: true,
+      },
+    });
   };
 
   const buildMeshPreview = (xmlText: string) => {
@@ -983,7 +1006,19 @@ export default function SimulationDetail() {
               <span className="text-xs font-semibold uppercase tracking-wider text-primary bg-primary/10 border border-primary/20 rounded-full px-2 py-1">
                 #{simulation.id}
               </span>
-              <StatusBadge status={simulation.status} />
+              <div className="flex items-center gap-2">
+                <StatusBadge status={simulation.status} />
+                {simulation.paramsDirty && (
+                  <button
+                    type="button"
+                    onClick={handleRerunUpdated}
+                    title="Parameters updated! Click to re-run."
+                    className="inline-flex items-center justify-center rounded-full p-1.5 text-indigo-500 hover:bg-indigo-500/10 hover:text-indigo-600 transition"
+                  >
+                    <RefreshCcw className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
               {/* {isCompleted && results && (
                 <span className="text-xs font-semibold tracking-wider bg-muted text-muted-foreground border border-border rounded-full px-2 py-1">
                   {solverBadge}
@@ -1225,14 +1260,14 @@ export default function SimulationDetail() {
                 <p className="text-sm text-muted-foreground">Loading mesh files...</p>
               ) : meshError ? (
                 <p className="text-sm text-destructive">{meshError}</p>
-              ) : simulationMeshes.length === 0 ? (
+              ) : meshArtifacts.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
                   No mesh artifacts saved yet.
                 </p>
               ) : (
                 <div className="space-y-3">
                   {Object.values(
-                    simulationMeshes.reduce(
+                    meshArtifacts.reduce(
                       (acc, mesh) => {
                         const key = mesh.name;
                         if (!acc[key]) {

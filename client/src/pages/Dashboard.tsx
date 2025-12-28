@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import { useMaterials } from "@/hooks/use-materials";
 import { useSimulations } from "@/hooks/use-simulations";
 import { StatusBadge } from "@/components/StatusBadge";
+import { Button } from "@/components/ui/button";
 import {
   Layers,
   Zap,
@@ -9,6 +10,7 @@ import {
   AlertTriangle,
   TrendingUp,
   Activity,
+  Play,
 } from "lucide-react";
 import { Link } from "wouter";
 import {
@@ -83,13 +85,21 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-display font-bold text-foreground">
-          Dashboard
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          Overview of your material database and simulation jobs.
-        </p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-3xl font-display font-bold text-foreground">
+            Dashboard
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            Overview of your material database and simulation jobs.
+          </p>
+        </div>
+        <Link href="/simulations/create">
+          <Button className="w-full sm:w-auto font-semibold opacity-90 hover:opacity-100">
+            <Zap className="h-4 w-4 fill-current" />
+            Create
+          </Button>
+        </Link>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

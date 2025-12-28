@@ -25,14 +25,16 @@ export function Layout({ children }: LayoutProps) {
 
   const navItems = [
     { label: "Dashboard", href: "/", icon: LayoutDashboard },
-    { label: "Create Simulation", href: "/simulations/create", icon: Zap, exact: true },
-    { label: "History", href: "/simulations", icon: History, exclude: ["/simulations/create"] },
-    { label: "Compare Simulations", href: "/compare-simulations", icon: BarChart2, exact: true },
+    { label: "Create", href: "/simulations/create", icon: Zap, exact: true },
+    { label: "Simualtions", href: "/simulations", icon: History, exclude: ["/simulations/create"] },
+    { label: "Compare", href: "/compare-simulations", icon: BarChart2, exact: true },
     { label: "Materials", href: "/materials", icon: Layers },
     { label: "Geometries", href: "/geometries", icon: Box }
   ];
 
-  const NavContent = () => (
+  const NavContent = () => {
+    const isSettingsActive = location === "/settings" || location.startsWith("/settings/");
+    return (
     <div className="flex flex-col h-full bg-card border-r border-border">
       <div className="p-6">
         <Link href="/">
@@ -78,16 +80,22 @@ export function Layout({ children }: LayoutProps) {
       <div className="p-4 border-t border-border mt-auto">
         <Link href="/settings">
           <div
-            className="flex items-center gap-3 px-3 py-2.5 w-full rounded-lg text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
+            className={clsx(
+              "flex items-center gap-3 px-3 py-2.5 w-full rounded-lg text-sm font-medium transition-colors cursor-pointer",
+              isSettingsActive
+                ? "bg-primary/10 text-primary shadow-sm ring-1 ring-primary/20"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+            )}
             onClick={() => setIsMobileOpen(false)}
           >
-            <Settings className="h-4 w-4" />
+            <Settings className={clsx("h-4 w-4", isSettingsActive ? "text-primary" : "text-muted-foreground")} />
             Settings
           </div>
         </Link>
       </div>
     </div>
-  );
+    );
+  };
 
   return (
     <div className="min-h-screen bg-background flex">
