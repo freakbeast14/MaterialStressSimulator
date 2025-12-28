@@ -75,6 +75,64 @@ export function useCreateSimulation() {
   });
 }
 
+type UpdateSimulationInput = z.infer<typeof api.simulations.update.input>;
+
+export function useUpdateSimulation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: UpdateSimulationInput }) => {
+      const url = buildUrl(api.simulations.update.path, { id });
+      const res = await fetch(url, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) {
+        if (res.status === 400) {
+          const error = api.simulations.update.responses[400].parse(await res.json());
+          throw new Error(error.message);
+        }
+        if (res.status === 404) {
+          const error = api.simulations.update.responses[404].parse(await res.json());
+          throw new Error(error.message);
+        }
+        throw new Error("Failed to update simulation");
+      }
+      return api.simulations.update.responses[200].parse(await res.json());
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: [api.simulations.list.path] });
+      queryClient.invalidateQueries({
+        queryKey: [api.simulations.get.path, variables.id],
+      });
+    },
+  });
+}
+
+export function useCancelSimulation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: number) => {
+      const url = buildUrl(api.simulations.cancel.path, { id });
+      const res = await fetch(url, { method: "POST" });
+      if (!res.ok) {
+        if (res.status === 404) {
+          const error = api.simulations.cancel.responses[404].parse(await res.json());
+          throw new Error(error.message);
+        }
+        throw new Error("Failed to cancel simulation");
+      }
+      return api.simulations.cancel.responses[200].parse(await res.json());
+    },
+    onSuccess: (_data, id) => {
+      queryClient.invalidateQueries({ queryKey: [api.simulations.list.path] });
+      queryClient.invalidateQueries({
+        queryKey: [api.simulations.get.path, id],
+      });
+    },
+  });
+}
+
 export function useDeleteSimulation() {
   const queryClient = useQueryClient();
   return useMutation({

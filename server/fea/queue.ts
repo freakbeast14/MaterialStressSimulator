@@ -5,7 +5,7 @@ import {
   type FenicsJobInput,
   type FenicsMeshArtifact,
 } from "./fenics-client";
-import { readStoragePath, saveMeshFile } from "../storage-backend";
+import { deleteStoragePath, readStoragePath, saveMeshFile } from "../storage-backend";
 
 type SimulationJob = {
   id: number;
@@ -14,10 +14,33 @@ type SimulationJob = {
 
 const queue: SimulationJob[] = [];
 let isProcessing = false;
+const canceledJobs = new Set<number>();
 
 export function enqueueSimulation(id: number, input: Omit<FenicsJobInput, "material">): void {
   queue.push({ id, input });
   void processQueue();
+}
+
+export async function cancelSimulation(id: number): Promise<boolean> {
+  const queuedIndex = queue.findIndex((job) => job.id === id);
+  if (queuedIndex >= 0) {
+    queue.splice(queuedIndex, 1);
+    await storage.updateSimulationStatus(
+      id,
+      "failed",
+      { message: "Simulation canceled by user" },
+      0,
+    );
+    return true;
+  }
+  canceledJobs.add(id);
+  await storage.updateSimulationStatus(
+    id,
+    "failed",
+    { message: "Simulation canceled by user" },
+    0,
+  );
+  return true;
 }
 
 async function processQueue(): Promise<void> {
@@ -41,6 +64,23 @@ async function runJob(job: SimulationJob): Promise<void> {
   }
 
   await storage.updateSimulationStatus(job.id, "running", null, 5);
+  try {
+    const existingMeshes = await storage.getSimulationMeshes(job.id);
+    for (const mesh of existingMeshes) {
+      await deleteStoragePath(mesh.storagePath);
+    }
+    if (existingMeshes.length) {
+      await storage.deleteSimulationMeshes(job.id);
+    }
+  } catch (err) {
+    await storage.updateSimulationStatus(
+      job.id,
+      "failed",
+      { message: err instanceof Error ? err.message : "Failed to clear previous mesh artifacts" },
+      0,
+    );
+    return;
+  }
 
   let fenicsJobId: string | null = null;
   try {
@@ -83,7 +123,27 @@ async function runJob(job: SimulationJob): Promise<void> {
 
   while (true) {
     try {
+      if (canceledJobs.has(job.id)) {
+        canceledJobs.delete(job.id);
+        await storage.updateSimulationStatus(
+          job.id,
+          "failed",
+          { message: "Simulation canceled by user" },
+          0,
+        );
+        return;
+      }
       const status = await getFenicsJob(fenicsJobId);
+      if (canceledJobs.has(job.id)) {
+        canceledJobs.delete(job.id);
+        await storage.updateSimulationStatus(
+          job.id,
+          "failed",
+          { message: "Simulation canceled by user" },
+          0,
+        );
+        return;
+      }
       if (status.status === "completed") {
         if (status.artifacts?.meshes?.length) {
           await persistMeshArtifacts(job.id, job.input.geometryId, status.artifacts.meshes);

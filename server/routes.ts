@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { z } from "zod";
 import { materials } from "@shared/schema";
-import { enqueueSimulation } from "./fea/queue";
+import { cancelSimulation, enqueueSimulation } from "./fea/queue";
 import {
   ensureLocalStorageRoot,
   readStoragePath,
@@ -757,6 +757,148 @@ export async function registerRoutes(
       return res.status(404).json({ message: 'Simulation not found' });
     }
     res.json(simulation);
+  });
+
+  app.put(api.simulations.update.path, async (req, res) => {
+    try {
+      const simulationId = Number(req.params.id);
+      const simulation = await storage.getSimulation(simulationId);
+      if (!simulation) {
+        return res.status(404).json({ message: "Simulation not found" });
+      }
+      const input = api.simulations.update.input.parse(req.body);
+      const { boundaryConditions, run, ...updateFields } = input;
+      const shouldRun = Boolean(run);
+      const existingConditions = await storage.getBoundaryConditions(simulationId);
+      const existingPayload = existingConditions.map((condition) => ({
+        type: condition.type,
+        face: condition.face,
+        magnitude: condition.magnitude ?? null,
+        unit: condition.unit ?? null,
+      }));
+      const nextPayload = boundaryConditions ?? existingPayload;
+      const normalizeBoundaryCondition = (item: {
+        type: string;
+        face: string;
+        magnitude?: number | null;
+        unit?: string | null;
+      }) => ({
+        type: item.type,
+        face: item.face,
+        magnitude: item.magnitude ?? null,
+        unit: item.unit ?? null,
+      });
+      const normalizeForCompare = (items: typeof nextPayload) =>
+        JSON.stringify(
+          items
+            .map(normalizeBoundaryCondition)
+            .sort((a, b) =>
+              `${a.face}-${a.type}`.localeCompare(`${b.face}-${b.type}`)
+            )
+        );
+      const normalizedExisting = normalizeForCompare(existingPayload);
+      const normalizedNext = normalizeForCompare(nextPayload);
+      const hasBoundaryChanges =
+        boundaryConditions ? normalizedExisting !== normalizedNext : false;
+      const hasNonNameUpdates = Object.entries(updateFields).some(([key, value]) => {
+        if (key === "name" || value === undefined) return false;
+        const current = (simulation as any)[key];
+        return (value ?? null) !== (current ?? null);
+      });
+      const hasParamChanges = hasNonNameUpdates || hasBoundaryChanges;
+      const merged = {
+        ...simulation,
+        ...updateFields,
+        status: shouldRun ? "pending" : simulation.status,
+        progress: shouldRun ? 0 : simulation.progress,
+        results: shouldRun ? null : simulation.results,
+        completedAt: shouldRun ? null : simulation.completedAt,
+        paramsDirty: shouldRun
+          ? false
+          : hasParamChanges
+          ? true
+          : simulation.paramsDirty ?? false,
+      };
+      const updated = await storage.updateSimulation(simulationId, {
+        name: merged.name,
+        materialId: merged.materialId,
+        geometryId: merged.geometryId,
+        type: merged.type,
+        appliedLoad: merged.appliedLoad,
+        temperature: merged.temperature,
+        duration: merged.duration,
+        frequency: merged.frequency,
+        dampingRatio: merged.dampingRatio,
+        materialModel: merged.materialModel,
+        yieldStrength: merged.yieldStrength,
+        hardeningModulus: merged.hardeningModulus,
+        status: merged.status,
+        progress: merged.progress ?? 0,
+        results: merged.results ?? null,
+        completedAt: merged.completedAt ?? null,
+        paramsDirty: merged.paramsDirty ?? false,
+      });
+      if (!updated) {
+        return res.status(404).json({ message: "Simulation not found" });
+      }
+
+      if (boundaryConditions) {
+        await storage.deleteBoundaryConditions(simulationId);
+        if (boundaryConditions.length) {
+          await Promise.all(
+            boundaryConditions.map((condition) =>
+              storage.createBoundaryCondition({
+                simulationId,
+                type: condition.type,
+                face: condition.face,
+                magnitude: condition.magnitude ?? null,
+                unit: condition.unit ?? null,
+              })
+            )
+          );
+        }
+      }
+
+      if (shouldRun) {
+        const payload = {
+          name: updated.name,
+          materialId: updated.materialId,
+          geometryId: updated.geometryId,
+          type: updated.type,
+          appliedLoad: updated.appliedLoad,
+          temperature: updated.temperature,
+          duration: updated.duration,
+          frequency: updated.frequency,
+          dampingRatio: updated.dampingRatio,
+          materialModel: updated.materialModel,
+          yieldStrength: updated.yieldStrength,
+          hardeningModulus: updated.hardeningModulus,
+          boundaryConditions: boundaryConditions ?? (await storage.getBoundaryConditions(simulationId)),
+        };
+        enqueueSimulation(simulationId, payload);
+      }
+
+      res.json(updated);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({
+          message: err.errors[0].message,
+          field: err.errors[0].path.join('.'),
+        });
+      }
+      throw err;
+    }
+  });
+
+  app.post(api.simulations.cancel.path, async (req, res) => {
+    const simulationId = Number(req.params.id);
+    const simulation = await storage.getSimulation(simulationId);
+    if (!simulation) {
+      return res.status(404).json({ message: "Simulation not found" });
+    }
+    await cancelSimulation(simulationId);
+    const updated = await storage.getSimulation(simulationId);
+    return res.json(updated ?? simulation);
   });
 
   app.delete(api.simulations.delete.path, async (req, res) => {

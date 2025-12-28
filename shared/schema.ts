@@ -43,6 +43,7 @@ export const simulations = pgTable("simulations", {
   
   // Progress tracking
   progress: integer("progress").default(0), // 0-100%
+  paramsDirty: boolean("params_dirty").default(false),
   
   // Results stored as JSON
   results: jsonb("results").$type<{ 

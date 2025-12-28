@@ -30,6 +30,7 @@ export interface IStorage {
   getSimulations(): Promise<Simulation[]>;
   getSimulation(id: number): Promise<Simulation | undefined>;
   createSimulation(simulation: InsertSimulation): Promise<Simulation>;
+  updateSimulation(id: number, simulation: Partial<InsertSimulation & { status: string; results: any; progress: number; completedAt: Date | null }>): Promise<Simulation | undefined>;
   updateSimulationStatus(id: number, status: string, results?: any, progress?: number): Promise<Simulation>;
   deleteSimulation(id: number): Promise<boolean>;
 
@@ -45,10 +46,12 @@ export interface IStorage {
   getSimulationMeshes(simulationId: number): Promise<SimulationMesh[]>;
   getSimulationMesh(id: number): Promise<SimulationMesh | undefined>;
   createSimulationMesh(mesh: InsertSimulationMesh): Promise<SimulationMesh>;
+  deleteSimulationMeshes(simulationId: number): Promise<SimulationMesh[]>;
 
   // Boundary conditions
   getBoundaryConditions(simulationId: number): Promise<SimulationBoundaryCondition[]>;
   createBoundaryCondition(condition: InsertSimulationBoundaryCondition): Promise<SimulationBoundaryCondition>;
+  deleteBoundaryConditions(simulationId: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -99,6 +102,26 @@ export class DatabaseStorage implements IStorage {
       results: null,
     }).returning();
     return simulation;
+  }
+
+  async updateSimulation(
+    id: number,
+    updateSimulation: Partial<
+      InsertSimulation & {
+        status: string;
+        results: any;
+        progress: number;
+        completedAt: Date | null;
+        paramsDirty: boolean;
+      }
+    >,
+  ): Promise<Simulation | undefined> {
+    const [updated] = await db
+      .update(simulations)
+      .set(updateSimulation)
+      .where(eq(simulations.id, id))
+      .returning();
+    return updated;
   }
 
   async updateSimulationStatus(id: number, status: string, results?: any, progress?: number): Promise<Simulation> {
@@ -183,6 +206,14 @@ export class DatabaseStorage implements IStorage {
     return mesh;
   }
 
+  async deleteSimulationMeshes(simulationId: number): Promise<SimulationMesh[]> {
+    const deleted = await db
+      .delete(simulationMeshes)
+      .where(eq(simulationMeshes.simulationId, simulationId))
+      .returning();
+    return deleted;
+  }
+
   async getBoundaryConditions(simulationId: number): Promise<SimulationBoundaryCondition[]> {
     return await db
       .select()
@@ -199,6 +230,12 @@ export class DatabaseStorage implements IStorage {
       .values(insertCondition)
       .returning();
     return condition;
+  }
+
+  async deleteBoundaryConditions(simulationId: number): Promise<void> {
+    await db
+      .delete(simulationBoundaryConditions)
+      .where(eq(simulationBoundaryConditions.simulationId, simulationId));
   }
 }
 

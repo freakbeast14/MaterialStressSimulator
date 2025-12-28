@@ -574,6 +574,9 @@ export default function SimulationComparison() {
           <TabsContent value="heatmap">
             <div className="bg-card rounded-2xl border border-border p-6">
               <h3 className="font-semibold mb-4">Comparison Heatmap</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Quick visual scan of how stress, deformation, and safety factor compare across runs.
+              </p>
               <Plot
                 data={[
                   {
@@ -600,6 +603,9 @@ export default function SimulationComparison() {
           <TabsContent value="metrics">
             <div className="bg-card rounded-2xl border border-border p-6">
               <h3 className="font-semibold mb-4">3D Metrics Space</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Each point is a simulation plotted by max stress, deformation, and safety factor.
+              </p>
               <Plot
                 data={[
                   {

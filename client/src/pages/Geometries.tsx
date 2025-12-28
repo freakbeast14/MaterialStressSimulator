@@ -379,9 +379,9 @@ export default function Geometries() {
                     {geometry.createdAt
                       ? new Date(geometry.createdAt).toLocaleString("en-US", {
                           month: "short",
-                          day: "2-digit",
+                          day: "numeric",
                           year: "numeric",
-                          hour: "2-digit",
+                          hour: "numeric",
                           minute: "2-digit",
                         })
                       : "—"}
@@ -470,7 +470,7 @@ export default function Geometries() {
                 onClick={handleCreate}
                 disabled={isCreating || !formState.name || !formState.file}
               >
-                {isCreating ? "Saving..." : "Add Geometry"}
+                {isCreating ? "Saving..." : "Add"}
               </Button>
             </div>
           </div>

@@ -121,6 +121,43 @@ export const api = {
         404: errorSchemas.notFound,
       },
     },
+    update: {
+      method: 'PUT' as const,
+      path: '/api/simulations/:id',
+      input: insertSimulationSchema
+        .pick({
+          name: true,
+          materialId: true,
+          geometryId: true,
+          type: true,
+          appliedLoad: true,
+          temperature: true,
+          duration: true,
+          frequency: true,
+          dampingRatio: true,
+          materialModel: true,
+          yieldStrength: true,
+          hardeningModulus: true,
+        })
+        .partial()
+        .extend({
+          boundaryConditions: z.array(boundaryConditionSchema).optional(),
+          run: z.boolean().optional(),
+        }),
+      responses: {
+        200: z.custom<typeof simulations.$inferSelect>(),
+        400: errorSchemas.validation,
+        404: errorSchemas.notFound,
+      },
+    },
+    cancel: {
+      method: 'POST' as const,
+      path: '/api/simulations/:id/cancel',
+      responses: {
+        200: z.custom<typeof simulations.$inferSelect>(),
+        404: errorSchemas.notFound,
+      },
+    },
     delete: {
       method: 'DELETE' as const,
       path: '/api/simulations/:id',
