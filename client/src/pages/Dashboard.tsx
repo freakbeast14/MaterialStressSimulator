@@ -75,6 +75,30 @@ export default function Dashboard() {
       return acc;
     }, []) || [];
 
+  const recentSimulations =
+    simulations
+      ? [...simulations].sort((a, b) => {
+          const statusRank = (status: string) => {
+            if (status === "running") return 0;
+            if (status === "pending") return 1;
+            return 2;
+          };
+          const statusDelta = statusRank(a.status) - statusRank(b.status);
+          if (statusDelta !== 0) return statusDelta;
+          const aTime =
+            (a.updatedAt && Date.parse(a.updatedAt)) ||
+            (a.completedAt && Date.parse(a.completedAt)) ||
+            (a.createdAt && Date.parse(a.createdAt)) ||
+            0;
+          const bTime =
+            (b.updatedAt && Date.parse(b.updatedAt)) ||
+            (b.completedAt && Date.parse(b.completedAt)) ||
+            (b.createdAt && Date.parse(b.createdAt)) ||
+            0;
+          return bTime - aTime;
+        })
+      : [];
+
   if (loadingMaterials || loadingSimulations) {
     return (
       <div className="flex h-[50vh] items-center justify-center">
@@ -177,7 +201,7 @@ export default function Dashboard() {
             </Link>
           </div>
           <div className="divide-y divide-border/50">
-            {simulations?.slice(0, 6).map((sim) => (
+            {recentSimulations.slice(0, 6).map((sim) => (
               <Link key={sim.id} href={`/simulations/${sim.id}`}>
                 <div className="p-4 hover:bg-muted/50 transition-colors cursor-pointer group">
                   <div className="flex items-center justify-between gap-2">

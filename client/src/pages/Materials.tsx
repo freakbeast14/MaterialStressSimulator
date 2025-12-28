@@ -214,19 +214,20 @@ export default function Materials() {
                   <div className="flex items-center gap-1">
                     <button
                       type="button"
-                      className="rounded-full p-1 text-muted-foreground hover:text-primary hover:bg-primary/10 transition"
+                      className="rounded-lg p-2 m-[-8px] mr-2 text-muted-foreground hover:text-indigo-500 hover:bg-indigo-500/10 transition"
                       onClick={(event) => {
                         event.preventDefault();
                         event.stopPropagation();
                         handleOpenEdit(material);
                       }}
                       aria-label={`Edit ${material.name}`}
+                      title="Edit"
                     >
                       <Pencil className="h-4 w-4" />
                     </button>
                     <button
                       type="button"
-                      className="rounded-full p-1 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition"
+                      className="rounded-lg p-2 m-[-8px] mr-1 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition"
                       onClick={(event) => {
                         event.preventDefault();
                         event.stopPropagation();
@@ -234,6 +235,7 @@ export default function Materials() {
                       }}
                       aria-label={`Delete ${material.name}`}
                       disabled={isDeleting}
+                      title="Delete"
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>

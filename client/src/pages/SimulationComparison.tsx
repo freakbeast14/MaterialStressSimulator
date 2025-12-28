@@ -72,11 +72,13 @@ export default function SimulationComparison() {
     return results?.maxStress || 0;
   };
   const filteredSims = completedSims.filter((sim) => {
+    const geometryName = getGeometryName(sim.geometryId);
     const materialName = getMaterialName(sim.materialId);
     const query = search.toLowerCase();
     return (
       sim.name.toLowerCase().includes(query) ||
       sim.type.toLowerCase().includes(query) ||
+      geometryName.toLowerCase().includes(search.toLowerCase()) ||
       materialName.toLowerCase().includes(query)
     );
   });
@@ -245,7 +247,7 @@ export default function SimulationComparison() {
                     <tr>
                       <th className="px-3 py-3"></th>
                       <th className="px-3 py-3">ID</th>
-                      <th className="px-3 py-3">Simulation</th>
+                      <th className="px-3 py-3">Name</th>
                       <th className="px-3 py-3">Test</th>
                       <th className="px-3 py-3">Material</th>
                       <th className="px-3 py-3">Geometry</th>
@@ -266,12 +268,17 @@ export default function SimulationComparison() {
                     </colgroup>
                     <tbody className="divide-y divide-border">
                       {filteredSims.map((sim) => (
-                        <tr key={sim.id} className="hover:bg-muted/30 transition-colors">
+                        <tr
+                          key={sim.id}
+                          className="hover:bg-muted/30 transition-colors cursor-pointer"
+                          onClick={() => toggleSimulation(sim.id)}
+                        >
                           <td className="px-3 py-3">
                             <input
                               type="checkbox"
                               checked={selectedSims.includes(sim.id)}
                               onChange={() => toggleSimulation(sim.id)}
+                              onClick={(event) => event.stopPropagation()}
                               className="w-4 h-4 rounded border-border"
                             />
                           </td>
@@ -573,7 +580,7 @@ export default function SimulationComparison() {
 
           <TabsContent value="heatmap">
             <div className="bg-card rounded-2xl border border-border p-6">
-              <h3 className="font-semibold mb-4">Comparison Heatmap</h3>
+              <h3 className="font-semibold">Comparison Heatmap</h3>
               <p className="text-sm text-muted-foreground mb-4">
                 Quick visual scan of how stress, deformation, and safety factor compare across runs.
               </p>
@@ -602,7 +609,7 @@ export default function SimulationComparison() {
 
           <TabsContent value="metrics">
             <div className="bg-card rounded-2xl border border-border p-6">
-              <h3 className="font-semibold mb-4">3D Metrics Space</h3>
+              <h3 className="font-semibold">3D Metrics Space</h3>
               <p className="text-sm text-muted-foreground mb-4">
                 Each point is a simulation plotted by max stress, deformation, and safety factor.
               </p>
