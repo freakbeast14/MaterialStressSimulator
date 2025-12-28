@@ -23,6 +23,8 @@ export interface IStorage {
   getMaterials(): Promise<Material[]>;
   getMaterial(id: number): Promise<Material | undefined>;
   createMaterial(material: InsertMaterial): Promise<Material>;
+  updateMaterial(id: number, material: InsertMaterial): Promise<Material | undefined>;
+  deleteMaterial(id: number): Promise<boolean>;
 
   // Simulations
   getSimulations(): Promise<Simulation[]>;
@@ -35,6 +37,8 @@ export interface IStorage {
   getGeometries(): Promise<Geometry[]>;
   getGeometry(id: number): Promise<Geometry | undefined>;
   createGeometry(geometry: InsertGeometry): Promise<Geometry>;
+  updateGeometry(id: number, geometry: Partial<InsertGeometry>): Promise<Geometry | undefined>;
+  deleteGeometry(id: number): Promise<boolean>;
   updateGeometryStorage(id: number, storagePath: string, sizeBytes: number): Promise<Geometry>;
 
   // Simulation meshes
@@ -60,6 +64,23 @@ export class DatabaseStorage implements IStorage {
   async createMaterial(insertMaterial: InsertMaterial): Promise<Material> {
     const [material] = await db.insert(materials).values(insertMaterial).returning();
     return material;
+  }
+
+  async updateMaterial(id: number, updateMaterial: InsertMaterial): Promise<Material | undefined> {
+    const [updated] = await db
+      .update(materials)
+      .set(updateMaterial)
+      .where(eq(materials.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteMaterial(id: number): Promise<boolean> {
+    const [deleted] = await db
+      .delete(materials)
+      .where(eq(materials.id, id))
+      .returning();
+    return !!deleted;
   }
 
   async getSimulations(): Promise<Simulation[]> {
@@ -113,6 +134,26 @@ export class DatabaseStorage implements IStorage {
   async createGeometry(insertGeometry: InsertGeometry): Promise<Geometry> {
     const [geometry] = await db.insert(geometries).values(insertGeometry).returning();
     return geometry;
+  }
+
+  async updateGeometry(
+    id: number,
+    updateGeometry: Partial<InsertGeometry>,
+  ): Promise<Geometry | undefined> {
+    const [updated] = await db
+      .update(geometries)
+      .set(updateGeometry)
+      .where(eq(geometries.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteGeometry(id: number): Promise<boolean> {
+    const [deleted] = await db
+      .delete(geometries)
+      .where(eq(geometries.id, id))
+      .returning();
+    return !!deleted;
   }
 
   async updateGeometryStorage(id: number, storagePath: string, sizeBytes: number): Promise<Geometry> {

@@ -10,6 +10,7 @@ import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/Dashboard";
 import Materials from "@/pages/Materials";
 import MaterialDetail from "@/pages/MaterialDetail";
+import Geometries from "@/pages/Geometries";
 import Simulations from "@/pages/Simulations";
 import SimulationDetail from "@/pages/SimulationDetail";
 import SimulationComparison from "@/pages/SimulationComparison";
@@ -23,6 +24,7 @@ function Router() {
       <Switch>
         <Route path="/" component={Dashboard} />
         <Route path="/materials" component={Materials} />
+        <Route path="/geometries" component={Geometries} />
         <Route path="/materials/:id" component={MaterialDetail} />
         <Route path="/simulations" component={Simulations} />
         <Route path="/simulations/create" component={CreateSimulation} />

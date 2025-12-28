@@ -592,6 +592,7 @@ export default function SimulationComparison() {
                   margin: { l: 50, r: 50, t: 50, b: 50 },
                 }}
                 style={{ width: "100%" }}
+                // config={{ displayModeBar: false }}
               />
             </div>
           </TabsContent>
@@ -630,6 +631,7 @@ export default function SimulationComparison() {
                   font: { color: "var(--foreground)" },
                 }}
                 style={{ width: "100%" }}
+                // config={{ displayModeBar: false }}
               />
             </div>
           </TabsContent>

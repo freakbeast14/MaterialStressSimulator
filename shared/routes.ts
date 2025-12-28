@@ -62,6 +62,24 @@ export const api = {
         404: errorSchemas.notFound,
       },
     },
+    update: {
+      method: 'PUT' as const,
+      path: '/api/materials/:id',
+      input: insertMaterialSchema,
+      responses: {
+        200: z.custom<typeof materials.$inferSelect>(),
+        400: errorSchemas.validation,
+        404: errorSchemas.notFound,
+      },
+    },
+    delete: {
+      method: 'DELETE' as const,
+      path: '/api/materials/:id',
+      responses: {
+        200: z.object({ success: z.literal(true) }),
+        404: errorSchemas.notFound,
+      },
+    },
   },
   simulations: {
     list: {
@@ -151,6 +169,29 @@ export const api = {
           format: z.string(),
           contentBase64: z.string(),
         }),
+        404: errorSchemas.notFound,
+      },
+    },
+    update: {
+      method: 'PUT' as const,
+      path: '/api/geometries/:id',
+      input: z.object({
+        name: z.string().min(1),
+        originalName: z.string().optional(),
+        format: z.string().optional(),
+        contentBase64: z.string().optional(),
+      }),
+      responses: {
+        200: z.custom<typeof geometries.$inferSelect>(),
+        400: errorSchemas.validation,
+        404: errorSchemas.notFound,
+      },
+    },
+    delete: {
+      method: 'DELETE' as const,
+      path: '/api/geometries/:id',
+      responses: {
+        200: z.object({ success: z.literal(true) }),
         404: errorSchemas.notFound,
       },
     },

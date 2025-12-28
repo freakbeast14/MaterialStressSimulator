@@ -1,11 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { useCreateMaterial } from "@/hooks/use-materials";
-import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useTheme } from "next-themes";
 
@@ -17,29 +14,12 @@ const STORAGE_KEYS = {
 };
 
 export default function Settings() {
-  const { toast } = useToast();
   const { setTheme, theme } = useTheme();
-  const { mutateAsync: createMaterial, isPending } = useCreateMaterial();
 
   const [units, setUnits] = useState("metric");
   const [refreshInterval, setRefreshInterval] = useState("10");
   const [defaultSimType, setDefaultSimType] = useState("Tensile Test");
   const [notifications, setNotifications] = useState(true);
-
-  const [name, setName] = useState("");
-  const [category, setCategory] = useState("Metal");
-  const [description, setDescription] = useState("");
-  const [density, setDensity] = useState("");
-  const [youngsModulus, setYoungsModulus] = useState("");
-  const [poissonRatio, setPoissonRatio] = useState("");
-  const [thermalConductivity, setThermalConductivity] = useState("");
-  const [meltingPoint, setMeltingPoint] = useState("");
-  const [stressStrainCurve, setStressStrainCurve] = useState(
-    '[{"strain":0,"stress":0},{"strain":0.01,"stress":100}]'
-  );
-  const [thermalExpansionCurve, setThermalExpansionCurve] = useState(
-    '[{"temperature":20,"coefficient":12},{"temperature":100,"coefficient":13}]'
-  );
 
   useEffect(() => {
     const savedUnits = localStorage.getItem(STORAGE_KEYS.units);
@@ -59,48 +39,6 @@ export default function Settings() {
     localStorage.setItem(STORAGE_KEYS.notifications, String(notifications));
   }, [units, refreshInterval, defaultSimType, notifications]);
 
-  const parsedCurves = useMemo(() => {
-    const parseJson = (value: string) => JSON.parse(value);
-    try {
-      return {
-        stress: parseJson(stressStrainCurve),
-        thermal: parseJson(thermalExpansionCurve),
-      };
-    } catch {
-      return null;
-    }
-  }, [stressStrainCurve, thermalExpansionCurve]);
-
-  const handleCreateMaterial = async () => {
-    if (!parsedCurves) {
-      toast({
-        title: "Invalid curve JSON",
-        description: "Please fix the stress-strain or thermal expansion JSON.",
-        variant: "destructive",
-      });
-      return;
-    }
-    try {
-      await createMaterial({
-        name,
-        category,
-        description,
-        density: Number(density),
-        youngsModulus: Number(youngsModulus),
-        poissonRatio: Number(poissonRatio),
-        thermalConductivity: Number(thermalConductivity),
-        meltingPoint: Number(meltingPoint),
-        stressStrainCurve: parsedCurves.stress,
-        thermalExpansionCurve: parsedCurves.thermal,
-      });
-      toast({ title: "Material created", description: "New material added to the library." });
-      setName("");
-      setDescription("");
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to create material.";
-      toast({ title: "Creation failed", description: message, variant: "destructive" });
-    }
-  };
 
   return (
     <div className="space-y-8">
@@ -177,89 +115,7 @@ export default function Settings() {
           </div>
         </div>
 
-        <div className="lg:col-span-2">
-          <div className="bg-card rounded-2xl border border-border p-6 space-y-6">
-            <div>
-              <h3 className="text-lg font-semibold">Add New Material</h3>
-              <p className="text-sm text-muted-foreground">Provide full material properties and curves.</p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Material Name</Label>
-                <Input value={name} onChange={(e) => setName(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label>Category</Label>
-                <Select value={category} onValueChange={setCategory}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Metal">Metal</SelectItem>
-                    <SelectItem value="Polymer">Polymer</SelectItem>
-                    <SelectItem value="Composite">Composite</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Description</Label>
-              <Textarea value={description} onChange={(e) => setDescription(e.target.value)} />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label>Density (kg/m³)</Label>
-                <Input value={density} onChange={(e) => setDensity(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label>Young's Modulus (GPa)</Label>
-                <Input value={youngsModulus} onChange={(e) => setYoungsModulus(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label>Poisson's Ratio</Label>
-                <Input value={poissonRatio} onChange={(e) => setPoissonRatio(e.target.value)} />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Thermal Conductivity (W/m·K)</Label>
-                <Input value={thermalConductivity} onChange={(e) => setThermalConductivity(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label>Melting Point (°C)</Label>
-                <Input value={meltingPoint} onChange={(e) => setMeltingPoint(e.target.value)} />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Stress-Strain Curve (JSON)</Label>
-              <Textarea
-                value={stressStrainCurve}
-                onChange={(e) => setStressStrainCurve(e.target.value)}
-                className={parsedCurves ? "" : "border-destructive"}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Thermal Expansion Curve (JSON)</Label>
-              <Textarea
-                value={thermalExpansionCurve}
-                onChange={(e) => setThermalExpansionCurve(e.target.value)}
-                className={parsedCurves ? "" : "border-destructive"}
-              />
-            </div>
-
-            <div className="flex justify-end">
-              <Button onClick={handleCreateMaterial} disabled={isPending || !name}>
-              {isPending ? "Saving..." : "Add Material"}
-              </Button>
-            </div>
-          </div>
-        </div>
+        <div className="lg:col-span-2" />
       </div>
     </div>
   );

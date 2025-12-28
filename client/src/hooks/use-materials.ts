@@ -54,3 +54,55 @@ export function useCreateMaterial() {
     },
   });
 }
+
+type UpdateMaterialInput = z.infer<typeof api.materials.update.input>;
+
+export function useUpdateMaterial() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: UpdateMaterialInput }) => {
+      const url = buildUrl(api.materials.update.path, { id });
+      const res = await fetch(url, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) {
+        if (res.status === 400) {
+          const error = api.materials.update.responses[400].parse(await res.json());
+          throw new Error(error.message);
+        }
+        if (res.status === 404) {
+          const error = api.materials.update.responses[404].parse(await res.json());
+          throw new Error(error.message);
+        }
+        throw new Error("Failed to update material");
+      }
+      return api.materials.update.responses[200].parse(await res.json());
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.materials.list.path] });
+    },
+  });
+}
+
+export function useDeleteMaterial() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: number) => {
+      const url = buildUrl(api.materials.delete.path, { id });
+      const res = await fetch(url, { method: "DELETE" });
+      if (!res.ok) {
+        if (res.status === 404) {
+          const error = api.materials.delete.responses[404].parse(await res.json());
+          throw new Error(error.message);
+        }
+        throw new Error("Failed to delete material");
+      }
+      return api.materials.delete.responses[200].parse(await res.json());
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.materials.list.path] });
+    },
+  });
+}

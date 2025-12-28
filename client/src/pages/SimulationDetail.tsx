@@ -246,6 +246,25 @@ export default function SimulationDetail() {
     ]
   );
 
+  const formatFaceLabel = (face: string) => {
+    switch (face) {
+      case "z+":
+        return "Top (z+)";
+      case "z-":
+        return "Bottom (z-)";
+      case "x+":
+        return "Right (x+)";
+      case "x-":
+        return "Left (x-)";
+      case "y+":
+        return "Front (y+)";
+      case "y-":
+        return "Back (y-)";
+      default:
+        return face;
+    }
+  };
+
   const bcItems = useMemo(() => {
     if (!boundaryConditions?.length) return [];
     return boundaryConditions.map((condition) => {
@@ -254,11 +273,11 @@ export default function SimulationDetail() {
       const value =
         condition.type === "pressure"
           ? `${formatNumber(condition.magnitude ?? undefined)} ${condition.unit || "N"}`
-          : "0";
+          : "";
       return {
         id: condition.id,
         label,
-        face: condition.face,
+        face: formatFaceLabel(condition.face),
         value,
       };
     });
@@ -491,55 +510,14 @@ export default function SimulationDetail() {
   }, [simulationMeshes, meshPreview, isLoadingMeshPreview]);
 
   const geometryMesh = useMemo(() => {
-    const isCylinder = geometry?.name?.toLowerCase().includes("cylinder");
-    if (isCylinder) {
-      const segments = 32;
-      const radius = 1;
-      const height = 1;
-      const x: number[] = [];
-      const y: number[] = [];
-      const z: number[] = [];
-      const i: number[] = [];
-      const j: number[] = [];
-      const k: number[] = [];
-      const topCenterIndex = 0;
-      const bottomCenterIndex = 1;
-      x.push(0, 0);
-      y.push(0, 0);
-      z.push(height, 0);
-      let idx = 2;
-      for (let s = 0; s < segments; s += 1) {
-        const angle = (2 * Math.PI * s) / segments;
-        const cx = Math.cos(angle) * radius;
-        const cy = Math.sin(angle) * radius;
-        x.push(cx, cx);
-        y.push(cy, cy);
-        z.push(height, 0);
-        const topIndex = idx;
-        const bottomIndex = idx + 1;
-        const nextTop = idx + 2 >= 2 + segments * 2 ? 2 : idx + 2;
-        const nextBottom = nextTop + 1;
-        i.push(topCenterIndex);
-        j.push(topIndex);
-        k.push(nextTop);
-        i.push(bottomCenterIndex);
-        j.push(nextBottom);
-        k.push(bottomIndex);
-        i.push(topIndex);
-        j.push(bottomIndex);
-        k.push(nextBottom);
-        i.push(topIndex);
-        j.push(nextBottom);
-        k.push(nextTop);
-        idx += 2;
-      }
-      return { x, y, z, i, j, k };
-    }
     if (!geometryContent || !geometryFormat) return null;
     if (geometryFormat.toLowerCase() !== "stl") return null;
+    const normalized = geometryContent.includes(",")
+      ? geometryContent.split(",")[1]
+      : geometryContent;
     let decoded = "";
     try {
-      decoded = atob(geometryContent);
+      decoded = atob(normalized);
     } catch {
       return null;
     }
@@ -662,7 +640,7 @@ export default function SimulationDetail() {
               condition.type === "pressure"
                 ? `${formatNumber(condition.magnitude ?? undefined)} ${condition.unit || "N"}`
                 : "0";
-            return `${label} ${condition.face} ${magnitude}`;
+            return `${label} ${formatFaceLabel(condition.face)} ${magnitude}`;
           })
           .join(" | ")
       : "";
@@ -1006,11 +984,11 @@ export default function SimulationDetail() {
                 #{simulation.id}
               </span>
               <StatusBadge status={simulation.status} />
-              {isCompleted && results && (
+              {/* {isCompleted && results && (
                 <span className="text-xs font-semibold tracking-wider bg-muted text-muted-foreground border border-border rounded-full px-2 py-1">
                   {solverBadge}
                 </span>
-              )}
+              )} */}
             </div>
             <p className="text-muted-foreground">
               Run on {runDate}
@@ -1136,7 +1114,7 @@ export default function SimulationDetail() {
                         },
                       }}
                       style={{ width: "100%", height: "100%" }}
-                      config={{ displayModeBar: false }}
+                      // config={{ displayModeBar: false }}
                     />
                   ) : (
                     <p className="text-sm text-muted-foreground">
@@ -1354,7 +1332,7 @@ export default function SimulationDetail() {
                             },
                           }}
                           style={{ width: "100%", height: "100%" }}
-                          config={{ displayModeBar: false }}
+                          // config={{ displayModeBar: false }}
                         />
                       </div>
                     ) : (
@@ -1911,8 +1889,9 @@ export default function SimulationDetail() {
                     plot_bgcolor: "transparent",
                     font: { color: "var(--foreground)" },
                   }}
-                  config={{ displayModeBar: false, responsive: true }}
+                  config={{ responsive: true }}
                   style={{ width: "100%" }}
+                  // config={{ displayModeBar: false }}
                 />
               </div>
             </TabsContent>
@@ -1953,6 +1932,7 @@ export default function SimulationDetail() {
                     font: { color: "var(--foreground)" },
                   }}
                   style={{ width: "100%" }}
+                  // config={{ displayModeBar: false }}
                 />
               </div>
             </TabsContent>

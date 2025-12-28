@@ -157,6 +157,16 @@ export default function CreateSimulation() {
     );
   };
 
+  const formatFileLabel = (name?: string | null) => {
+    if (!name) return "No file chosen";
+    if (name.length <= 15) return name;
+    const parts = name.split(".");
+    const ext = parts.length > 1 ? `.${parts.pop()}` : "";
+    const base = parts.join(".") || name;
+    const prefix = base.slice(0, 15);
+    return `${prefix}...${ext || ""}`;
+  };
+
   useEffect(() => {
     if (!geometryId) {
       setGeometryContent(null);
@@ -204,55 +214,14 @@ export default function CreateSimulation() {
   }, [geometries, geometryId]);
 
   const geometryMesh = useMemo(() => {
-    const isCylinder = selectedGeometry?.name.toLowerCase().includes("cylinder");
-    if (isCylinder) {
-      const segments = 32;
-      const radius = 1;
-      const height = 1;
-      const x: number[] = [];
-      const y: number[] = [];
-      const z: number[] = [];
-      const i: number[] = [];
-      const j: number[] = [];
-      const k: number[] = [];
-      const topCenterIndex = 0;
-      const bottomCenterIndex = 1;
-      x.push(0, 0);
-      y.push(0, 0);
-      z.push(height, 0);
-      let idx = 2;
-      for (let s = 0; s < segments; s += 1) {
-        const angle = (2 * Math.PI * s) / segments;
-        const cx = Math.cos(angle) * radius;
-        const cy = Math.sin(angle) * radius;
-        x.push(cx, cx);
-        y.push(cy, cy);
-        z.push(height, 0);
-        const topIndex = idx;
-        const bottomIndex = idx + 1;
-        const nextTop = idx + 2 >= 2 + segments * 2 ? 2 : idx + 2;
-        const nextBottom = nextTop + 1;
-        i.push(topCenterIndex);
-        j.push(topIndex);
-        k.push(nextTop);
-        i.push(bottomCenterIndex);
-        j.push(nextBottom);
-        k.push(bottomIndex);
-        i.push(topIndex);
-        j.push(bottomIndex);
-        k.push(nextBottom);
-        i.push(topIndex);
-        j.push(nextBottom);
-        k.push(nextTop);
-        idx += 2;
-      }
-      return { x, y, z, i, j, k };
-    }
     if (!geometryContent || !geometryFormat) return null;
     if (geometryFormat.toLowerCase() !== "stl") return null;
+    const normalized = geometryContent.includes(",")
+      ? geometryContent.split(",")[1]
+      : geometryContent;
     const decoded = (() => {
       try {
-        return atob(geometryContent);
+        return atob(normalized);
       } catch {
         return "";
       }
@@ -413,7 +382,7 @@ export default function CreateSimulation() {
                         },
                       }}
                       style={{ width: "100%", height: "100%" }}
-                      config={{ displayModeBar: false }}
+                      // config={{ displayModeBar: false }}
                     />
                   </div>
                 ) : geometryId ? (
@@ -436,14 +405,38 @@ export default function CreateSimulation() {
                     value={geometryName}
                     onChange={(e) => setGeometryName(e.target.value)}
                   />
-                  <Input
-                    type="file"
-                    accept=".stp,.step,.stl"
-                    onChange={(e) => setGeometryFile(e.target.files?.[0] || null)}
-                  />
+                  <div className="flex items-center gap-3 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm">
+                    <input
+                      id="geometry-file"
+                      type="file"
+                      accept=".stp,.step,.stl"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0] || null;
+                        setGeometryFile(file);
+                        if (file && geometryName.trim() === "") {
+                          const base = file.name.replace(/\.[^/.]+$/, "");
+                          setGeometryName(base);
+                        }
+                      }}
+                    />
+                    <Label
+                      htmlFor="geometry-file"
+                      className="cursor-pointer rounded-md border border-input px-3 py-1 text-xs font-semibold text-muted-foreground bg-muted/60 shadow-sm hover:bg-muted hover:text-foreground"
+                    >
+                      Choose File
+                    </Label>
+                    <span
+                      className="text-xs text-muted-foreground"
+                      title={geometryFile?.name || "No file chosen"}
+                    >
+                      {formatFileLabel(geometryFile?.name)}
+                    </span>
+                  </div>
                   <Button
                     type="button"
                     variant="outline"
+                    className="disabled:pointer-events-auto disabled:cursor-not-allowed disabled:hover:text-foreground disabled:hover:bg-transparent disabled:opacity-60 hover:text-primary hover:bg-primary/10"
                     onClick={handleUploadGeometry}
                     disabled={!geometryName || !geometryFile || isUploadingGeometry}
                   >
@@ -528,7 +521,7 @@ export default function CreateSimulation() {
               <Button
                 type="button"
                 variant="ghost"
-                className="h-8 w-8 rounded-full text-emerald-600 hover:text-emerald-600 hover:bg-emerald-500/10"
+                className="h-8 w-8 rounded-full text-primary hover:text-primary hover:bg-primary/10"
                 onClick={addBoundaryCondition}
                 aria-label="Add boundary condition"
               >

@@ -343,232 +343,343 @@ endsolid beam
     originalName: "cylinder.stl",
     format: "stl",
     content: `solid cylinder
-  facet normal 0 0 1
+  facet normal -0.965926 -0.258819 0.000000
     outer loop
-      vertex 0 0 1
-      vertex 1 0 1
-      vertex 0.707 0.707 1
+      vertex 10.000000 0.000000 -10.000000
+      vertex 10.000000 0.000000 10.000000
+      vertex 8.660254 5.000000 10.000000
     endloop
   endfacet
-  facet normal 0 0 1
+  facet normal -0.965926 -0.258819 0.000000
     outer loop
-      vertex 0 0 1
-      vertex 0.707 0.707 1
-      vertex 0 1 1
+      vertex 10.000000 0.000000 -10.000000
+      vertex 8.660254 5.000000 10.000000
+      vertex 8.660254 5.000000 -10.000000
     endloop
   endfacet
-  facet normal 0 0 1
+  facet normal 0.000000 0.000000 1.000000
     outer loop
-      vertex 0 0 1
-      vertex 0 1 1
-      vertex -0.707 0.707 1
+      vertex 10.000000 0.000000 10.000000
+      vertex 8.660254 5.000000 10.000000
+      vertex 0.000000 0.000000 10.000000
     endloop
   endfacet
-  facet normal 0 0 1
+  facet normal 0.000000 0.000000 -1.000000
     outer loop
-      vertex 0 0 1
-      vertex -0.707 0.707 1
-      vertex -1 0 1
+      vertex 8.660254 5.000000 -10.000000
+      vertex 10.000000 0.000000 -10.000000
+      vertex 0.000000 0.000000 -10.000000
     endloop
   endfacet
-  facet normal 0 0 1
+  facet normal -0.707107 -0.707107 0.000000
     outer loop
-      vertex 0 0 1
-      vertex -1 0 1
-      vertex -0.707 -0.707 1
+      vertex 8.660254 5.000000 -10.000000
+      vertex 8.660254 5.000000 10.000000
+      vertex 5.000000 8.660254 10.000000
     endloop
   endfacet
-  facet normal 0 0 1
+  facet normal -0.707107 -0.707107 0.000000
     outer loop
-      vertex 0 0 1
-      vertex -0.707 -0.707 1
-      vertex 0 -1 1
+      vertex 8.660254 5.000000 -10.000000
+      vertex 5.000000 8.660254 10.000000
+      vertex 5.000000 8.660254 -10.000000
     endloop
   endfacet
-  facet normal 0 0 1
+  facet normal 0.000000 -0.000000 1.000000
     outer loop
-      vertex 0 0 1
-      vertex 0 -1 1
-      vertex 0.707 -0.707 1
+      vertex 8.660254 5.000000 10.000000
+      vertex 5.000000 8.660254 10.000000
+      vertex 0.000000 0.000000 10.000000
     endloop
   endfacet
-  facet normal 0 0 1
+  facet normal 0.000000 0.000000 -1.000000
     outer loop
-      vertex 0 0 1
-      vertex 0.707 -0.707 1
-      vertex 1 0 1
+      vertex 5.000000 8.660254 -10.000000
+      vertex 8.660254 5.000000 -10.000000
+      vertex 0.000000 0.000000 -10.000000
     endloop
   endfacet
-  facet normal 0 0 -1
+  facet normal -0.258819 -0.965926 0.000000
     outer loop
-      vertex 0 0 0
-      vertex 0.707 0.707 0
-      vertex 1 0 0
+      vertex 5.000000 8.660254 -10.000000
+      vertex 5.000000 8.660254 10.000000
+      vertex 0.000000 10.000000 10.000000
     endloop
   endfacet
-  facet normal 0 0 -1
+  facet normal -0.258819 -0.965926 0.000000
     outer loop
-      vertex 0 0 0
-      vertex 0 1 0
-      vertex 0.707 0.707 0
+      vertex 5.000000 8.660254 -10.000000
+      vertex 0.000000 10.000000 10.000000
+      vertex 0.000000 10.000000 -10.000000
     endloop
   endfacet
-  facet normal 0 0 -1
+  facet normal 0.000000 0.000000 1.000000
     outer loop
-      vertex 0 0 0
-      vertex -0.707 0.707 0
-      vertex 0 1 0
+      vertex 5.000000 8.660254 10.000000
+      vertex 0.000000 10.000000 10.000000
+      vertex 0.000000 0.000000 10.000000
     endloop
   endfacet
-  facet normal 0 0 -1
+  facet normal 0.000000 0.000000 -1.000000
     outer loop
-      vertex 0 0 0
-      vertex -1 0 0
-      vertex -0.707 0.707 0
+      vertex 0.000000 10.000000 -10.000000
+      vertex 5.000000 8.660254 -10.000000
+      vertex 0.000000 0.000000 -10.000000
     endloop
   endfacet
-  facet normal 0 0 -1
+  facet normal 0.258819 -0.965926 0.000000
     outer loop
-      vertex 0 0 0
-      vertex -0.707 -0.707 0
-      vertex -1 0 0
+      vertex 0.000000 10.000000 -10.000000
+      vertex 0.000000 10.000000 10.000000
+      vertex -5.000000 8.660254 10.000000
     endloop
   endfacet
-  facet normal 0 0 -1
+  facet normal 0.258819 -0.965926 0.000000
     outer loop
-      vertex 0 0 0
-      vertex 0 -1 0
-      vertex -0.707 -0.707 0
+      vertex 0.000000 10.000000 -10.000000
+      vertex -5.000000 8.660254 10.000000
+      vertex -5.000000 8.660254 -10.000000
     endloop
   endfacet
-  facet normal 0 0 -1
+  facet normal 0.000000 0.000000 1.000000
     outer loop
-      vertex 0 0 0
-      vertex 0.707 -0.707 0
-      vertex 0 -1 0
+      vertex 0.000000 10.000000 10.000000
+      vertex -5.000000 8.660254 10.000000
+      vertex 0.000000 0.000000 10.000000
     endloop
   endfacet
-  facet normal 0 0 -1
+  facet normal 0.000000 0.000000 -1.000000
     outer loop
-      vertex 0 0 0
-      vertex 1 0 0
-      vertex 0.707 -0.707 0
+      vertex -5.000000 8.660254 -10.000000
+      vertex 0.000000 10.000000 -10.000000
+      vertex 0.000000 0.000000 -10.000000
     endloop
   endfacet
-  facet normal 0.707 0.707 0
+  facet normal 0.707107 -0.707107 0.000000
     outer loop
-      vertex 1 0 0
-      vertex 0.707 0.707 0
-      vertex 0.707 0.707 1
+      vertex -5.000000 8.660254 -10.000000
+      vertex -5.000000 8.660254 10.000000
+      vertex -8.660254 5.000000 10.000000
     endloop
   endfacet
-  facet normal 0.707 0.707 0
+  facet normal 0.707107 -0.707107 0.000000
     outer loop
-      vertex 1 0 0
-      vertex 0.707 0.707 1
-      vertex 1 0 1
+      vertex -5.000000 8.660254 -10.000000
+      vertex -8.660254 5.000000 10.000000
+      vertex -8.660254 5.000000 -10.000000
     endloop
   endfacet
-  facet normal 0 1 0
+  facet normal 0.000000 0.000000 1.000000
     outer loop
-      vertex 0.707 0.707 0
-      vertex 0 1 0
-      vertex 0 1 1
+      vertex -5.000000 8.660254 10.000000
+      vertex -8.660254 5.000000 10.000000
+      vertex 0.000000 0.000000 10.000000
     endloop
   endfacet
-  facet normal 0 1 0
+  facet normal 0.000000 0.000000 -1.000000
     outer loop
-      vertex 0.707 0.707 0
-      vertex 0 1 1
-      vertex 0.707 0.707 1
+      vertex -8.660254 5.000000 -10.000000
+      vertex -5.000000 8.660254 -10.000000
+      vertex 0.000000 0.000000 -10.000000
     endloop
   endfacet
-  facet normal -0.707 0.707 0
+  facet normal 0.965926 -0.258819 0.000000
     outer loop
-      vertex 0 1 0
-      vertex -0.707 0.707 0
-      vertex -0.707 0.707 1
+      vertex -8.660254 5.000000 -10.000000
+      vertex -8.660254 5.000000 10.000000
+      vertex -10.000000 0.000000 10.000000
     endloop
   endfacet
-  facet normal -0.707 0.707 0
+  facet normal 0.965926 -0.258819 0.000000
     outer loop
-      vertex 0 1 0
-      vertex -0.707 0.707 1
-      vertex 0 1 1
+      vertex -8.660254 5.000000 -10.000000
+      vertex -10.000000 0.000000 10.000000
+      vertex -10.000000 0.000000 -10.000000
     endloop
   endfacet
-  facet normal -1 0 0
+  facet normal 0.000000 0.000000 1.000000
     outer loop
-      vertex -0.707 0.707 0
-      vertex -1 0 0
-      vertex -1 0 1
+      vertex -8.660254 5.000000 10.000000
+      vertex -10.000000 0.000000 10.000000
+      vertex 0.000000 0.000000 10.000000
     endloop
   endfacet
-  facet normal -1 0 0
+  facet normal 0.000000 0.000000 -1.000000
     outer loop
-      vertex -0.707 0.707 0
-      vertex -1 0 1
-      vertex -0.707 0.707 1
+      vertex -10.000000 0.000000 -10.000000
+      vertex -8.660254 5.000000 -10.000000
+      vertex 0.000000 0.000000 -10.000000
     endloop
   endfacet
-  facet normal -0.707 -0.707 0
+  facet normal 0.965926 0.258819 0.000000
     outer loop
-      vertex -1 0 0
-      vertex -0.707 -0.707 0
-      vertex -0.707 -0.707 1
+      vertex -10.000000 0.000000 -10.000000
+      vertex -10.000000 0.000000 10.000000
+      vertex -8.660254 -5.000000 10.000000
     endloop
   endfacet
-  facet normal -0.707 -0.707 0
+  facet normal 0.965926 0.258819 0.000000
     outer loop
-      vertex -1 0 0
-      vertex -0.707 -0.707 1
-      vertex -1 0 1
+      vertex -10.000000 0.000000 -10.000000
+      vertex -8.660254 -5.000000 10.000000
+      vertex -8.660254 -5.000000 -10.000000
     endloop
   endfacet
-  facet normal 0 -1 0
+  facet normal 0.000000 0.000000 1.000000
     outer loop
-      vertex -0.707 -0.707 0
-      vertex 0 -1 0
-      vertex 0 -1 1
+      vertex -10.000000 0.000000 10.000000
+      vertex -8.660254 -5.000000 10.000000
+      vertex 0.000000 0.000000 10.000000
     endloop
   endfacet
-  facet normal 0 -1 0
+  facet normal 0.000000 -0.000000 -1.000000
     outer loop
-      vertex -0.707 -0.707 0
-      vertex 0 -1 1
-      vertex -0.707 -0.707 1
+      vertex -8.660254 -5.000000 -10.000000
+      vertex -10.000000 0.000000 -10.000000
+      vertex 0.000000 0.000000 -10.000000
     endloop
   endfacet
-  facet normal 0.707 -0.707 0
+  facet normal 0.707107 0.707107 0.000000
     outer loop
-      vertex 0 -1 0
-      vertex 0.707 -0.707 0
-      vertex 0.707 -0.707 1
+      vertex -8.660254 -5.000000 -10.000000
+      vertex -8.660254 -5.000000 10.000000
+      vertex -5.000000 -8.660254 10.000000
     endloop
   endfacet
-  facet normal 0.707 -0.707 0
+  facet normal 0.707107 0.707107 0.000000
     outer loop
-      vertex 0 -1 0
-      vertex 0.707 -0.707 1
-      vertex 0 -1 1
+      vertex -8.660254 -5.000000 -10.000000
+      vertex -5.000000 -8.660254 10.000000
+      vertex -5.000000 -8.660254 -10.000000
     endloop
   endfacet
-  facet normal 1 0 0
+  facet normal 0.000000 0.000000 1.000000
     outer loop
-      vertex 0.707 -0.707 0
-      vertex 1 0 0
-      vertex 1 0 1
+      vertex -8.660254 -5.000000 10.000000
+      vertex -5.000000 -8.660254 10.000000
+      vertex 0.000000 0.000000 10.000000
     endloop
   endfacet
-  facet normal 1 0 0
+  facet normal 0.000000 0.000000 -1.000000
     outer loop
-      vertex 0.707 -0.707 0
-      vertex 1 0 1
-      vertex 0.707 -0.707 1
+      vertex -5.000000 -8.660254 -10.000000
+      vertex -8.660254 -5.000000 -10.000000
+      vertex 0.000000 0.000000 -10.000000
     endloop
   endfacet
-endsolid cylinder
-`,
+  facet normal 0.258819 0.965926 0.000000
+    outer loop
+      vertex -5.000000 -8.660254 -10.000000
+      vertex -5.000000 -8.660254 10.000000
+      vertex -0.000000 -10.000000 10.000000
+    endloop
+  endfacet
+  facet normal 0.258819 0.965926 0.000000
+    outer loop
+      vertex -5.000000 -8.660254 -10.000000
+      vertex -0.000000 -10.000000 10.000000
+      vertex -0.000000 -10.000000 -10.000000
+    endloop
+  endfacet
+  facet normal 0.000000 0.000000 1.000000
+    outer loop
+      vertex -5.000000 -8.660254 10.000000
+      vertex -0.000000 -10.000000 10.000000
+      vertex 0.000000 0.000000 10.000000
+    endloop
+  endfacet
+  facet normal 0.000000 0.000000 -1.000000
+    outer loop
+      vertex -0.000000 -10.000000 -10.000000
+      vertex -5.000000 -8.660254 -10.000000
+      vertex 0.000000 0.000000 -10.000000
+    endloop
+  endfacet
+  facet normal -0.258819 0.965926 0.000000
+    outer loop
+      vertex -0.000000 -10.000000 -10.000000
+      vertex -0.000000 -10.000000 10.000000
+      vertex 5.000000 -8.660254 10.000000
+    endloop
+  endfacet
+  facet normal -0.258819 0.965926 0.000000
+    outer loop
+      vertex -0.000000 -10.000000 -10.000000
+      vertex 5.000000 -8.660254 10.000000
+      vertex 5.000000 -8.660254 -10.000000
+    endloop
+  endfacet
+  facet normal 0.000000 0.000000 1.000000
+    outer loop
+      vertex -0.000000 -10.000000 10.000000
+      vertex 5.000000 -8.660254 10.000000
+      vertex 0.000000 0.000000 10.000000
+    endloop
+  endfacet
+  facet normal 0.000000 0.000000 -1.000000
+    outer loop
+      vertex 5.000000 -8.660254 -10.000000
+      vertex -0.000000 -10.000000 -10.000000
+      vertex 0.000000 0.000000 -10.000000
+    endloop
+  endfacet
+  facet normal -0.707107 0.707107 0.000000
+    outer loop
+      vertex 5.000000 -8.660254 -10.000000
+      vertex 5.000000 -8.660254 10.000000
+      vertex 8.660254 -5.000000 10.000000
+    endloop
+  endfacet
+  facet normal -0.707107 0.707107 0.000000
+    outer loop
+      vertex 5.000000 -8.660254 -10.000000
+      vertex 8.660254 -5.000000 10.000000
+      vertex 8.660254 -5.000000 -10.000000
+    endloop
+  endfacet
+  facet normal 0.000000 0.000000 1.000000
+    outer loop
+      vertex 5.000000 -8.660254 10.000000
+      vertex 8.660254 -5.000000 10.000000
+      vertex 0.000000 0.000000 10.000000
+    endloop
+  endfacet
+  facet normal 0.000000 0.000000 -1.000000
+    outer loop
+      vertex 8.660254 -5.000000 -10.000000
+      vertex 5.000000 -8.660254 -10.000000
+      vertex 0.000000 0.000000 -10.000000
+    endloop
+  endfacet
+  facet normal -0.965926 0.258819 0.000000
+    outer loop
+      vertex 8.660254 -5.000000 -10.000000
+      vertex 8.660254 -5.000000 10.000000
+      vertex 10.000000 0.000000 10.000000
+    endloop
+  endfacet
+  facet normal -0.965926 0.258819 0.000000
+    outer loop
+      vertex 8.660254 -5.000000 -10.000000
+      vertex 10.000000 0.000000 10.000000
+      vertex 10.000000 0.000000 -10.000000
+    endloop
+  endfacet
+  facet normal 0.000000 0.000000 1.000000
+    outer loop
+      vertex 8.660254 -5.000000 10.000000
+      vertex 10.000000 0.000000 10.000000
+      vertex 0.000000 0.000000 10.000000
+    endloop
+  endfacet
+  facet normal 0.000000 0.000000 -1.000000
+    outer loop
+      vertex 10.000000 0.000000 -10.000000
+      vertex 8.660254 -5.000000 -10.000000
+      vertex 0.000000 0.000000 -10.000000
+    endloop
+  endfacet
+endsolid cylinder`,
   },
 ];
 
@@ -605,6 +716,33 @@ export async function registerRoutes(
       }
       throw err;
     }
+  });
+
+  app.put(api.materials.update.path, async (req, res) => {
+    try {
+      const input = api.materials.update.input.parse(req.body);
+      const updated = await storage.updateMaterial(Number(req.params.id), input);
+      if (!updated) {
+        return res.status(404).json({ message: "Material not found" });
+      }
+      res.json(updated);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({
+          message: err.errors[0].message,
+          field: err.errors[0].path.join("."),
+        });
+      }
+      throw err;
+    }
+  });
+
+  app.delete(api.materials.delete.path, async (req, res) => {
+    const deleted = await storage.deleteMaterial(Number(req.params.id));
+    if (!deleted) {
+      return res.status(404).json({ message: "Material not found" });
+    }
+    res.json({ success: true });
   });
 
   // === Simulations Routes ===
@@ -746,6 +884,65 @@ export async function registerRoutes(
       }
       throw err;
     }
+  });
+
+  app.put(api.geometries.update.path, async (req, res) => {
+    try {
+      const input = api.geometries.update.input.parse(req.body);
+      const geometryId = Number(req.params.id);
+      const geometry = await storage.getGeometry(geometryId);
+      if (!geometry) {
+        return res.status(404).json({ message: "Geometry not found" });
+      }
+
+      let updatePayload: Partial<typeof geometry> = { name: input.name };
+
+      if (input.contentBase64) {
+        if (!input.originalName || !input.format) {
+          return res.status(400).json({
+            message: "originalName and format are required when uploading new geometry content.",
+            field: "contentBase64",
+          });
+        }
+        const normalized = input.contentBase64.includes(",")
+          ? input.contentBase64.split(",")[1]
+          : input.contentBase64;
+        const buffer = Buffer.from(normalized, "base64");
+        const safeFormat = input.format.replace(".", "").toLowerCase();
+        const safeName = input.name.replace(/[^a-z0-9-_]+/gi, "_");
+        const fileName = `${Date.now()}-${safeName}.${safeFormat}`;
+        const saved = await saveGeometryFile(fileName, buffer);
+        updatePayload = {
+          name: input.name,
+          originalName: input.originalName,
+          format: safeFormat,
+          storagePath: saved.storagePath,
+          sizeBytes: saved.sizeBytes,
+        };
+      }
+
+      const updated = await storage.updateGeometry(geometryId, updatePayload);
+      if (!updated) {
+        return res.status(404).json({ message: "Geometry not found" });
+      }
+      res.json(updated);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({
+          message: err.errors[0].message,
+          field: err.errors[0].path.join("."),
+        });
+      }
+      throw err;
+    }
+  });
+
+  app.delete(api.geometries.delete.path, async (req, res) => {
+    const deleted = await storage.deleteGeometry(Number(req.params.id));
+    if (!deleted) {
+      return res.status(404).json({ message: "Geometry not found" });
+    }
+    res.json({ success: true });
   });
 
   // === Simulation Mesh Routes ===
