@@ -20,12 +20,13 @@ MatSim Analytics is designed for engineers and material scientists to:
 1. [Prerequisites](#prerequisites)
 2. [Installation Guide (Windows)](#installation-guide-windows)
 3. [Database Setup](#database-setup)
-4. [FEniCS Solver Service (Windows + WSL)](#fenics-solver-service-windows--wsl)
-5. [Running the Application](#running-the-application)
-6. [Testing the Application](#testing-the-application)
-7. [Demo Walkthrough](#demo-walkthrough)
-8. [Troubleshooting](#troubleshooting)
-9. [Project Structure](#project-structure)
+4. [Storage (Production/Render + Supabase)](#storage-productionrender--supabase)
+5. [FEniCS Solver Service (Windows + WSL)](#fenics-solver-service-windows--wsl)
+6. [Running the Application](#running-the-application)
+7. [Testing the Application](#testing-the-application)
+8. [Demo Walkthrough](#demo-walkthrough)
+9. [Troubleshooting](#troubleshooting)
+10. [Project Structure](#project-structure)
 
 ---
 
@@ -173,6 +174,32 @@ This will:
 ```
 
 If you get errors, see the [Troubleshooting](#troubleshooting) section.
+
+---
+
+## Storage (Production/Render + Supabase)
+
+Render free tier does not persist the `storage/` folder. For production, use Supabase Storage for geometries and meshes. Local development can continue using the filesystem.
+
+### Step 1: Create Supabase buckets
+1. In Supabase, create two buckets:
+   - `geometries`
+   - `meshes`
+
+### Step 2: Configure Render environment variables
+Set these environment variables on the Render Node service:
+```
+STORAGE_BACKEND=supabase
+SUPABASE_URL=https://<your-project>.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=<your-service-role-key>
+SUPABASE_GEOMETRY_BUCKET=geometries
+SUPABASE_MESH_BUCKET=meshes
+```
+
+Notes:
+- `SUPABASE_SERVICE_ROLE_KEY` is the **service role** key (server-side). Do not use the publishable anon key.
+- You can omit `SUPABASE_GEOMETRY_BUCKET` and `SUPABASE_MESH_BUCKET` if you keep the default names.
+- For local development, do **not** set `STORAGE_BACKEND` and the app will use the local `storage/` folder.
 
 ---
 

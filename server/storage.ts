@@ -35,6 +35,7 @@ export interface IStorage {
   getGeometries(): Promise<Geometry[]>;
   getGeometry(id: number): Promise<Geometry | undefined>;
   createGeometry(geometry: InsertGeometry): Promise<Geometry>;
+  updateGeometryStorage(id: number, storagePath: string, sizeBytes: number): Promise<Geometry>;
 
   // Simulation meshes
   getSimulationMeshes(simulationId: number): Promise<SimulationMesh[]>;
@@ -112,6 +113,15 @@ export class DatabaseStorage implements IStorage {
   async createGeometry(insertGeometry: InsertGeometry): Promise<Geometry> {
     const [geometry] = await db.insert(geometries).values(insertGeometry).returning();
     return geometry;
+  }
+
+  async updateGeometryStorage(id: number, storagePath: string, sizeBytes: number): Promise<Geometry> {
+    const [updated] = await db
+      .update(geometries)
+      .set({ storagePath, sizeBytes })
+      .where(eq(geometries.id, id))
+      .returning();
+    return updated;
   }
 
   async getSimulationMeshes(simulationId: number): Promise<SimulationMesh[]> {
