@@ -243,6 +243,10 @@ Leave this terminal running.
 ### Step 4: Get the WSL IP
 Open a second Ubuntu terminal:
 ```bash
+hostname -I
+```
+OR
+```bash
 ip addr show eth0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1
 ```
 Use the first IP shown (e.g., `172.29.22.11`).
@@ -532,6 +536,26 @@ sudo apt install -y gmsh
 **Solution:**
 1. Run a **new** simulation after installing gmsh.
 2. Confirm the Mesh Outputs panel updates automatically.
+
+
+### Issue 10: Ubuntu terminal hanged or not working.
+
+**Solution:**
+1. Open Powershell in Admin mode.
+2. Run the below command to check if Ubuntu is running.
+```bash
+wsl -l -v
+```
+3. Shutdown WSL.
+```bash
+wsl --shutdown
+```
+4. Close and re-open Powershell in Admin mode.
+5. Now run the below command.
+```bash
+wsl -d Ubuntu
+```
+6. Close Powershell and Open Ubuntu from Search.
 
 ---
 

@@ -16,8 +16,17 @@ import {
 import { AlertCircle, Loader2, Play, MinusCircle, PlusCircle } from "lucide-react";
 import Plot from "react-plotly.js";
 
-export default function CreateSimulation() {
-  const [, setLocation] = useLocation();
+type SimulationFormProps = {
+  initialMaterialId?: string;
+  initialGeometryId?: string;
+  onSuccess?: (id: number) => void;
+};
+
+export function SimulationForm({
+  initialMaterialId = "",
+  initialGeometryId = "",
+  onSuccess,
+}: SimulationFormProps) {
   const { data: materials, isLoading: isMaterialsLoading } = useMaterials();
   const { mutate: createSimulation, isPending: isCreating } =
     useCreateSimulation();
@@ -56,6 +65,9 @@ export default function CreateSimulation() {
     { id: "pressure-1", type: "pressure", face: "z+", magnitude: "1000", unit: "N" },
   ]);
 
+  const selectItemClass =
+    "focus:bg-primary focus:text-primary-foreground data-[highlighted]:bg-primary data-[highlighted]:text-primary-foreground";
+
   const sortedGeometries = useMemo(() => {
     if (!geometries) return [];
     return [...geometries].sort((a, b) => {
@@ -72,10 +84,18 @@ export default function CreateSimulation() {
     [sortedGeometries, geometryId],
   );
 
+  const clampDampingRatio = (value: string) => {
+    if (value.trim() === "") return 0;
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) return 0;
+    return Math.min(Math.max(parsed, 0), 1);
+  };
+
   const handleStartSimulation = () => {
     const selectedMaterialId = parseInt(materialId || "0");
     if (!selectedMaterialId) return;
     const loadMagnitude = parseFloat(appliedLoad);
+    const normalizedDampingRatio = clampDampingRatio(dampingRatio);
     const resolvedYieldStrength =
       materialModel === "plastic"
         ? (() => {
@@ -116,7 +136,7 @@ export default function CreateSimulation() {
         temperature: parseFloat(temperature),
         duration: parseFloat(duration),
         frequency: parseFloat(frequency),
-        dampingRatio: parseFloat(dampingRatio),
+        dampingRatio: normalizedDampingRatio,
         geometryId: geometryId ? parseInt(geometryId, 10) : undefined,
         materialModel,
         yieldStrength: resolvedYieldStrength,
@@ -125,7 +145,7 @@ export default function CreateSimulation() {
       },
       {
         onSuccess: (data) => {
-          setLocation(`/simulations/${data.id}`);
+          onSuccess?.(data.id);
         },
       }
     );
@@ -194,17 +214,31 @@ export default function CreateSimulation() {
   }, [geometryId]);
 
   useEffect(() => {
-    if (!materials || materialId) return;
+    if (!initialMaterialId) return;
+    if (materialId !== initialMaterialId) {
+      setMaterialId(initialMaterialId);
+    }
+  }, [materialId, initialMaterialId]);
+
+  useEffect(() => {
+    if (!initialGeometryId) return;
+    if (geometryId !== initialGeometryId) {
+      setGeometryId(initialGeometryId);
+    }
+  }, [geometryId, initialGeometryId]);
+
+  useEffect(() => {
+    if (!materials || materialId || initialMaterialId) return;
     const aluminum = materials.find((material) =>
       material.name.toLowerCase().includes("aluminum")
     );
     if (aluminum) {
       setMaterialId(String(aluminum.id));
     }
-  }, [materials, materialId]);
+  }, [materials, materialId, initialMaterialId]);
 
   useEffect(() => {
-    if (!geometries || geometryId) return;
+    if (!geometries || geometryId || initialGeometryId) return;
     const unitCube = geometries.find((geometry) =>
       geometry.name.toLowerCase().includes("unit cube")
     );
@@ -298,6 +332,15 @@ export default function CreateSimulation() {
       warnings.push("Add at least one applied load so the solver has forcing.");
     }
     const loadFaces = new Set(loads.map((condition) => condition.face));
+    const loadFaceCounts = loads.reduce<Record<string, number>>((acc, condition) => {
+      acc[condition.face] = (acc[condition.face] || 0) + 1;
+      return acc;
+    }, {});
+    Object.entries(loadFaceCounts).forEach(([face, count]) => {
+      if (count > 1) {
+        warnings.push(`Only one applied load is allowed per face (${face}).`);
+      }
+    });
     fixed.forEach((condition) => {
       if (loadFaces.has(condition.face)) {
         warnings.push(`Fixed and load are both applied on ${condition.face}.`);
@@ -343,7 +386,11 @@ export default function CreateSimulation() {
                 </SelectTrigger>
                 <SelectContent>
                   {sortedGeometries.map((geometry) => (
-                    <SelectItem key={geometry.id} value={String(geometry.id)}>
+                    <SelectItem
+                      key={geometry.id}
+                      value={String(geometry.id)}
+                      className={selectItemClass}
+                    >
                       {geometry.name}
                     </SelectItem>
                   ))}
@@ -457,7 +504,11 @@ export default function CreateSimulation() {
                 </SelectTrigger>
                 <SelectContent>
                   {materials?.map((material) => (
-                    <SelectItem key={material.id} value={String(material.id)}>
+                    <SelectItem
+                      key={material.id}
+                      value={String(material.id)}
+                      className={selectItemClass}
+                    >
                       {material.name}
                     </SelectItem>
                   ))}
@@ -479,9 +530,15 @@ export default function CreateSimulation() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Tensile Test">Tensile Test</SelectItem>
-                  <SelectItem value="Thermal Stress">Thermal Stress</SelectItem>
-                  <SelectItem value="Fatigue">Fatigue Analysis</SelectItem>
+                  <SelectItem value="Tensile Test" className={selectItemClass}>
+                    Tensile Test
+                  </SelectItem>
+                  <SelectItem value="Thermal Stress" className={selectItemClass}>
+                    Thermal Stress
+                  </SelectItem>
+                  <SelectItem value="Fatigue" className={selectItemClass}>
+                    Fatigue Analysis
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -562,8 +619,12 @@ export default function CreateSimulation() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="fixed">Fixed Support</SelectItem>
-                          <SelectItem value="pressure">Applied Load</SelectItem>
+                          <SelectItem value="fixed" className={selectItemClass}>
+                            Fixed Support
+                          </SelectItem>
+                          <SelectItem value="pressure" className={selectItemClass}>
+                            Applied Load
+                          </SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -581,12 +642,24 @@ export default function CreateSimulation() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="z-">Bottom (z-)</SelectItem>
-                          <SelectItem value="z+">Top (z+)</SelectItem>
-                          <SelectItem value="x-">Left (x-)</SelectItem>
-                          <SelectItem value="x+">Right (x+)</SelectItem>
-                          <SelectItem value="y-">Back (y-)</SelectItem>
-                          <SelectItem value="y+">Front (y+)</SelectItem>
+                          <SelectItem value="z-" className={selectItemClass}>
+                            Bottom (z-)
+                          </SelectItem>
+                          <SelectItem value="z+" className={selectItemClass}>
+                            Top (z+)
+                          </SelectItem>
+                          <SelectItem value="x-" className={selectItemClass}>
+                            Left (x-)
+                          </SelectItem>
+                          <SelectItem value="x+" className={selectItemClass}>
+                            Right (x+)
+                          </SelectItem>
+                          <SelectItem value="y-" className={selectItemClass}>
+                            Back (y-)
+                          </SelectItem>
+                          <SelectItem value="y+" className={selectItemClass}>
+                            Front (y+)
+                          </SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -607,20 +680,25 @@ export default function CreateSimulation() {
                   </div>
                 </div>
               ))}
-              {bcWarnings.length > 0 && (
-                <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
-                  <div className="flex items-center gap-2 font-semibold">
-                    <AlertCircle className="h-4 w-4" />
-                    Boundary condition checks
-                  </div>
-                  <ul className="mt-2 space-y-1">
-                    {bcWarnings.map((warning) => (
-                      <li key={warning}>{warning}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
             </div>
+            {bcWarnings.length > 0 && (
+              // <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
+              //   <div className="flex items-center gap-2 font-semibold">
+              //     <AlertCircle className="h-4 w-4" />
+              //     Boundary condition checks
+              //   </div>
+              //   <ul className="mt-2 space-y-1">
+              //     {bcWarnings.map((warning) => (
+              //       <li key={warning}>{warning}</li>
+              //     ))}
+              //   </ul>
+              // </div>
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">
+                {bcWarnings.map((error) => (
+                  <p key={error}>{error}</p>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="space-y-3 pb-4 border-border">
@@ -634,12 +712,16 @@ export default function CreateSimulation() {
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="linear">Linear Elastic</SelectItem>
-                    <SelectItem value="plastic">Elastic-Plastic</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+                <SelectContent>
+                  <SelectItem value="linear" className={selectItemClass}>
+                    Linear Elastic
+                  </SelectItem>
+                  <SelectItem value="plastic" className={selectItemClass}>
+                    Elastic-Plastic
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
               <div className="space-y-2">
                 <Label className="text-sm">Yield Strength (MPa)</Label>
                 <Input
@@ -691,9 +773,19 @@ export default function CreateSimulation() {
                 <Input
                   type="number"
                   step="0.01"
+                  min="0"
+                  max="1"
                   placeholder="0.05"
                   value={dampingRatio}
                   onChange={(e) => setDampingRatio(e.target.value)}
+                  onBlur={() =>
+                    setDampingRatio((prev) => {
+                      if (prev.trim() === "") return "";
+                      const parsed = Number(prev);
+                      if (!Number.isFinite(parsed)) return prev;
+                      return String(Math.min(Math.max(parsed, 0), 1));
+                    })
+                  }
                 />
               </div>
             </div>
@@ -701,7 +793,7 @@ export default function CreateSimulation() {
           <div className="pt-2 flex justify-end">
             <Button
               size="lg"
-              className="w-full md:w-auto font-semibold shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all"
+              className="w-full md:w-auto font-semibold opacity-90 hover:opacity-100 disabled:pointer-events-auto disabled:hover:opacity-50 disabled:cursor-not-allowed"
               onClick={handleStartSimulation}
               disabled={isCreating || !simName || !materialId}
             >
@@ -721,5 +813,22 @@ export default function CreateSimulation() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function CreateSimulation() {
+  const [location, setLocation] = useLocation();
+  const initialMaterialId = useMemo(() => {
+    const queryIndex = location.indexOf("?");
+    if (queryIndex === -1) return "";
+    const params = new URLSearchParams(location.slice(queryIndex));
+    return params.get("materialId") ?? "";
+  }, [location]);
+
+  return (
+    <SimulationForm
+      initialMaterialId={initialMaterialId}
+      onSuccess={(id) => setLocation(`/simulations/${id}`)}
+    />
   );
 }

@@ -2,6 +2,8 @@ import { useState } from "react";
 import { useMaterials } from "@/hooks/use-materials";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Download } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 type CompareProps = {
   embedded?: boolean;
@@ -33,6 +35,21 @@ export default function Compare({ embedded = false }: CompareProps) {
   const titleClassName = embedded
     ? "text-2xl font-display font-bold text-foreground"
     : "text-3xl font-display font-bold text-foreground";
+
+  const exportChartSvg = (chartId: string, filename: string) => {
+    const container = document.getElementById(chartId);
+    const svg = container?.querySelector("svg");
+    if (!svg) return;
+    const serializer = new XMLSerializer();
+    const svgString = serializer.serializeToString(svg);
+    const blob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <div className="space-y-6">
@@ -85,8 +102,21 @@ export default function Compare({ embedded = false }: CompareProps) {
             <>
               {/* Chart */}
               <div className="bg-card p-6 rounded-2xl border border-border shadow-sm">
-                <h3 className="text-lg font-semibold font-display mb-6">Stress-Strain Comparison</h3>
-                <div className="h-[400px]">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <h3 className="text-lg font-semibold font-display">Stress-Strain Comparison</h3>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="hover:bg-primary/10 hover:text-primary"
+                    onClick={() =>
+                      exportChartSvg("materials-stress-strain", "materials-stress-strain.svg")
+                    }
+                  >
+                    <Download className="h-4 w-4" />
+                    Export Chart
+                  </Button>
+                </div>
+                <div id="materials-stress-strain" className="mt-4 h-[400px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart>
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted-foreground))" opacity={0.2} />
@@ -112,6 +142,59 @@ export default function Compare({ embedded = false }: CompareProps) {
                           data={mat.stressStrainCurve as any[]}
                           type="monotone"
                           dataKey="stress"
+                          name={mat.name}
+                          stroke={colors[idx % colors.length]}
+                          strokeWidth={2}
+                          dot={false}
+                          connectNulls
+                        />
+                      ))}
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              <div className="bg-card p-6 rounded-2xl border border-border shadow-sm">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <h3 className="text-lg font-semibold font-display">Thermal Expansion Comparison</h3>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="hover:bg-primary/10 hover:text-primary"
+                    onClick={() =>
+                      exportChartSvg("materials-thermal-expansion", "materials-thermal-expansion.svg")
+                    }
+                  >
+                    <Download className="h-4 w-4" />
+                    Export Chart
+                  </Button>
+                </div>
+                <div id="materials-thermal-expansion" className="mt-4 h-[400px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted-foreground))" opacity={0.2} />
+                      <XAxis
+                        dataKey="temperature"
+                        type="number"
+                        label={{ value: "Temperature (°C)", position: "insideBottom", offset: -5 }}
+                        tick={{ fill: "hsl(var(--muted-foreground))" }}
+                        domain={[0, "auto"]}
+                        allowDataOverflow={false}
+                      />
+                      <YAxis
+                        label={{ value: "Expansion Coefficient (µm/m·°C)", angle: -90, position: "insideLeft" }}
+                        tick={{ fill: "hsl(var(--muted-foreground))" }}
+                      />
+                      <Tooltip
+                        contentStyle={{ backgroundColor: "hsl(var(--card))", borderColor: "hsl(var(--border))" }}
+                      />
+                      <Legend />
+                      {selectedMaterials.map((mat, idx) => (
+                        <Line
+                          key={mat.id}
+                          data={mat.thermalExpansionCurve as any[]}
+                          type="monotone"
+                          dataKey="coefficient"
                           name={mat.name}
                           stroke={colors[idx % colors.length]}
                           strokeWidth={2}

@@ -1008,16 +1008,23 @@ export default function SimulationDetail() {
               </span>
               <div className="flex items-center gap-2">
                 <StatusBadge status={simulation.status} />
-                {simulation.paramsDirty && (
-                  <button
-                    type="button"
-                    onClick={handleRerunUpdated}
-                    title="Parameters updated! Click to re-run."
-                    className="inline-flex items-center justify-center rounded-full p-1.5 text-indigo-500 hover:bg-indigo-500/10 hover:text-indigo-600 transition"
-                  >
-                    <RefreshCcw className="h-4 w-4" />
-                  </button>
-                )}
+                  {simulation.paramsDirty && (
+                    <button
+                      type="button"
+                      onClick={handleRerunUpdated}
+                      className="inline-flex items-center justify-center rounded-full p-1.5 text-indigo-500 hover:bg-indigo-500/10 hover:text-indigo-600 transition"
+                    >
+                      <span className="relative inline-flex items-center justify-center group">
+                        <RefreshCcw className="h-4 w-4" />
+                        <span className="pointer-events-none absolute bottom-full left-[65%] mb-3 w-max -translate-x-1/2 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                          <span className="relative rounded-lg bg-slate-900 px-4 py-2 text-xs font-semibold text-white shadow-lg">
+                            Parameters updated. Click to re-run.
+                            <span className="absolute left-1/2 top-full h-3 w-3 -translate-x-1/2 -translate-y-1/2 rotate-45 bg-slate-900" />
+                          </span>
+                        </span>
+                      </span>
+                    </button>
+                  )}
               </div>
               {/* {isCompleted && results && (
                 <span className="text-xs font-semibold tracking-wider bg-muted text-muted-foreground border border-border rounded-full px-2 py-1">
@@ -1025,7 +1032,7 @@ export default function SimulationDetail() {
                 </span>
               )} */}
             </div>
-            <p className="text-muted-foreground">
+            <p className="font-mono text-muted-foreground">
               Run on {runDate}
             </p>
           </div>

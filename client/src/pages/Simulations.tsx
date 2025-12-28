@@ -4,7 +4,7 @@ import { useMaterials } from "@/hooks/use-materials";
 import { useCreateGeometry, useGeometries } from "@/hooks/use-geometries";
 import { useBoundaryConditions } from "@/hooks/use-boundary-conditions";
 import { StatusBadge } from "@/components/StatusBadge";
-import { Eye, Pencil, Play, Pause, Search, Trash2, MinusCircle, PlusCircle } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Eye, Filter, Pause, Pencil, Play, Search, Trash2, MinusCircle, PlusCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
@@ -63,6 +63,10 @@ export default function Simulations() {
   const [geometryFilter, setGeometryFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [sortKey, setSortKey] = useState<
+    "id" | "name" | "type" | "material" | "geometry" | "date" | "status"
+  >("id");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
   const getMaterialName = (id: number) =>
     materials?.find(m => m.id === id)?.name || "Unknown Material";
@@ -108,16 +112,93 @@ export default function Simulations() {
 
   const filteredSimulations = simulations?.filter((sim) => {
     const geometryName = getGeometryName(sim.geometryId);
+    const materialName = getMaterialName(sim.materialId);
     const matchesSearch =
       sim.name.toLowerCase().includes(search.toLowerCase()) ||
       sim.type.toLowerCase().includes(search.toLowerCase()) ||
-      geometryName.toLowerCase().includes(search.toLowerCase());
+      geometryName.toLowerCase().includes(search.toLowerCase()) ||
+      materialName.toLowerCase().includes(search.toLowerCase());
     const matchesMaterial = materialFilter === "all" || String(sim.materialId) === materialFilter;
     const matchesGeometry = geometryFilter === "all" || String(sim.geometryId) === geometryFilter;
     const matchesType = typeFilter === "all" || sim.type === typeFilter;
     const matchesStatus = statusFilter === "all" || sim.status === statusFilter;
     return matchesSearch && matchesMaterial && matchesGeometry && matchesType && matchesStatus;
   });
+
+  const sortedSimulations = useMemo(() => {
+    const list = [...(filteredSimulations ?? [])];
+    const getDateValue = (sim: typeof list[number]) => {
+      const rawDate =
+        (sim as any).updatedAt || sim.completedAt || sim.createdAt;
+      return rawDate ? new Date(rawDate).getTime() : 0;
+    };
+    const statusRank = (status: string) => {
+      if (status === "running") return 0;
+      if (status === "pending") return 1;
+      if (status === "failed") return 2;
+      return 3;
+    };
+    list.sort((a, b) => {
+      let result = 0;
+      switch (sortKey) {
+        case "id":
+          result = a.id - b.id;
+          break;
+        case "name":
+          result = a.name.localeCompare(b.name);
+          break;
+        case "type":
+          result = a.type.localeCompare(b.type);
+          break;
+        case "material":
+          result = getMaterialName(a.materialId).localeCompare(
+            getMaterialName(b.materialId)
+          );
+          break;
+        case "geometry":
+          result = getGeometryName(a.geometryId).localeCompare(
+            getGeometryName(b.geometryId)
+          );
+          break;
+        case "status":
+          result = statusRank(a.status) - statusRank(b.status);
+          if (result === 0) {
+            result = getDateValue(a) - getDateValue(b);
+          }
+          break;
+        case "date":
+        default:
+          result = getDateValue(a) - getDateValue(b);
+          break;
+      }
+      return sortDir === "asc" ? result : -result;
+    });
+    return list;
+  }, [filteredSimulations, sortKey, sortDir, getMaterialName, getGeometryName]);
+
+  const handleSort = (
+    key: "id" | "name" | "type" | "material" | "geometry" | "date" | "status"
+  ) => {
+    setSortKey((prev) => {
+      if (prev === key) {
+        setSortDir((current) => (current === "asc" ? "desc" : "asc"));
+        return prev;
+      }
+      setSortDir(key === "date" ? "desc" : "asc");
+      return key;
+    });
+  };
+
+  const renderSortIcon = (
+    key: "id" | "name" | "type" | "material" | "geometry" | "date" | "status"
+  ) => {
+    if (sortKey !== key) return <ArrowUpDown className="h-3.5 w-3.5 opacity-50" />;
+    return sortDir === "asc" ? (
+      <ArrowUp className="h-3.5 w-3.5" />
+    ) : (
+      <ArrowDown className="h-3.5 w-3.5" />
+    );
+  };
 
   const getTypeBadgeClass = (type: string) => {
     const normalized = type.toLowerCase();
@@ -226,6 +307,49 @@ export default function Simulations() {
       return { type: condition.type, face: condition.face };
     });
 
+  const bcErrors = useMemo(() => {
+    const errors: string[] = [];
+    const fixed = boundaryConditionsForm.filter((condition) => condition.type === "fixed");
+    const loads = boundaryConditionsForm.filter((condition) => condition.type === "pressure");
+    if (fixed.length === 0) {
+      errors.push("Add at least one fixed support to prevent rigid-body motion.");
+    }
+    if (loads.length === 0) {
+      errors.push("Add at least one applied load so the solver has forcing.");
+    }
+    const loadFaces = new Set(loads.map((condition) => condition.face));
+    const loadFaceCounts = loads.reduce<Record<string, number>>((acc, condition) => {
+      acc[condition.face] = (acc[condition.face] || 0) + 1;
+      return acc;
+    }, {});
+    Object.entries(loadFaceCounts).forEach(([face, count]) => {
+      if (count > 1) {
+        errors.push(`Only one applied load is allowed per face (${face}).`);
+      }
+    });
+    fixed.forEach((condition) => {
+      if (loadFaces.has(condition.face)) {
+        errors.push(`Fixed and load are both applied on ${condition.face}.`);
+      }
+    });
+    loads.forEach((condition) => {
+      const magnitude = condition.magnitude.trim();
+      if (magnitude === "") {
+        errors.push(`Load on ${condition.face} has no magnitude.`);
+      } else if (!Number.isFinite(Number(magnitude))) {
+        errors.push(`Load on ${condition.face} has an invalid magnitude.`);
+      }
+    });
+    return errors;
+  }, [boundaryConditionsForm]);
+
+  const normalizeDampingRatio = (value: string) => {
+    if (value.trim() === "") return null;
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) return null;
+    return Math.min(Math.max(parsed, 0), 1);
+  };
+
   const resolvePlasticValue = (value: string, fallback: number) => {
     const parsed = parseFloat(value);
     if (value.trim() === "" || !Number.isFinite(parsed)) return fallback;
@@ -277,6 +401,12 @@ export default function Simulations() {
       const parsed = Number(value);
       return Number.isFinite(parsed) ? parsed : null;
     };
+    const normalizeDampingRatio = (value: string) => {
+      if (value.trim() === "") return null;
+      const parsed = Number(value);
+      if (!Number.isFinite(parsed)) return null;
+      return Math.min(Math.max(parsed, 0), 1);
+    };
     const draft = {
       name: simName.trim(),
       type: simType,
@@ -286,7 +416,7 @@ export default function Simulations() {
       temperature: normalizeNumber(temperature),
       duration: normalizeNumber(duration),
       frequency: normalizeNumber(frequency),
-      dampingRatio: normalizeNumber(dampingRatio),
+      dampingRatio: normalizeDampingRatio(dampingRatio),
       materialModel,
       yieldStrength: resolvedYieldStrength,
       hardeningModulus: resolvedHardeningModulus,
@@ -361,6 +491,7 @@ export default function Simulations() {
 
   const submitUpdate = async (run: boolean) => {
     if (!activeSimulationId) return;
+    if (bcErrors.length > 0) return;
     const resolvedYieldStrength =
       materialModel === "plastic"
         ? resolvePlasticValue(yieldStrength, 250)
@@ -380,7 +511,7 @@ export default function Simulations() {
         temperature: temperature ? Number(temperature) : null,
         duration: duration ? Number(duration) : null,
         frequency: frequency ? Number(frequency) : null,
-        dampingRatio: dampingRatio ? Number(dampingRatio) : null,
+        dampingRatio: normalizeDampingRatio(dampingRatio),
         materialModel,
         yieldStrength: resolvedYieldStrength,
         hardeningModulus: resolvedHardeningModulus,
@@ -515,7 +646,8 @@ export default function Simulations() {
           </div>
           <div className="flex flex-wrap gap-3">
             <Select value={materialFilter} onValueChange={setMaterialFilter}>
-              <SelectTrigger className="w-full sm:w-44 bg-card">
+              <SelectTrigger className="w-full sm:w-44 bg-card text-xs relative pl-9">
+                <Filter className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                 <SelectValue placeholder="Material" />
               </SelectTrigger>
             <SelectContent>
@@ -528,7 +660,8 @@ export default function Simulations() {
             </SelectContent>
           </Select>
             <Select value={geometryFilter} onValueChange={setGeometryFilter}>
-              <SelectTrigger className="w-full sm:w-44 bg-card">
+              <SelectTrigger className="w-full sm:w-44 bg-card text-xs relative pl-9">
+                <Filter className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                 <SelectValue placeholder="Geometry" />
               </SelectTrigger>
               <SelectContent>
@@ -541,7 +674,8 @@ export default function Simulations() {
               </SelectContent>
             </Select>
             <Select value={typeFilter} onValueChange={setTypeFilter}>
-              <SelectTrigger className="w-full sm:w-40 bg-card">
+              <SelectTrigger className="w-full sm:w-40 bg-card text-xs relative pl-9">
+                <Filter className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                 <SelectValue placeholder="Test Type" />
               </SelectTrigger>
               <SelectContent>
@@ -554,7 +688,8 @@ export default function Simulations() {
               </SelectContent>
             </Select>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full sm:w-36 bg-card">
+              <SelectTrigger className="w-full sm:w-36 bg-card text-xs relative pl-9">
+                <Filter className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
@@ -581,7 +716,7 @@ export default function Simulations() {
               <colgroup>
               <col className="w-16" />
               <col className="w-[16%]" />
-              <col className="w-[12%]" />
+              <col className="w-[14%]" />
               <col className="w-[16%]" />
               <col className="w-[16%]" />
               <col className="w-[14%]" />
@@ -590,17 +725,80 @@ export default function Simulations() {
             </colgroup>
             <thead className="text-xs uppercase bg-muted text-muted-foreground font-semibold">
               <tr>
-                <th className="px-6 py-4">ID</th>
-                <th className="px-6 py-4">Name</th>
-                <th className="px-6 py-4">Type</th>
-                <th className="px-6 py-4">Material</th>
-                <th className="px-6 py-4">Geometry</th>
-                <th className="px-6 py-4">Date</th>
-                <th className="px-6 py-4">Status</th>
-                <th className="px-6 py-4 lg:relative">
-                  <div className="lg:absolute lg:bottom-[16px] lg:left-[48px]">
+                <th className="px-6 py-4">
+                  <button
+                    type="button"
+                    onClick={() => handleSort("id")}
+                    className="inline-flex items-center gap-2 uppercase"
+                  >
+                    ID
+                    {renderSortIcon("id")}
+                  </button>
+                </th>
+                <th className="px-6 py-4">
+                  <button
+                    type="button"
+                    onClick={() => handleSort("name")}
+                    className="inline-flex items-center gap-2 uppercase"
+                  >
+                    Name
+                    {renderSortIcon("name")}
+                  </button>
+                </th>
+                <th className="px-6 py-4">
+                  <button
+                    type="button"
+                    onClick={() => handleSort("type")}
+                    className="inline-flex items-center gap-2 uppercase"
+                  >
+                    Type
+                    {renderSortIcon("type")}
+                  </button>
+                </th>
+                <th className="px-6 py-4">
+                  <button
+                    type="button"
+                    onClick={() => handleSort("material")}
+                    className="inline-flex items-center gap-2 uppercase"
+                  >
+                    Material
+                    {renderSortIcon("material")}
+                  </button>
+                </th>
+                <th className="px-6 py-4">
+                  <button
+                    type="button"
+                    onClick={() => handleSort("geometry")}
+                    className="inline-flex items-center gap-2 uppercase"
+                  >
+                    Geometry
+                    {renderSortIcon("geometry")}
+                  </button>
+                </th>
+                <th className="px-6 py-4">
+                  <button
+                    type="button"
+                    onClick={() => handleSort("date")}
+                    className="inline-flex items-center gap-2 uppercase"
+                  >
+                    Date
+                    {renderSortIcon("date")}
+                  </button>
+                </th>
+                <th className="px-6 py-4">
+                  <button
+                    type="button"
+                    onClick={() => handleSort("status")}
+                    className="inline-flex items-center gap-2 uppercase"
+                  >
+                    Status
+                    {renderSortIcon("status")}
+                  </button>
+                </th>
+                <th className="px-6 py-4 text-center">
+                  {/* <div className="lg:absolute lg:bottom-[16px] lg:right-[0px]"> */}
                     Action
-                  </div>
+                  {/* </div> */}
                 </th>
               </tr>
               </thead>
@@ -610,7 +808,7 @@ export default function Simulations() {
                 <colgroup>
                   <col className="w-16" />
                   <col className="w-[16%]" />
-                  <col className="w-[12%]" />
+                  <col className="w-[14%]" />
                   <col className="w-[16%]" />
                   <col className="w-[16%]" />
                   <col className="w-[14%]" />
@@ -618,7 +816,7 @@ export default function Simulations() {
                   <col className="w-[24%]" />
                 </colgroup>
                 <tbody className="divide-y divide-border">
-                {filteredSimulations?.map((sim) => (
+                {sortedSimulations.map((sim) => (
                   <tr key={sim.id} className="hover:bg-muted/30 transition-colors">
                     <td className="px-6 py-4 font-mono text-xs text-muted-foreground">#{sim.id}</td>
                     <td className="px-6 py-4 font-medium text-foreground">
@@ -738,7 +936,7 @@ export default function Simulations() {
                     </td>
                   </tr>
                 ))}
-                {filteredSimulations?.length === 0 && (
+                {sortedSimulations.length === 0 && (
                   <tr>
                     <td colSpan={8} className="px-6 py-12 text-center text-muted-foreground">
                       No simulations found.
@@ -1017,6 +1215,13 @@ export default function Simulations() {
                   </div>
                 ))}
               </div>
+              {bcErrors.length > 0 && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">
+                  {bcErrors.map((error) => (
+                    <p key={error}>{error}</p>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="space-y-3">
@@ -1082,8 +1287,18 @@ export default function Simulations() {
                   <Input
                     type="number"
                     step="0.01"
+                    min="0"
+                    max="1"
                     value={dampingRatio}
                     onChange={(event) => setDampingRatio(event.target.value)}
+                    onBlur={() =>
+                      setDampingRatio((prev) => {
+                        if (prev.trim() === "") return "";
+                        const parsed = Number(prev);
+                        if (!Number.isFinite(parsed)) return prev;
+                        return String(Math.min(Math.max(parsed, 0), 1));
+                      })
+                    }
                   />
                 </div>
               </div>
@@ -1093,14 +1308,16 @@ export default function Simulations() {
               <Button
                 variant="outline"
                 onClick={() => submitUpdate(false)}
-                disabled={isUpdating || !activeSimulation || !isEditDirty}
+                disabled={
+                  isUpdating || !activeSimulation || !isEditDirty || bcErrors.length > 0
+                }
                 className="hover:text-primary hover:bg-primary/10 disabled:cursor-not-allowed disabled:pointer-events-auto disabled:hover:text-foreground disabled:hover:bg-transparent disabled:opacity-60"
               >
                 {isUpdating ? 'Saving...' : 'Save'}
               </Button>
               <Button
                 onClick={() => submitUpdate(true)}
-                disabled={isUpdating || !activeSimulation}
+                disabled={isUpdating || !activeSimulation || bcErrors.length > 0}
               >
                 <Play className="h-4 w-4 fill-current" />
                 Run

@@ -154,6 +154,15 @@ function GeometryPreview({
 }
 
 export default function Geometries() {
+  const formatSize = (bytes: number) => {
+    const kb = bytes / 1024;
+    if (kb < 1000) return `${kb.toFixed(1)} KB`;
+    const mb = kb / 1024;
+    if (mb < 1000) return `${mb.toFixed(1)} MB`;
+    const gb = mb / 1024;
+    return `${gb.toFixed(1)} GB`;
+  };
+
   const { data: geometries, isLoading } = useGeometries();
   const { mutateAsync: createGeometry, isPending: isCreating } = useCreateGeometry();
   const { mutateAsync: updateGeometry, isPending: isUpdating } = useUpdateGeometry();
@@ -336,18 +345,20 @@ export default function Geometries() {
                 <div className="flex items-center gap-1">
                   <button
                     type="button"
-                    className="rounded-full p-1 text-muted-foreground hover:text-primary hover:bg-primary/10 transition"
+                    className="rounded-lg p-2 m-[-8px] mr-2 text-muted-foreground hover:text-indigo-500 hover:bg-indigo-500/10 transition"
                     onClick={() => handleOpenEdit(geometry)}
                     aria-label={`Edit ${geometry.name}`}
+                    title="Edit"
                   >
                     <Pencil className="h-4 w-4" />
                   </button>
                   <button
                     type="button"
-                    className="rounded-full p-1 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition"
+                    className="rounded-lg p-2 m-[-8px] text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition"
                     onClick={() => handleDelete(geometry.id, geometry.name)}
                     aria-label={`Delete ${geometry.name}`}
                     disabled={isDeleting}
+                    title="Delete"
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
@@ -370,7 +381,7 @@ export default function Geometries() {
                 <div>
                   <span className="block text-xs text-muted-foreground">Size</span>
                   <span className="font-mono font-medium text-foreground">
-                    {(geometry.sizeBytes / 1024).toFixed(1)} KB
+                    {formatSize(geometry.sizeBytes)}
                   </span>
                 </div>
                 <div>
@@ -539,7 +550,7 @@ export default function Geometries() {
                 onClick={handleUpdate}
                 disabled={isUpdating || !formState.name || !activeGeometry}
               >
-                {isUpdating ? "Saving..." : "Save Changes"}
+                {isUpdating ? "Saving..." : "Save"}
               </Button>
             </div>
           </div>

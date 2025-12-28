@@ -1,14 +1,11 @@
 import { useParams, useLocation } from "wouter";
 import { useMaterial } from "@/hooks/use-materials";
-import { useCreateSimulation } from "@/hooks/use-simulations";
 import { PropertyCard } from "@/components/PropertyCard";
+import { SimulationForm } from "@/pages/CreateSimulation";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
-import { ChevronLeft, FlaskConical, Play } from "lucide-react";
+import { ChevronLeft, Play } from "lucide-react";
 import { useState } from "react";
 import { Link } from "wouter";
 
@@ -17,40 +14,10 @@ export default function MaterialDetail() {
   const materialId = parseInt(id || "0");
   const [, setLocation] = useLocation();
   const { data: material, isLoading } = useMaterial(materialId);
-  const { mutate: createSimulation, isPending: isCreating } = useCreateSimulation();
-  
-  const [simName, setSimName] = useState("");
-  const [simType, setSimType] = useState("Tensile Test");
-  const [appliedLoad, setAppliedLoad] = useState("1000");
-  const [temperature, setTemperature] = useState("25");
-  const [duration, setDuration] = useState("10");
-  const [frequency, setFrequency] = useState("1");
-  const [dampingRatio, setDampingRatio] = useState("0.05");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   if (isLoading) return <div className="p-8">Loading material data...</div>;
   if (!material) return <div className="p-8">Material not found</div>;
-
-  const handleStartSimulation = () => {
-    createSimulation(
-      { 
-        name: simName, 
-        type: simType, 
-        materialId,
-        appliedLoad: parseFloat(appliedLoad),
-        temperature: parseFloat(temperature),
-        duration: parseFloat(duration),
-        frequency: parseFloat(frequency),
-        dampingRatio: parseFloat(dampingRatio),
-      },
-      {
-        onSuccess: (data) => {
-          setIsDialogOpen(false);
-          setLocation(`/simulations/${data.id}`);
-        },
-      }
-    );
-  };
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -72,111 +39,22 @@ export default function MaterialDetail() {
           
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button size="lg" className="bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20">
-                <FlaskConical className="mr-2 h-4 w-4" /> Run Simulation
+              <Button
+                size="lg"
+                className="w-full md:w-auto font-semibold opacity-90 hover:opacity-100"
+              >
+                <Play className="h-4 w-4 fill-current" />
+                Run
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-h-[85vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>Configure Simulation Parameters</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-5 py-4">
-                {/* Basic Info Section */}
-                <div className="space-y-3 pb-4 border-b border-border">
-                  <h4 className="text-sm font-semibold text-foreground">Basic Information</h4>
-                  <div className="space-y-2">
-                    <Label className="text-sm">Simulation Name</Label>
-                    <Input 
-                      placeholder="e.g. High Temp Stress Test" 
-                      value={simName}
-                      onChange={(e) => setSimName(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-sm">Analysis Type</Label>
-                    <Select value={simType} onValueChange={setSimType}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Tensile Test">Tensile Test</SelectItem>
-                        <SelectItem value="Thermal Stress">Thermal Stress</SelectItem>
-                        <SelectItem value="Fatigue">Fatigue Analysis</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                {/* Load & Environmental Parameters */}
-                <div className="space-y-3 pb-4 border-b border-border">
-                  <h4 className="text-sm font-semibold text-foreground">Load & Environment</h4>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-2">
-                      <Label className="text-sm">Applied Load (N)</Label>
-                      <Input 
-                        type="number"
-                        placeholder="1000"
-                        value={appliedLoad}
-                        onChange={(e) => setAppliedLoad(e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-sm">Temperature (°C)</Label>
-                      <Input 
-                        type="number"
-                        placeholder="25"
-                        value={temperature}
-                        onChange={(e) => setTemperature(e.target.value)}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Time & Dynamic Parameters */}
-                <div className="space-y-3">
-                  <h4 className="text-sm font-semibold text-foreground">Time & Dynamics</h4>
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="space-y-2">
-                      <Label className="text-sm">Duration (s)</Label>
-                      <Input 
-                        type="number"
-                        placeholder="10"
-                        value={duration}
-                        onChange={(e) => setDuration(e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-sm">Frequency (Hz)</Label>
-                      <Input 
-                        type="number"
-                        step="0.1"
-                        placeholder="1"
-                        value={frequency}
-                        onChange={(e) => setFrequency(e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-sm">Damping Ratio</Label>
-                      <Input 
-                        type="number"
-                        step="0.01"
-                        placeholder="0.05"
-                        value={dampingRatio}
-                        onChange={(e) => setDampingRatio(e.target.value)}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <Button 
-                  className="w-full mt-6" 
-                  onClick={handleStartSimulation}
-                  disabled={isCreating || !simName}
-                >
-                  {isCreating ? "Initializing..." : "Start Simulation"}
-                  {!isCreating && <Play className="ml-2 h-4 w-4" />}
-                </Button>
-              </div>
+            <DialogContent className="max-h-[85vh] max-w-3xl overflow-y-auto">
+              <SimulationForm
+                initialMaterialId={String(materialId)}
+                onSuccess={(id) => {
+                  setIsDialogOpen(false);
+                  setLocation(`/simulations/${id}`);
+                }}
+              />
             </DialogContent>
           </Dialog>
         </div>
