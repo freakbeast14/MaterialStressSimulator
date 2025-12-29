@@ -245,7 +245,17 @@ export default function Geometries() {
         format,
         contentBase64: base64,
       });
-      toast({ title: "Geometry created", description: "New geometry added." });
+      toast({ 
+        title: "Geometry created",
+        description: (
+          <span>
+            <span className="font-semibold text-foreground">
+              "{formState.name}"
+            </span>{" "}
+            added to the library.
+          </span>
+        ), 
+      });
       resetForm();
       setIsCreateOpen(false);
     } catch (error) {
