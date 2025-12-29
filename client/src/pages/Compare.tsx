@@ -86,7 +86,7 @@ export default function Compare({ embedded = false }: CompareProps) {
                   />
                   <label
                     htmlFor={`mat-${mat.id}`}
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer truncate"
                     title={mat.name}
                   >
                     {truncateText(mat.name, 30)}
