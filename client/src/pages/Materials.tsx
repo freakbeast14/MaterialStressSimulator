@@ -20,8 +20,10 @@ import {
 import Compare from "@/pages/Compare";
 
 export default function Materials() {
-  const truncateName = (value: string, max = 30) =>
-    value.length > max ? `${value.slice(0, max)}...` : value;
+  const truncateName = (value: string | undefined, max = 30) => {
+    if (!value) { return value };
+    return value.length > max ? `${value.slice(0, max)}...` : value;
+  }
 
   const { data: materials, isLoading } = useMaterials();
   const { mutateAsync: createMaterial, isPending } = useCreateMaterial();
@@ -97,8 +99,8 @@ export default function Materials() {
         title: "Material created",
         description: (
           <span>
-            <span className="font-semibold text-foreground">
-              "{name}"
+            <span className="font-medium text-foreground italic">
+              {truncateName(name, 25)}
             </span>{" "}
             added to the library.
           </span>
@@ -189,8 +191,8 @@ export default function Materials() {
         title: "Material deleted",
         description: (
           <span>
-            <span className="font-semibold text-foreground">
-              "{deleteTarget.name}"
+            <span className="font-medium text-foreground italic">
+              {truncateName(deleteTarget.name, 25)}
             </span>{" "}
             was removed.
           </span>
@@ -276,7 +278,7 @@ export default function Materials() {
                 </div>
                 
                 <h3
-                  className="text-xl font-bold font-display text-foreground mb-2"
+                  className="text-xl font-bold font-display text-foreground mb-2 truncate"
                   title={material.name}
                 >
                   {truncateName(material.name)}
@@ -544,10 +546,10 @@ export default function Materials() {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Delete material?</DialogTitle>
-            <DialogDescription className="text-foreground">
+            <DialogDescription className="text-foreground pt-4">
               This will permanently remove{" "}
-              <span className="font-semibold text-foreground">
-                {deleteTarget?.name || "this material"}
+              <span className="font-semibold text-foreground" title={deleteTarget?.name || ""}>
+                {truncateName(deleteTarget?.name, 25) || "this material"}
               </span>
               .
             </DialogDescription>

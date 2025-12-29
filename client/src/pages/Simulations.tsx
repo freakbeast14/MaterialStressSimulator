@@ -80,6 +80,10 @@ export default function Simulations() {
     geometries?.find((geom) => geom.id === id)?.name || "Unknown Geometry";
   const truncateText = (value: string, max: number) =>
     value.length > max ? `${value.slice(0, max)}…` : value;
+  const truncateName = (value: string | undefined, max = 30) => {
+    if (!value) { return value };
+    return value.length > max ? `${value.slice(0, max)}...` : value;
+  }
   const materialHueMap = useMemo(() => {
     const list = materials ?? [];
     const map = new Map<number, number>();
@@ -234,8 +238,8 @@ export default function Simulations() {
         title: "Simulation deleted",
         description: (
           <span>
-            <span className="font-semibold text-foreground">
-              "{deleteTarget.name}"
+            <span className="font-medium text-foreground italic">
+              {truncateName(deleteTarget.name, 25)}
             </span>{" "}
             was removed.
           </span>
@@ -864,7 +868,7 @@ export default function Simulations() {
                 {sortedSimulations.map((sim) => (
                   <tr key={sim.id} className="hover:bg-muted/30 transition-colors">
                     <td className="px-6 py-4 font-mono text-xs text-muted-foreground">#{sim.id}</td>
-                    <td className="px-6 py-4 font-medium text-foreground">
+                    <td className="px-6 py-4 font-medium text-foreground truncate">
                       <span title={sim.name}>
                         {truncateText(sim.name, 15)}
                       </span>
@@ -1374,10 +1378,10 @@ export default function Simulations() {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Delete simulation?</DialogTitle>
-            <DialogDescription className="text-foreground">
+            <DialogDescription className="text-foreground pt-4">
               This will permanently remove{" "}
-              <span className="font-semibold text-foreground">
-                {deleteTarget?.name || "this simulation"}
+              <span className="font-semibold text-foreground" title={deleteTarget?.name || ""}>
+                {truncateName(deleteTarget?.name, 25) || "this simulation"}
               </span>
               .
             </DialogDescription>
