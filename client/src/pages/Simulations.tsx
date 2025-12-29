@@ -4,7 +4,7 @@ import { useMaterials } from "@/hooks/use-materials";
 import { useCreateGeometry, useGeometries } from "@/hooks/use-geometries";
 import { useBoundaryConditions } from "@/hooks/use-boundary-conditions";
 import { StatusBadge } from "@/components/StatusBadge";
-import { ArrowDown, ArrowUp, ArrowUpDown, Eye, Filter, Pause, Pencil, Play, Search, Trash2, MinusCircle, PlusCircle } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Eye, Filter, Pause, Pencil, Play, Search, Trash2, MinusCircle, PlusCircle, Zap } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
@@ -668,18 +668,29 @@ export default function Simulations() {
     <div className="space-y-6">
       <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-display font-bold text-foreground">Simulation Jobs</h1>
+          <h1 className="text-3xl font-display font-bold text-foreground">Simulations</h1>
           <p className="text-muted-foreground mt-1">Monitor active jobs and view historical results.</p>
         </div>
         <div className="flex flex-col gap-3 w-full lg:w-auto">
-          <div className="relative w-full">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input 
-              placeholder="Search jobs..." 
-              className="pl-9 bg-card"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
+          <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="relative w-full">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input 
+                placeholder="Search..." 
+                className="pl-9 bg-card"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+            {/* <Button asChild className="h-9 w-full sm:w-auto">
+              <Link href="/simulations/create">Create Simulation</Link>
+            </Button> */}
+            <Link href="/simulations/create">
+              <Button className="w-full sm:w-auto font-semibold opacity-90 hover:opacity-100">
+                <Zap className="h-4 w-4 fill-current" />
+                Create
+              </Button>
+            </Link>
           </div>
           <div className="flex flex-wrap gap-3">
             <Select value={materialFilter} onValueChange={setMaterialFilter}>
