@@ -90,7 +90,17 @@ export default function Materials() {
         stressStrainCurve: parsedCurves.stress,
         thermalExpansionCurve: parsedCurves.thermal,
       });
-      toast({ title: "Material created", description: "New material added to the library." });
+      toast({ 
+        title: "Material created",
+        description: (
+          <span>
+            <span className="font-semibold text-foreground">
+              "{name}"
+            </span>{" "}
+            added to the library.
+          </span>
+        ), 
+      });
       setName("");
       setDescription("");
       setIsDialogOpen(false);
@@ -378,7 +388,7 @@ export default function Materials() {
 
             <div className="flex justify-end">
               <Button onClick={handleCreateMaterial} disabled={isPending || !name}>
-                {isPending ? "Saving..." : "Add Material"}
+                {isPending ? "Saving..." : "Add"}
               </Button>
             </div>
           </div>
@@ -465,7 +475,7 @@ export default function Materials() {
 
             <div className="flex justify-end">
               <Button onClick={handleUpdateMaterial} disabled={isUpdating || !name || !activeMaterial}>
-                {isUpdating ? "Saving..." : "Save Changes"}
+                {isUpdating ? "Saving..." : "Save"}
               </Button>
             </div>
           </div>
