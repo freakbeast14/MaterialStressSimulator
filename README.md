@@ -28,12 +28,12 @@ MatSim Analytics is designed for engineers and material scientists to:
 
 ```mermaid
 flowchart LR
-  A[Client (React + Vite)] -->|REST| B[Node API (Express)]
-  B -->|DB (Postgres)| C[(Database)]
-  B -->|Files (local or storage)| D[(Meshes/Geometries)]
-  B -->|Jobs| E[FEniCS Service (FastAPI)]
-  E -->|Mesh/Results| D
-  E -->|Results JSON| B
+    A["Client <br>(React + Vite)"] -- REST API --> B["Server<br>(NodeJS + Express)"]
+    B -- Updates DB <br>(Postgres) --> C[("Database<br>(Neon)")]
+    B -- Access STL, XML, VTU Files <br>(Object Storage) --> D[("Meshes/Geometries<br>(Supabase Storage)")]
+    B -- Queue Jobs --> E["FEniCS Service <br>(FastAPI)"]
+    E -- Stores Mesh/Results<br>(XML/VTU) --> D
+    E -- Results<br>(JSON) --> B
 ```
 
 ## Tech Stack
