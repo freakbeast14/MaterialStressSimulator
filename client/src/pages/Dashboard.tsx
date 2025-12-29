@@ -35,6 +35,8 @@ export default function Dashboard() {
     simulations?.filter((s) => s.status === "failed").length || 0;
   const pendingSimulations =
     simulations?.filter((s) => s.status === "pending").length || 0;
+  const truncateText = (value: string, max: number) =>
+    value.length > max ? `${value.slice(0, max)}…` : value;
 
   const stats = [
     {
@@ -206,11 +208,11 @@ export default function Dashboard() {
                 <div className="p-4 hover:bg-muted/50 transition-colors cursor-pointer group">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex-1 min-w-0">
-                      <h4 className="font-medium text-foreground group-hover:text-primary transition-colors truncate">
-                        {sim.name}
+                      <h4 className="font-medium text-foreground group-hover:text-primary transition-colors truncate" title={sim.name}>
+                        {truncateText(sim.name, 30)}
                       </h4>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {sim.type}
+                      <p className="text-xs text-muted-foreground mt-1" title={sim.type}>
+                        {truncateText(sim.type, 30)}
                       </p>
                     </div>
                     <StatusBadge status={sim.paramsDirty ? "Updated" : sim.status} />

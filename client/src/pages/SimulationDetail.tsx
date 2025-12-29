@@ -1016,8 +1016,13 @@ export default function SimulationDetail() {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="space-y-2">
             <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-display font-bold text-foreground">
-                {simulation.name}
+              <h1
+                className="text-3xl font-display font-bold text-foreground"
+                title={simulation.name}
+              >
+                {simulation.name.length > 30
+                  ? `${simulation.name.slice(0, 30)}...`
+                  : simulation.name}
               </h1>
               <span className="text-xs font-semibold uppercase tracking-wider text-primary bg-primary/10 border border-primary/20 rounded-full px-2 py-1">
                 #{simulation.id}

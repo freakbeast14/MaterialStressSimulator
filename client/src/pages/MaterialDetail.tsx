@@ -29,7 +29,14 @@ export default function MaterialDetail() {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-3 mb-2">
-              <h1 className="text-3xl font-display font-bold text-foreground">{material.name}</h1>
+              <h1
+                className="text-3xl font-display font-bold text-foreground"
+                title={material.name}
+              >
+                {material.name.length > 30
+                  ? `${material.name.slice(0, 30)}...`
+                  : material.name}
+              </h1>
               <span className="px-3 py-1 rounded-full bg-secondary text-xs font-semibold uppercase text-secondary-foreground">
                 {material.category}
               </span>
