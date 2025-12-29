@@ -408,7 +408,7 @@ export default function Dashboard() {
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.4 }}
-            className="bg-card rounded-2xl border border-border overflow-hidden"
+            className="bg-card w-full rounded-2xl border border-border overflow-hidden"
           >
             <div className="p-4 border-b border-border flex items-center justify-between">
               <h2 className="text-lg font-semibold font-display">
@@ -460,7 +460,7 @@ export default function Dashboard() {
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.5 }}
-            className="bg-card rounded-2xl border border-border overflow-hidden"
+            className="bg-card w-full rounded-2xl border border-border overflow-hidden"
           >
             <div className="p-4 border-b border-border flex items-center justify-between">
               <h2 className="text-lg font-semibold font-display">
