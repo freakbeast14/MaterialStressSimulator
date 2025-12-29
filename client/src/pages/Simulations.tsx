@@ -18,6 +18,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
 import Plot from "react-plotly.js";
 
 export default function Simulations() {
@@ -29,10 +30,13 @@ export default function Simulations() {
   const { data: materials } = useMaterials();
   const { data: geometries } = useGeometries();
   const { mutateAsync: createGeometry, isPending: isUploadingGeometry } = useCreateGeometry();
+  const { toast } = useToast();
   const [activeSimulationId, setActiveSimulationId] = useState<number | null>(null);
   const { data: boundaryConditions } = useBoundaryConditions(activeSimulationId ?? undefined);
   const [search, setSearch] = useState("");
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [simName, setSimName] = useState("");
   const [simType, setSimType] = useState("Tensile Test");
@@ -216,17 +220,34 @@ export default function Simulations() {
     return "bg-muted text-muted-foreground";
   };
 
-  const handleDelete = async (id: number, name: string) => {
-    const confirmed = window.confirm(`Delete simulation "${name}"? This cannot be undone.`);
-    if (!confirmed) return;
-    setDeletingId(id);
+  const handleDelete = (id: number, name: string) => {
+    setDeleteTarget({ id, name });
+    setIsDeleteOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeletingId(deleteTarget.id);
     try {
-      await deleteSimulation(id);
+      await deleteSimulation(deleteTarget.id);
+      toast({
+        title: "Simulation deleted",
+        description: (
+          <span>
+            <span className="font-semibold text-foreground">
+              "{deleteTarget.name}"
+            </span>{" "}
+            was removed.
+          </span>
+        ),
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to delete simulation.";
-      window.alert(message);
+      toast({ title: "Delete failed", description: message, variant: "destructive" });
     } finally {
       setDeletingId(null);
+      setIsDeleteOpen(false);
+      setDeleteTarget(null);
     }
   };
 
@@ -1337,6 +1358,38 @@ export default function Simulations() {
                 Run
               </Button>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete simulation?</DialogTitle>
+            <DialogDescription className="text-foreground">
+              This will permanently remove{" "}
+              <span className="font-semibold text-foreground">
+                {deleteTarget?.name || "this simulation"}
+              </span>
+              .
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-3">
+            <Button 
+              variant="outline" 
+              onClick={() => setIsDeleteOpen(false)}
+              className="hover:text-primary hover:bg-primary/10"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmDelete}
+              disabled={!deleteTarget || (isDeleting && deletingId === deleteTarget?.id)}
+              className="opacity-90 hover:opacity-100 disabled:hover:opacity-50"
+            >
+              {isDeleting && deletingId === deleteTarget?.id ? "Deleting..." : "Delete"}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

@@ -171,6 +171,8 @@ export default function Geometries() {
   const [search, setSearch] = useState("");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null);
   const [activeGeometryId, setActiveGeometryId] = useState<number | null>(null);
   const [formState, setFormState] = useState<GeometryFormState>({
     name: "",
@@ -292,15 +294,32 @@ export default function Geometries() {
     }
   };
 
-  const handleDelete = async (geometryId: number, name: string) => {
-    const confirmed = window.confirm(`Delete "${name}"? This cannot be undone.`);
-    if (!confirmed) return;
+  const handleDelete = (geometryId: number, name: string) => {
+    setDeleteTarget({ id: geometryId, name });
+    setIsDeleteOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
     try {
-      await deleteGeometry(geometryId);
-      toast({ title: "Geometry deleted", description: "Geometry removed from the library." });
+      await deleteGeometry(deleteTarget.id);
+      toast({
+        title: "Geometry deleted",
+        description: (
+          <span>
+            <span className="font-semibold text-foreground">
+              "{deleteTarget.name}"
+            </span>{" "}
+            was removed.
+          </span>
+        ),
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to delete geometry.";
       toast({ title: "Delete failed", description: message, variant: "destructive" });
+    } finally {
+      setIsDeleteOpen(false);
+      setDeleteTarget(null);
     }
   };
 
@@ -369,7 +388,7 @@ export default function Geometries() {
                 {geometry.name}
               </h3>
               <p className="text-sm text-muted-foreground mb-6 flex-1">
-                Original: {geometry.originalName}
+                {geometry.originalName}
               </p>
               <GeometryPreview
                 geometryId={geometry.id}
@@ -553,6 +572,38 @@ export default function Geometries() {
                 {isUpdating ? "Saving..." : "Save"}
               </Button>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete geometry?</DialogTitle>
+            <DialogDescription className="text-foreground">
+              This will permanently remove{" "}
+              <span className="font-semibold text-foreground">
+                {deleteTarget?.name || "this geometry"}
+              </span>
+              .
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-3">
+            <Button 
+              variant="outline" 
+              onClick={() => setIsDeleteOpen(false)}
+              className="hover:text-primary hover:bg-primary/10"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmDelete}
+              disabled={!deleteTarget || isDeleting}
+              className="opacity-90 hover:opacity-100 disabled:hover:opacity-50"
+            >
+              {isDeleting ? "Deleting..." : "Delete"}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
