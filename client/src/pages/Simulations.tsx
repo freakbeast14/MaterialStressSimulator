@@ -103,7 +103,8 @@ export default function Simulations() {
   }, [simulations]);
 
   const simulationStatuses = useMemo(() => {
-    const statuses = simulations?.map((sim) => sim.status) || [];
+    const statuses =
+      simulations?.map((sim) => (sim.paramsDirty ? "updated" : sim.status)) || [];
     return Array.from(new Set(statuses)).sort();
   }, [simulations]);
 
@@ -123,7 +124,12 @@ export default function Simulations() {
     const matchesMaterial = materialFilter === "all" || String(sim.materialId) === materialFilter;
     const matchesGeometry = geometryFilter === "all" || String(sim.geometryId) === geometryFilter;
     const matchesType = typeFilter === "all" || sim.type === typeFilter;
-    const matchesStatus = statusFilter === "all" || sim.status === statusFilter;
+    const matchesStatus =
+      statusFilter === "all"
+        ? true
+        : statusFilter === "updated"
+        ? Boolean(sim.paramsDirty)
+        : sim.status === statusFilter;
     return matchesSearch && matchesMaterial && matchesGeometry && matchesType && matchesStatus;
   });
 
@@ -523,6 +529,7 @@ export default function Simulations() {
     });
     queryClient.invalidateQueries({ queryKey: ["/api/simulations"] });
     queryClient.invalidateQueries({ queryKey: ["/api/simulations/:id", activeSimulationId] });
+    queryClient.refetchQueries({ queryKey: ["/api/simulations"] });
     queryClient.refetchQueries({ queryKey: ["/api/simulations/:id", activeSimulationId] });
     setIsEditOpen(false);
   };
@@ -548,6 +555,7 @@ export default function Simulations() {
     });
     queryClient.invalidateQueries({ queryKey: ["/api/simulations"] });
     queryClient.invalidateQueries({ queryKey: ["/api/simulations/:id", sim.id] });
+    queryClient.refetchQueries({ queryKey: ["/api/simulations"] });
     queryClient.refetchQueries({ queryKey: ["/api/simulations/:id", sim.id] });
   };
 
@@ -885,10 +893,8 @@ export default function Simulations() {
                         );
                       })()}
                     </td>
-                    <td className="px-6 py-4">
-                      <StatusBadge
-                        status={sim.status}
-                      />
+                  <td className="px-6 py-4">
+                      <StatusBadge status={sim.paramsDirty ? "Updated" : sim.status} />
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-1">
