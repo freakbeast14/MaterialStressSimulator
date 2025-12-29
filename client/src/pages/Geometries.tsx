@@ -264,7 +264,7 @@ export default function Geometries() {
         title: "Geometry created",
         description: (
           <span>
-            <span className="font-medium text-foreground italic">
+            <span className="font-medium text-foreground italic" title={formState.name}>
               {truncateName(formState.name, 25)}
             </span>{" "}
             added to the library.
@@ -332,7 +332,7 @@ export default function Geometries() {
         title: "Geometry deleted",
         description: (
           <span>
-            <span className="font-medium text-foreground italic">
+            <span className="font-medium text-foreground italic" title={deleteTarget.name}>
               {truncateName(deleteTarget.name, 25)}
             </span>{" "}
             was removed.

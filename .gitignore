@@ -12,3 +12,4 @@ vite.config.ts.*
 storage/
 Custom_Geometries/
 .local/
+README_Personal.md
