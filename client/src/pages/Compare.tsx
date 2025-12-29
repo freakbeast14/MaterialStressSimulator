@@ -18,6 +18,8 @@ export default function Compare({ embedded = false }: CompareProps) {
       prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
     );
   };
+  const truncateText = (value: string, max: number) =>
+    value.length > max ? `${value.slice(0, max)}…` : value;
 
   // Prepare data for multi-line chart
   // This is simplified; in a real app you'd need to normalize X-axis points
@@ -31,6 +33,8 @@ export default function Compare({ embedded = false }: CompareProps) {
     "#f59e0b", // amber
     "#ef4444", // red
   ];
+  const truncateLegendLabel = (value: string, max = 30) =>
+    value.length > max ? `${value.slice(0, max)}...` : value;
 
   const titleClassName = embedded
     ? "text-2xl font-display font-bold text-foreground"
@@ -83,8 +87,9 @@ export default function Compare({ embedded = false }: CompareProps) {
                   <label
                     htmlFor={`mat-${mat.id}`}
                     className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                    title={mat.name}
                   >
-                    {mat.name}
+                    {truncateText(mat.name, 30)}
                   </label>
                 </div>
               ))}
@@ -135,7 +140,13 @@ export default function Compare({ embedded = false }: CompareProps) {
                       <Tooltip 
                         contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))' }}
                       />
-                      <Legend />
+                      <Legend
+                        formatter={(value) => (
+                          <span title={String(value)}>
+                            {truncateLegendLabel(String(value), 30)}
+                          </span>
+                        )}
+                      />
                       {selectedMaterials.map((mat, idx) => (
                         <Line
                           key={mat.id}
@@ -188,7 +199,13 @@ export default function Compare({ embedded = false }: CompareProps) {
                       <Tooltip
                         contentStyle={{ backgroundColor: "hsl(var(--card))", borderColor: "hsl(var(--border))" }}
                       />
-                      <Legend />
+                      <Legend
+                        formatter={(value) => (
+                          <span title={String(value)}>
+                            {truncateLegendLabel(String(value), 30)}
+                          </span>
+                        )}
+                      />
                       {selectedMaterials.map((mat, idx) => (
                         <Line
                           key={mat.id}

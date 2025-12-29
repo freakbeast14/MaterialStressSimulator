@@ -200,6 +200,19 @@ export default function Geometries() {
     return `${prefix}...${ext || ""}`;
   };
 
+  const truncateName = (value: string, max = 30) =>
+    value.length > max ? `${value.slice(0, max)}...` : value;
+
+  const truncateFileName = (name: string, max = 30) => {
+    if (name.length <= max) return name;
+    const parts = name.split(".");
+    const ext = parts.length > 1 ? parts.pop() : "";
+    const base = parts.join(".") || name;
+    const prefixLength = Math.max(3, max - (ext ? ext.length + 2 : 3));
+    const prefix = base.slice(0, prefixLength);
+    return `${prefix}..${ext || ""}`;
+  };
+
   const resetForm = () => {
     setFormState({ name: "", file: null });
     setActiveGeometryId(null);
@@ -394,11 +407,17 @@ export default function Geometries() {
                 </div>
               </div>
 
-              <h3 className="text-xl font-bold font-display text-foreground mb-2">
-                {geometry.name}
+              <h3
+                className="text-xl font-bold font-display text-foreground mb-2"
+                title={geometry.name}
+              >
+                {truncateName(geometry.name)}
               </h3>
-              <p className="text-sm text-muted-foreground mb-6 flex-1">
-                {geometry.originalName}
+              <p
+                className="text-sm text-muted-foreground mb-6 flex-1"
+                title={geometry.originalName}
+              >
+                {truncateFileName(geometry.originalName)}
               </p>
               <GeometryPreview
                 geometryId={geometry.id}

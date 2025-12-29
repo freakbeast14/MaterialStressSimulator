@@ -25,6 +25,8 @@ export default function SimulationComparison() {
     geometries?.find((geom) => geom.id === id)?.name || "Unknown";
   const truncateText = (value: string, max = 10) =>
     value.length > max ? `${value.slice(0, max)}…` : value;
+  const truncateChartLabel = (value: string, max = 30) =>
+    value.length > max ? `${value.slice(0, max)}...` : value;
   const materialHueMap = useMemo(() => {
     const list = materials ?? [];
     const map = new Map<number, number>();
@@ -87,7 +89,7 @@ export default function SimulationComparison() {
   // Prepare data for 3D surface plot
   const prepare3DData = () => {
     if (selected.length < 2) return null;
-    
+
     const z = selected.map((sim) => {
       const results = sim.results as any;
       return [
@@ -100,7 +102,8 @@ export default function SimulationComparison() {
     return {
       z,
       x: ["Max Stress (MPa)", "Max Deformation (mm)", "Safety Factor"],
-      y: selected.map((s) => s.name),
+      y: selected.map((s) => truncateChartLabel(s.name, 30)),
+      hovertext: selected.map((s) => s.name),
       type: "heatmap" as const,
     };
   };
@@ -376,44 +379,71 @@ export default function SimulationComparison() {
         </div>
 
         {/* Metrics Table */}
-        <div className="bg-card rounded-2xl border border-border p-6">
-          <h3 className="font-semibold mb-4">Key Metrics</h3>
+        <div className="bg-card rounded-2xl border border-border p-6 pr-2">
+          <h3 className="font-semibold mb-4 pr-6">Key Metrics</h3>
           {selected.length < 2 ? (
-            <p className="text-muted-foreground text-sm">Select at least 2 simulations to compare.</p>
+            <p className="text-muted-foreground text-sm pr-4">
+              Select at least 2 simulations to compare.
+            </p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="text-left p-2 font-medium">ID</th>
-                    <th className="text-left p-2 font-medium">Simulation</th>
-                    <th className="text-right p-2 font-medium">Max Stress (MPa)</th>
-                    <th className="text-right p-2 font-medium">Deformation (nm)</th>
-                    <th className="text-right p-2 font-medium">Safety</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {selected.map((sim) => {
-                    const r = sim.results as any;
-                    return (
-                      <tr key={sim.id} className="border-b border-border/50">
-                        <td className="p-2 truncate max-w-xs font-mono text-muted-foreground">#{sim.id}</td>
-                        <td className="p-2 truncate max-w-xs">{sim.name}</td>
-                        <td className="text-right p-2 font-mono">
-                          {formatMetric(getMaxStress(sim))}
-                        </td>
-                        <td className="text-right p-2 font-mono">
-                          {formatMetric((r?.maxDeformation || 0) * 1_000_000)}
-                        </td>
-                        <td className="text-right p-2 font-mono">
-                          {formatMetric(r?.safetyFactor || 0)}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <>
+              <div className="pr-4">
+              <table className="w-full table-fixed text-xs">
+                <colgroup>
+                  <col className="w-16" />
+                  <col className="w-[20%]" />
+                  <col className="w-[30%]" />
+                  <col className="w-[30%]" />
+                  <col className="w-[15%]" />
+                </colgroup>
+                <thead className="text-muted-foreground">
+                    <tr className="border-b border-border">
+                      <th className="text-left p-2 font-medium">ID</th>
+                      <th className="text-left p-2 font-medium">Simulation</th>
+                      <th className="text-right p-2 font-medium">Max Stress (MPa)</th>
+                      <th className="text-right p-2 font-medium">Deformation (nm)</th>
+                      <th className="text-right p-2 font-medium">Safety</th>
+                    </tr>
+                  </thead>
+                </table>
+              </div>
+              <div className="max-h-96 lg:max-h-[408px] overflow-y-auto pr-4">
+                <table className="w-full table-fixed text-xs">
+                  <colgroup>
+                    <col className="w-16" />
+                    <col className="w-[20%]" />
+                    <col className="w-[30%]" />
+                    <col className="w-[30%]" />
+                    <col className="w-[15%]" />
+                  </colgroup>
+                  <tbody>
+                    {selected.map((sim) => {
+                      const r = sim.results as any;
+                      return (
+                        <tr key={sim.id} className="border-b border-border/50">
+                          <td className="p-2 truncate max-w-xs font-mono text-muted-foreground">#{sim.id}</td>
+                          <td
+                            className="p-2 truncate max-w-xs"
+                            title={sim.name}
+                          >
+                            {truncateText(sim.name, 10)}
+                          </td>
+                          <td className="text-right p-2 font-mono">
+                            {formatMetric(getMaxStress(sim))}
+                          </td>
+                          <td className="text-right p-2 font-mono">
+                            {formatMetric((r?.maxDeformation || 0) * 1_000_000)}
+                          </td>
+                          <td className="text-right p-2 font-mono">
+                            {formatMetric(r?.safetyFactor || 0)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )}
         </div>
       </div>
@@ -519,7 +549,7 @@ export default function SimulationComparison() {
                       .sort((a, b) => b.score - a.score)
                       .map((sim, idx) => (
                         <div key={sim.id} className="flex items-center justify-between text-sm">
-                          <span className="truncate">{idx + 1}. {sim.name}</span>
+                          <span className="truncate" title={sim.name}>{idx + 1}. {truncateText(sim.name, 30)}</span>
                           <span className="font-semibold">{sim.score.toFixed(2)}</span>
                         </div>
                       ))}
@@ -539,7 +569,13 @@ export default function SimulationComparison() {
                     <XAxis dataKey="time" />
                     <YAxis />
                     <Tooltip />
-                    <Legend />
+                    <Legend
+                      formatter={(value) => (
+                        <span title={String(value)}>
+                          {truncateChartLabel(String(value), 30)}
+                        </span>
+                      )}
+                    />
                     {selected.map((sim, idx) => (
                       <Line
                         key={sim.id}
@@ -561,7 +597,13 @@ export default function SimulationComparison() {
                     <XAxis dataKey="strain" />
                     <YAxis />
                     <Tooltip />
-                    <Legend />
+                    <Legend
+                      formatter={(value) => (
+                        <span title={String(value)}>
+                          {truncateChartLabel(String(value), 30)}
+                        </span>
+                      )}
+                    />
                     {selected.map((sim, idx) => (
                       <Line
                         key={sim.id}
@@ -621,7 +663,9 @@ export default function SimulationComparison() {
                     z: selected.map(s => (s.results as any)?.safetyFactor || 0),
                     mode: "markers+text",
                     type: "scatter3d",
-                    text: selected.map(s => s.name),
+                    text: selected.map(s => truncateChartLabel(s.name, 30)),
+                    hovertext: selected.map(s => s.name),
+                    hovertemplate: "%{hovertext}<br>Stress: %{x}<br>Deformation: %{y}<br>Safety: %{z}<extra></extra>",
                     textposition: "top center",
                     marker: {
                       size: 10,

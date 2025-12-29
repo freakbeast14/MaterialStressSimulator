@@ -20,6 +20,9 @@ import {
 import Compare from "@/pages/Compare";
 
 export default function Materials() {
+  const truncateName = (value: string, max = 30) =>
+    value.length > max ? `${value.slice(0, max)}...` : value;
+
   const { data: materials, isLoading } = useMaterials();
   const { mutateAsync: createMaterial, isPending } = useCreateMaterial();
   const { mutateAsync: updateMaterial, isPending: isUpdating } = useUpdateMaterial();
@@ -272,7 +275,12 @@ export default function Materials() {
                   </div>
                 </div>
                 
-                <h3 className="text-xl font-bold font-display text-foreground mb-2">{material.name}</h3>
+                <h3
+                  className="text-xl font-bold font-display text-foreground mb-2"
+                  title={material.name}
+                >
+                  {truncateName(material.name)}
+                </h3>
                 <p className="text-sm text-muted-foreground line-clamp-2 mb-6 flex-1">
                   {material.description}
                 </p>
