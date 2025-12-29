@@ -28,6 +28,8 @@ export default function Materials() {
   const [search, setSearch] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null);
   const [activeMaterialId, setActiveMaterialId] = useState<number | null>(null);
   const [name, setName] = useState("");
   const [category, setCategory] = useState("Metal");
@@ -161,15 +163,32 @@ export default function Materials() {
     }
   };
 
-  const handleDeleteMaterial = async (id: number, name: string) => {
-    const confirmed = window.confirm(`Delete "${name}"? This cannot be undone.`);
-    if (!confirmed) return;
+  const handleDeleteMaterial = (id: number, name: string) => {
+    setDeleteTarget({ id, name });
+    setIsDeleteOpen(true);
+  };
+
+  const confirmDeleteMaterial = async () => {
+    if (!deleteTarget) return;
     try {
-      await deleteMaterial(id);
-      toast({ title: "Material deleted", description: "Material removed from the library." });
+      await deleteMaterial(deleteTarget.id);
+      toast({
+        title: "Material deleted",
+        description: (
+          <span>
+            <span className="font-semibold text-foreground">
+              "{deleteTarget.name}"
+            </span>{" "}
+            was removed.
+          </span>
+        ),
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to delete material.";
       toast({ title: "Delete failed", description: message, variant: "destructive" });
+    } finally {
+      setIsDeleteOpen(false);
+      setDeleteTarget(null);
     }
   };
 
@@ -449,6 +468,38 @@ export default function Materials() {
                 {isUpdating ? "Saving..." : "Save Changes"}
               </Button>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete material?</DialogTitle>
+            <DialogDescription className="text-foreground">
+              This will permanently remove{" "}
+              <span className="font-semibold text-foreground">
+                {deleteTarget?.name || "this material"}
+              </span>
+              .
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-3">
+            <Button 
+              variant="outline" 
+              onClick={() => setIsDeleteOpen(false)}
+              className="hover:text-primary hover:bg-primary/10"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmDeleteMaterial}
+              disabled={!deleteTarget || isDeleting}
+              className="opacity-90 hover:opacity-100 disabled:hover:opacity-50"
+            >
+              {isDeleting ? "Deleting..." : "Delete"}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
