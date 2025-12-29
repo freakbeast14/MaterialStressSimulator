@@ -80,8 +80,6 @@ python -m venv .venv
 
 - STL previews are supported in the UI; STEP upload is not yet supported.
 
-<br>
-
 ---
 
 **Last Updated:** December 29, 2025
