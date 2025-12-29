@@ -4,6 +4,7 @@ import { useSimulations } from "@/hooks/use-simulations";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
 import {
+  ArrowRight,
   Layers,
   Zap,
   Clock,
@@ -197,9 +198,10 @@ export default function Dashboard() {
             </h2>
             <Link
               href="/simulations"
-              className="text-sm text-primary hover:underline cursor-pointer"
+              className="group inline-flex items-center gap-1 text-sm font-semibold text-primary/85 transition-colors hover:text-primary"
             >
-              View All →
+              View All
+              <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1" />
             </Link>
           </div>
           <div className="divide-y divide-border/50">
@@ -271,9 +273,10 @@ export default function Dashboard() {
             </h2>
             <Link
               href="/materials"
-              className="text-sm text-primary hover:underline cursor-pointer"
+              className="group inline-flex items-center gap-1 text-sm font-semibold text-primary/85 transition-colors hover:text-primary"
             >
-              View All →
+              View All
+              <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1" />
             </Link>
           </div>
           <div className="divide-y divide-border/50">
@@ -282,8 +285,8 @@ export default function Dashboard() {
                 <div className="p-4 hover:bg-muted/50 transition-colors cursor-pointer group">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex-1 min-w-0">
-                      <h4 className="font-medium text-foreground group-hover:text-primary transition-colors truncate">
-                        {mat.name}
+                      <h4 className="font-medium text-foreground group-hover:text-primary transition-colors truncate" title={mat.name}>
+                        {truncateText(mat.name, 30)}
                       </h4>
                       <p className="text-xs text-muted-foreground mt-1">
                         {mat.category} • {mat.density} kg/m³
