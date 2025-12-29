@@ -38,8 +38,8 @@ flowchart LR
 
 ## Tech Stack
 
-- Frontend: React, Vite, Tailwind, Recharts, Plotly
-- Backend: TypeScript, Node.js, Express, Drizzle ORM
+- Frontend: React, TypeScript, Vite, Tailwind, Recharts, Plotly
+- Backend: Node.js, Express, Drizzle ORM
 - FEA Service: Python, FastAPI, FEniCS, meshio, gmsh
 - DB: Postgres (Neon/Supabase/etc.)
 
