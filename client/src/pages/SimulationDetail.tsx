@@ -1023,7 +1023,7 @@ export default function SimulationDetail() {
                 #{simulation.id}
               </span>
               <div className="flex items-center gap-2">
-                <StatusBadge status={simulation.status} />
+                <StatusBadge status={simulation.paramsDirty ? "Updated" : simulation.status} />
                   {simulation.paramsDirty && (
                     <button
                       type="button"

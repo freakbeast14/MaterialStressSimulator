@@ -360,7 +360,7 @@ export default function SimulationComparison() {
                               </span>
                             ) : (
                               <StatusBadge
-                                status={sim.status}
+                                status={sim.paramsDirty ? "Updated" : sim.status}
                                 className="text-[11px] font-mono tracking-normal"
                               />
                             )}

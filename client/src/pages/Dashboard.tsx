@@ -213,7 +213,7 @@ export default function Dashboard() {
                         {sim.type}
                       </p>
                     </div>
-                    <StatusBadge status={sim.status} />
+                    <StatusBadge status={sim.paramsDirty ? "Updated" : sim.status} />
                   </div>
                   {sim.status === "running" && sim.progress != null && (
                     <div className="mt-3 w-full">
