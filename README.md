@@ -30,7 +30,7 @@ MatSim Analytics is designed for engineers and material scientists to:
 flowchart LR
     A["Client <br>(React + Vite)"] -- REST API --> B["Server<br>(NodeJS + Express)"]
     B -- Updates DB <br>(Postgres) --> C[("Database<br>(Neon)")]
-    B -- Access STL, XML, VTU Files <br>(Object Storage) --> D[("Meshes/Geometries<br>(Supabase Storage)")]
+    B -- Access STL, XML, VTU Files <br>(File Storage) --> D[("Meshes/Geometries<br>(Supabase Storage)")]
     B -- Queue Jobs --> E["FEniCS Service <br>(FastAPI)"]
     E -- Stores Mesh/Results<br>(XML/VTU) --> D
     E -- Results<br>(JSON) --> B
@@ -41,7 +41,8 @@ flowchart LR
 - Frontend: React, TypeScript, Vite, Tailwind, Recharts, Plotly
 - Backend: Node.js, Express, Drizzle ORM
 - FEA Service: Python, FastAPI, FEniCS, meshio, gmsh
-- DB: Postgres (Neon/Supabase/etc.)
+- DB: PostgreSQL (Neon)
+- File Storage: Supabase Storage
 
 ## Local Setup (Brief)
 
