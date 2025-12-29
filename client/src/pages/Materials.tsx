@@ -99,7 +99,7 @@ export default function Materials() {
         title: "Material created",
         description: (
           <span>
-            <span className="font-medium text-foreground italic">
+            <span className="font-medium text-foreground italic" title={name}>
               {truncateName(name, 25)}
             </span>{" "}
             added to the library.
@@ -191,7 +191,7 @@ export default function Materials() {
         title: "Material deleted",
         description: (
           <span>
-            <span className="font-medium text-foreground italic">
+            <span className="font-medium text-foreground italic" title={deleteTarget.name}>
               {truncateName(deleteTarget.name, 25)}
             </span>{" "}
             was removed.

@@ -238,7 +238,7 @@ export default function Simulations() {
         title: "Simulation deleted",
         description: (
           <span>
-            <span className="font-medium text-foreground italic">
+            <span className="font-medium text-foreground italic" title={deleteTarget.name}>
               {truncateName(deleteTarget.name, 25)}
             </span>{" "}
             was removed.
