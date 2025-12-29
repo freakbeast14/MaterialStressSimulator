@@ -345,26 +345,51 @@ export default function Materials() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label>Density (kg/m³)</Label>
-                <Input value={density} onChange={(e) => setDensity(e.target.value)} />
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={density}
+                  onChange={(e) => setDensity(e.target.value)}
+                />
               </div>
               <div className="space-y-2">
                 <Label>Young's Modulus (GPa)</Label>
-                <Input value={youngsModulus} onChange={(e) => setYoungsModulus(e.target.value)} />
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={youngsModulus}
+                  onChange={(e) => setYoungsModulus(e.target.value)}
+                />
               </div>
               <div className="space-y-2">
                 <Label>Poisson's Ratio</Label>
-                <Input value={poissonRatio} onChange={(e) => setPoissonRatio(e.target.value)} />
+                <Input
+                  type="number"
+                  step="0.001"
+                  value={poissonRatio}
+                  onChange={(e) => setPoissonRatio(e.target.value)}
+                />
               </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Thermal Conductivity (W/m·K)</Label>
-                <Input value={thermalConductivity} onChange={(e) => setThermalConductivity(e.target.value)} />
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={thermalConductivity}
+                  onChange={(e) => setThermalConductivity(e.target.value)}
+                />
               </div>
               <div className="space-y-2">
                 <Label>Melting Point (°C)</Label>
-                <Input value={meltingPoint} onChange={(e) => setMeltingPoint(e.target.value)} />
+                <Input
+                  type="number"
+                  step="0.1"
+                  value={meltingPoint}
+                  onChange={(e) => setMeltingPoint(e.target.value)}
+                />
               </div>
             </div>
 
@@ -432,26 +457,51 @@ export default function Materials() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label>Density (kg/m³)</Label>
-                <Input value={density} onChange={(e) => setDensity(e.target.value)} />
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={density}
+                  onChange={(e) => setDensity(e.target.value)}
+                />
               </div>
               <div className="space-y-2">
                 <Label>Young's Modulus (GPa)</Label>
-                <Input value={youngsModulus} onChange={(e) => setYoungsModulus(e.target.value)} />
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={youngsModulus}
+                  onChange={(e) => setYoungsModulus(e.target.value)}
+                />
               </div>
               <div className="space-y-2">
                 <Label>Poisson's Ratio</Label>
-                <Input value={poissonRatio} onChange={(e) => setPoissonRatio(e.target.value)} />
+                <Input
+                  type="number"
+                  step="0.001"
+                  value={poissonRatio}
+                  onChange={(e) => setPoissonRatio(e.target.value)}
+                />
               </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Thermal Conductivity (W/m·K)</Label>
-                <Input value={thermalConductivity} onChange={(e) => setThermalConductivity(e.target.value)} />
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={thermalConductivity}
+                  onChange={(e) => setThermalConductivity(e.target.value)}
+                />
               </div>
               <div className="space-y-2">
                 <Label>Melting Point (°C)</Label>
-                <Input value={meltingPoint} onChange={(e) => setMeltingPoint(e.target.value)} />
+                <Input
+                  type="number"
+                  step="0.1"
+                  value={meltingPoint}
+                  onChange={(e) => setMeltingPoint(e.target.value)}
+                />
               </div>
             </div>
 
