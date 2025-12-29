@@ -549,7 +549,7 @@ export default function SimulationComparison() {
                       .sort((a, b) => b.score - a.score)
                       .map((sim, idx) => (
                         <div key={sim.id} className="flex items-center justify-between text-sm">
-                          <span className="truncate" title={sim.name}>{idx + 1}. {truncateText(sim.name, 30)}</span>
+                          <span className="truncate" title={sim.name}>{idx + 1}. {truncateText(sim.name, 25)}</span>
                           <span className="font-semibold">{sim.score.toFixed(2)}</span>
                         </div>
                       ))}
