@@ -682,9 +682,6 @@ export default function Simulations() {
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
-            {/* <Button asChild className="h-9 w-full sm:w-auto">
-              <Link href="/simulations/create">Create Simulation</Link>
-            </Button> */}
             <Link href="/simulations/create">
               <Button className="w-full sm:w-auto font-semibold opacity-90 hover:opacity-100">
                 <Zap className="h-4 w-4 fill-current" />
