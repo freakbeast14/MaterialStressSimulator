@@ -429,9 +429,10 @@ export function AssistantChat() {
             <div className="flex justify-center absolute w-full -translate-y-8">
               <button
                 type="button"
-                className="h-8 w-8 rounded-full border border-border bg-primary/10 shadow-sm text-muted-foreground hover:text-foreground hover:border-primary/40 absolute right-[24px]"
+                className="h-8 w-8 rounded-full border border-border bg-primary/10 shadow-sm text-muted-foreground hover:text-foreground hover:border-primary/40 absolute right-[22px]"
                 onClick={() => scrollToBottom("smooth")}
                 aria-label="Scroll to latest message"
+                title="Go to latest chat"
               >
                 <ChevronDown className="h-4 w-4 mx-auto" />
               </button>
