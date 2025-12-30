@@ -12,8 +12,10 @@ import {
 } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import clsx from "clsx";
+import { AssistantChat } from "@/components/AssistantChat";
+import { AssistantProvider, useAssistantContext } from "@/context/assistant-context";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -97,41 +99,56 @@ export function Layout({ children }: LayoutProps) {
     );
   };
 
+  const PageContextSync = () => {
+    const { setContext } = useAssistantContext();
+
+    useEffect(() => {
+      setContext(location, null);
+    }, [location, setContext]);
+
+    return null;
+  };
+
   return (
-    <div className="min-h-screen bg-background flex">
-      {/* Desktop Sidebar */}
-      <aside className="hidden md:block w-64 fixed inset-y-0 z-20">
-        <NavContent />
-      </aside>
+    <AssistantProvider>
+      <div className="min-h-screen bg-background flex">
+        {/* Desktop Sidebar */}
+        <aside className="hidden md:block w-64 fixed inset-y-0 z-20">
+          <NavContent />
+        </aside>
 
-      {/* Mobile Trigger */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-30 flex items-center justify-between p-4 bg-background/80 backdrop-blur-md border-b border-border">
-        <Link href="/">
-          <div className="flex items-center gap-2 cursor-pointer">
-            <div className="h-7 w-7 rounded-md bg-primary flex items-center justify-center">
-              <Activity className="h-4 w-4 text-primary-foreground" />
+        {/* Mobile Trigger */}
+        <div className="md:hidden fixed top-0 left-0 right-0 z-30 flex items-center justify-between p-4 bg-background/80 backdrop-blur-md border-b border-border">
+          <Link href="/">
+            <div className="flex items-center gap-2 cursor-pointer">
+              <div className="h-7 w-7 rounded-md bg-primary flex items-center justify-center">
+                <Activity className="h-4 w-4 text-primary-foreground" />
+              </div>
+              <span className="font-display font-bold">MatSim</span>
             </div>
-            <span className="font-display font-bold">MatSim</span>
-          </div>
-        </Link>
-        <Sheet open={isMobileOpen} onOpenChange={setIsMobileOpen}>
-          <SheetTrigger asChild>
-            <Button variant="ghost" size="icon">
-              <Menu className="h-5 w-5" />
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="left" className="p-0 w-64">
-            <NavContent />
-          </SheetContent>
-        </Sheet>
-      </div>
-
-      {/* Main Content */}
-      <main className="flex-1 md:ml-64 w-full pt-16 md:pt-0">
-        <div className="h-full px-4 py-8 md:px-8 md:py-12 max-w-7xl mx-auto">
-          {children}
+          </Link>
+          <Sheet open={isMobileOpen} onOpenChange={setIsMobileOpen}>
+            <SheetTrigger asChild>
+              <Button variant="ghost" size="icon">
+                <Menu className="h-5 w-5" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="left" className="p-0 w-64">
+              <NavContent />
+            </SheetContent>
+          </Sheet>
         </div>
-      </main>
-    </div>
+
+        {/* Main Content */}
+        <main className="flex-1 md:ml-64 w-full pt-16 md:pt-0">
+          <div className="h-full px-4 py-8 md:px-8 md:py-12 max-w-7xl mx-auto">
+            <PageContextSync />
+            {children}
+          </div>
+        </main>
+
+        <AssistantChat />
+      </div>
+    </AssistantProvider>
   );
 }

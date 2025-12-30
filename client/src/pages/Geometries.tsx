@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useGeometries, useCreateGeometry, useUpdateGeometry, useDeleteGeometry } from "@/hooks/use-geometries";
 import { useToast } from "@/hooks/use-toast";
@@ -14,6 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useAssistantContext } from "@/context/assistant-context";
 
 type GeometryFormState = {
   name: string;
@@ -168,6 +169,7 @@ export default function Geometries() {
   const { mutateAsync: updateGeometry, isPending: isUpdating } = useUpdateGeometry();
   const { mutateAsync: deleteGeometry, isPending: isDeleting } = useDeleteGeometry();
   const { toast } = useToast();
+  const { setContext } = useAssistantContext();
   const [search, setSearch] = useState("");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -180,10 +182,42 @@ export default function Geometries() {
   });
   const [createPreview, setCreatePreview] = useState<string | null>(null);
   const [editPreview, setEditPreview] = useState<string | null>(null);
+  const contextKeyRef = useRef("");
 
-  const filteredGeometries = geometries?.filter((geometry) =>
-    geometry.name.toLowerCase().includes(search.toLowerCase())
+  const filteredGeometries = useMemo(
+    () =>
+      geometries?.filter((geometry) =>
+        geometry.name.toLowerCase().includes(search.toLowerCase())
+      ) ?? [],
+    [geometries, search]
   );
+
+  const assistantSample = useMemo(
+    () =>
+      filteredGeometries.slice(0, 8).map((geometry) => ({
+        id: geometry.id,
+        name: geometry.name,
+        format: geometry.format,
+        sizeBytes: geometry.sizeBytes,
+      })),
+    [filteredGeometries]
+  );
+
+  useEffect(() => {
+    const sample = assistantSample;
+    const totalCount = geometries?.length ?? 0;
+    const filteredCount = filteredGeometries.length;
+    const contextPayload = { search, totalCount, filteredCount, sample };
+    const key = JSON.stringify({
+      search,
+      totalCount,
+      filteredCount,
+      ids: sample.map((item) => item.id),
+    });
+    if (contextKeyRef.current === key) return;
+    contextKeyRef.current = key;
+    setContext("geometries", contextPayload);
+  }, [assistantSample, geometries?.length, filteredGeometries.length, search, setContext]);
 
   const activeGeometry = useMemo(
     () => geometries?.find((geometry) => geometry.id === activeGeometryId) || null,

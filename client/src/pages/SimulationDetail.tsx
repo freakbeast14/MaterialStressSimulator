@@ -51,8 +51,10 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
 import Plotly from "plotly.js-dist-min";
+import { useAssistantContext } from "@/context/assistant-context";
 
 export default function SimulationDetail() {
+  const { setContext } = useAssistantContext();
   const { id } = useParams();
   const { data: simulation, isLoading } = useSimulation(parseInt(id || "0"));
   const { mutateAsync: updateSimulation } = useUpdateSimulation();
@@ -285,6 +287,79 @@ export default function SimulationDetail() {
       };
     });
   }, [boundaryConditions]);
+
+  const assistantContext = useMemo(() => {
+    if (!simulation) return null;
+    return {
+      simulation: {
+        id: simulation.id,
+        name: simulation.name,
+        status: simulation.paramsDirty ? "updated" : simulation.status,
+        type: simulation.type,
+        material: material?.name || "Unknown",
+        geometry: geometry?.name || "Unknown",
+        progress: simulation.progress ?? 0,
+        results: {
+          maxStress: results?.maxStress ?? null,
+          minStress: results?.minStress ?? null,
+          avgStress: results?.avgStress ?? null,
+          safetyFactor: results?.safetyFactor ?? null,
+          maxDeformation: results?.maxDeformation ?? null,
+          maxStrain: results?.maxStrain ?? null,
+          avgStrain: results?.avgStrain ?? null,
+          stressRange: results?.stressRange ?? null,
+        },
+        warnings: results?.meshWarnings ?? [],
+      },
+      boundaryConditions: bcItems.map((item) => ({
+        type: item.label,
+        face: item.face,
+        value: item.value,
+      })),
+      timeSeriesSample: timeSeriesData.slice(0, 25),
+      stressStrainSample: stressStrainData.slice(0, 25),
+    };
+  }, [
+    simulation,
+    material?.name,
+    geometry?.name,
+    results?.maxStress,
+    results?.minStress,
+    results?.avgStress,
+    results?.safetyFactor,
+    results?.maxDeformation,
+    results?.maxStrain,
+    results?.avgStrain,
+    results?.stressRange,
+    results?.meshWarnings,
+    bcItems,
+    timeSeriesData,
+    stressStrainData,
+  ]);
+
+  const assistantContextKey = useMemo(() => {
+    if (!assistantContext) return "";
+    return JSON.stringify({
+      id: assistantContext.simulation.id,
+      status: assistantContext.simulation.status,
+      material: assistantContext.simulation.material,
+      geometry: assistantContext.simulation.geometry,
+      results: assistantContext.simulation.results,
+      warnings: assistantContext.simulation.warnings,
+      boundaryConditions: assistantContext.boundaryConditions,
+      timeSeriesCount: assistantContext.timeSeriesSample.length,
+      stressStrainCount: assistantContext.stressStrainSample.length,
+    });
+  }, [assistantContext]);
+
+  const assistantContextKeyRef = useRef("");
+
+  useEffect(() => {
+    if (!assistantContext) return;
+    if (assistantContextKeyRef.current === assistantContextKey) return;
+    assistantContextKeyRef.current = assistantContextKey;
+    setContext("simulation-detail", assistantContext);
+  }, [assistantContext, assistantContextKey, setContext]);
 
   const progressStage =
     (simulation?.progress ?? 0) < 20

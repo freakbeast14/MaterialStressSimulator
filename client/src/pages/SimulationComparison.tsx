@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useSimulations } from "@/hooks/use-simulations";
 import { useMaterials } from "@/hooks/use-materials";
 import { useGeometries } from "@/hooks/use-geometries";
@@ -8,8 +8,10 @@ import Plot from "react-plotly.js";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { useAssistantContext } from "@/context/assistant-context";
 
 export default function SimulationComparison() {
+  const { setContext } = useAssistantContext();
   const { data: simulations } = useSimulations();
   const { data: materials } = useMaterials();
   const { data: geometries } = useGeometries();
@@ -85,6 +87,47 @@ export default function SimulationComparison() {
     );
   });
   const selected = completedSims.filter(s => selectedSims.includes(s.id));
+
+  const selectedForContext = useMemo(
+    () =>
+      selected.slice(0, 8).map((sim) => {
+        const results = sim.results as any;
+        return {
+          id: sim.id,
+          name: sim.name,
+          status: sim.paramsDirty ? "updated" : sim.status,
+          type: sim.type,
+          material: getMaterialName(sim.materialId),
+          geometry: getGeometryName(sim.geometryId),
+          metrics: {
+            maxStress: getMaxStress(sim),
+            minStress: results?.minStress ?? null,
+            avgStress: results?.avgStress ?? null,
+            maxStrain: results?.maxStrain ?? null,
+            avgStrain: results?.avgStrain ?? null,
+            maxDeformation: results?.maxDeformation ?? null,
+            safetyFactor: results?.safetyFactor ?? null,
+          },
+        };
+      }),
+    [selected, materials, geometries]
+  );
+  const contextKeyRef = useRef<string>("");
+  useEffect(() => {
+    const contextValue = {
+      selectedCount: selected.length,
+      selected: selectedForContext,
+      weights,
+    };
+    const nextKey = JSON.stringify({
+      selectedIds: selectedForContext.map((sim) => sim.id),
+      weights,
+      count: selected.length,
+    });
+    if (contextKeyRef.current === nextKey) return;
+    contextKeyRef.current = nextKey;
+    setContext("compare-simulations", contextValue);
+  }, [selected.length, selectedForContext, weights, setContext]);
 
   // Prepare data for 3D surface plot
   const prepare3DData = () => {

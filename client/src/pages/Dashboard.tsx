@@ -17,7 +17,7 @@ import {
   Ban
 } from "lucide-react";
 import { Link } from "wouter";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   BarChart,
   Bar,
@@ -28,6 +28,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import Plot from "react-plotly.js";
+import { useAssistantContext } from "@/context/assistant-context";
 
 type GeometryMiniPreviewProps = {
   geometryId: number;
@@ -157,6 +158,7 @@ export default function Dashboard() {
   const { data: materials, isLoading: loadingMaterials } = useMaterials();
   const { data: simulations, isLoading: loadingSimulations } = useSimulations();
   const { data: geometries, isLoading: loadingGeometries } = useGeometries();
+  const { setContext } = useAssistantContext();
 
   const activeSimulations =
     simulations?.filter((s) => s.status === "running").length || 0;
@@ -243,6 +245,55 @@ export default function Dashboard() {
           return bTime - aTime;
         })
       : [];
+
+  const assistantContext = useMemo(() => {
+    return {
+      totals: {
+        materials: materials?.length ?? 0,
+        geometries: geometries?.length ?? 0,
+        simulations: simulations?.length ?? 0,
+        running: activeSimulations,
+        pending: pendingSimulations,
+        completed: completedSimulations,
+        failed: failedSimulations,
+      },
+      recentSimulations: recentSimulations.slice(0, 6).map((sim) => ({
+        id: sim.id,
+        name: sim.name,
+        status: sim.paramsDirty ? "updated" : sim.status,
+        type: sim.type,
+      })),
+    };
+  }, [
+    materials?.length,
+    geometries?.length,
+    simulations?.length,
+    activeSimulations,
+    pendingSimulations,
+    completedSimulations,
+    failedSimulations,
+    recentSimulations,
+  ]);
+
+  const assistantContextKey = useMemo(() => {
+    return JSON.stringify({
+      totals: assistantContext.totals,
+      recentSimulations: assistantContext.recentSimulations.map((sim) => ({
+        id: sim.id,
+        status: sim.status,
+        type: sim.type,
+        name: sim.name,
+      })),
+    });
+  }, [assistantContext]);
+
+  const assistantContextKeyRef = useRef("");
+
+  useEffect(() => {
+    if (assistantContextKeyRef.current === assistantContextKey) return;
+    assistantContextKeyRef.current = assistantContextKey;
+    setContext("dashboard", assistantContext);
+  }, [assistantContext, assistantContextKey, setContext]);
 
   if (loadingMaterials || loadingSimulations || loadingGeometries) {
     return (

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
 import { useMaterials, useUpdateMaterial, useDeleteMaterial } from "@/hooks/use-materials";
@@ -18,6 +18,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import Compare from "@/pages/Compare";
+import { useAssistantContext } from "@/context/assistant-context";
 
 export default function Materials() {
   const truncateName = (value: string | undefined, max = 30) => {
@@ -30,6 +31,7 @@ export default function Materials() {
   const { mutateAsync: updateMaterial, isPending: isUpdating } = useUpdateMaterial();
   const { mutateAsync: deleteMaterial, isPending: isDeleting } = useDeleteMaterial();
   const { toast } = useToast();
+  const { setContext } = useAssistantContext();
   const [search, setSearch] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -55,6 +57,20 @@ export default function Materials() {
     m.name.toLowerCase().includes(search.toLowerCase()) || 
     m.category.toLowerCase().includes(search.toLowerCase())
   );
+
+  useEffect(() => {
+    const sample = (filteredMaterials ?? []).slice(0, 8).map((material) => ({
+      id: material.id,
+      name: material.name,
+      category: material.category,
+    }));
+    setContext("materials", {
+      search,
+      totalCount: materials?.length ?? 0,
+      filteredCount: filteredMaterials?.length ?? 0,
+      sample,
+    });
+  }, [materials?.length, filteredMaterials, search, setContext]);
 
   const activeMaterial = useMemo(
     () => materials?.find((material) => material.id === activeMaterialId) || null,

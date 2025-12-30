@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import Plot from "react-plotly.js";
+import { useAssistantContext } from "@/context/assistant-context";
 
 export default function Simulations() {
   const queryClient = useQueryClient();
@@ -31,6 +32,7 @@ export default function Simulations() {
   const { data: geometries } = useGeometries();
   const { mutateAsync: createGeometry, isPending: isUploadingGeometry } = useCreateGeometry();
   const { toast } = useToast();
+  const { setContext } = useAssistantContext();
   const [activeSimulationId, setActiveSimulationId] = useState<number | null>(null);
   const { data: boundaryConditions } = useBoundaryConditions(activeSimulationId ?? undefined);
   const [search, setSearch] = useState("");
@@ -191,6 +193,44 @@ export default function Simulations() {
     });
     return list;
   }, [filteredSimulations, sortKey, sortDir, getMaterialName, getGeometryName]);
+
+  useEffect(() => {
+    const sample = sortedSimulations.slice(0, 8).map((sim) => ({
+      id: sim.id,
+      name: sim.name,
+      status: sim.paramsDirty ? "updated" : sim.status,
+      type: sim.type,
+      material: getMaterialName(sim.materialId),
+      geometry: getGeometryName(sim.geometryId),
+    }));
+    setContext("simulations", {
+      search,
+      filters: {
+        material: materialFilter,
+        geometry: geometryFilter,
+        type: typeFilter,
+        status: statusFilter,
+      },
+      sort: { key: sortKey, direction: sortDir },
+      totalCount: simulations?.length ?? 0,
+      filteredCount: filteredSimulations?.length ?? 0,
+      sample,
+    });
+  }, [
+    search,
+    materialFilter,
+    geometryFilter,
+    typeFilter,
+    statusFilter,
+    sortKey,
+    sortDir,
+    simulations?.length,
+    filteredSimulations?.length,
+    sortedSimulations,
+    setContext,
+    getMaterialName,
+    getGeometryName,
+  ]);
 
   const handleSort = (
     key: "id" | "name" | "type" | "material" | "geometry" | "date" | "status"
