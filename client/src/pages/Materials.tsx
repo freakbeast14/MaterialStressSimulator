@@ -73,6 +73,58 @@ export default function Materials() {
     }
   }, [stressStrainCurve, thermalExpansionCurve]);
 
+  const hasMaterialChanges = useMemo(() => {
+    if (!activeMaterial) return false;
+    const parseSafe = (value: string) => {
+      try {
+        return JSON.parse(value);
+      } catch {
+        return null;
+      }
+    };
+    const normalizeNumber = (value: string | number | null | undefined) => {
+      const num = typeof value === "string" ? Number(value) : value ?? null;
+      return Number.isFinite(num as number) ? num : null;
+    };
+    const draft = {
+      name: name.trim(),
+      category,
+      description,
+      density: normalizeNumber(density),
+      youngsModulus: normalizeNumber(youngsModulus),
+      poissonRatio: normalizeNumber(poissonRatio),
+      thermalConductivity: normalizeNumber(thermalConductivity),
+      meltingPoint: normalizeNumber(meltingPoint),
+      stressStrainCurve: parseSafe(stressStrainCurve),
+      thermalExpansionCurve: parseSafe(thermalExpansionCurve),
+    };
+    const baseline = {
+      name: activeMaterial.name,
+      category: activeMaterial.category,
+      description: activeMaterial.description,
+      density: normalizeNumber(activeMaterial.density),
+      youngsModulus: normalizeNumber(activeMaterial.youngsModulus),
+      poissonRatio: normalizeNumber(activeMaterial.poissonRatio),
+      thermalConductivity: normalizeNumber(activeMaterial.thermalConductivity),
+      meltingPoint: normalizeNumber(activeMaterial.meltingPoint),
+      stressStrainCurve: activeMaterial.stressStrainCurve ?? [],
+      thermalExpansionCurve: activeMaterial.thermalExpansionCurve ?? [],
+    };
+    return JSON.stringify(draft) !== JSON.stringify(baseline);
+  }, [
+    activeMaterial,
+    name,
+    category,
+    description,
+    density,
+    youngsModulus,
+    poissonRatio,
+    thermalConductivity,
+    meltingPoint,
+    stressStrainCurve,
+    thermalExpansionCurve,
+  ]);
+
   const handleCreateMaterial = async () => {
     if (!parsedCurves) {
       toast({
@@ -170,7 +222,17 @@ export default function Materials() {
           thermalExpansionCurve: parsedCurves.thermal,
         },
       });
-      toast({ title: "Material updated", description: "Material saved successfully." });
+      toast({ 
+        title: "Material updated",
+        description: (
+          <span>
+            <span className="font-medium text-foreground italic" title={name}>
+              {truncateName(name, 25)}
+            </span>{" "}
+            saved successfully.
+          </span>
+        ), 
+      });
       setIsEditOpen(false);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to update material.";
@@ -534,7 +596,11 @@ export default function Materials() {
             </div>
 
             <div className="flex justify-end">
-              <Button onClick={handleUpdateMaterial} disabled={isUpdating || !name || !activeMaterial}>
+              <Button
+                onClick={handleUpdateMaterial}
+                disabled={isUpdating || !name || !activeMaterial || !hasMaterialChanges}
+                className="opacity-90 hover:opacity-100 disabled:pointer-events-auto disabled:hover:opacity-50 disabled:cursor-not-allowed"
+              >
                 {isUpdating ? "Saving..." : "Save"}
               </Button>
             </div>
