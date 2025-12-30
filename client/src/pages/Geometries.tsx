@@ -345,7 +345,17 @@ export default function Geometries() {
           data: { name: formState.name },
         });
       }
-      toast({ title: "Geometry updated", description: "Geometry saved successfully." });
+      toast({ 
+        title: "Geometry updated",
+        description: (
+          <span>
+            <span className="font-medium text-foreground italic" title={formState.name}>
+              {truncateName(formState.name, 25)}
+            </span>{" "}
+            saved successfully.
+          </span>
+        ), 
+      });
       setIsEditOpen(false);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to update geometry.";
@@ -632,7 +642,14 @@ export default function Geometries() {
             <div className="flex justify-end">
               <Button
                 onClick={handleUpdate}
-                disabled={isUpdating || !formState.name || !activeGeometry}
+                disabled={
+                  isUpdating ||
+                  !formState.name ||
+                  !activeGeometry ||
+                  (formState.name.trim() === activeGeometry?.name &&
+                    !formState.file)
+                }
+                className="opacity-90 hover:opacity-100 disabled:pointer-events-auto disabled:hover:opacity-50 disabled:cursor-not-allowed"
               >
                 {isUpdating ? "Saving..." : "Save"}
               </Button>
