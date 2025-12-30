@@ -3,6 +3,9 @@ import {
   Bot,
   BotMessageSquare,
   ChevronDown,
+  Minus,
+  Minimize2,
+  Maximize2,
   SendHorizontal,
   User,
   X,
@@ -10,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAssistantContext } from "@/context/assistant-context";
+import { useLocation } from "wouter";
 
 type ChatMessage = {
   role: "user" | "assistant";
@@ -222,19 +226,31 @@ const renderAssistantContent = (content: string) => {
 
 export function AssistantChat() {
   const { page, context } = useAssistantContext();
+  const [location] = useLocation();
   const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState<ChatMessage[]>([
+  const [assistantMuted, setAssistantMuted] = useState(false);
+  const [assistantVolume, setAssistantVolume] = useState(60);
+  const [assistantSound, setAssistantSound] = useState("soft-chime");
+  const [isExpanded, setIsExpanded] = useState(false);
+  const initialMessages: ChatMessage[] = [
     {
       role: "assistant",
       content:
         "Hi! I can help explain features or summarize simulation results. Ask me anything about MatSim.",
     },
-  ]);
+  ];
+  const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const ASSISTANT_SOUND_KEYS = {
+    mute: "matsim.assistant.mute",
+    volume: "matsim.assistant.volume",
+    sound: "matsim.assistant.sound",
+  };
 
   const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
     messagesEndRef.current?.scrollIntoView({ behavior, block: "end" });
@@ -244,6 +260,32 @@ export function AssistantChat() {
     if (!isOpen) return;
     scrollToBottom("smooth");
   }, [messages, isLoading, isOpen]);
+
+  useEffect(() => {
+    setIsOpen(false);
+  }, [location]);
+
+  useEffect(() => {
+    const applySettings = () => {
+      const savedMute = localStorage.getItem(ASSISTANT_SOUND_KEYS.mute);
+      const savedVolume = localStorage.getItem(ASSISTANT_SOUND_KEYS.volume);
+      const savedSound = localStorage.getItem(ASSISTANT_SOUND_KEYS.sound);
+      setAssistantMuted(savedMute === "true");
+      if (savedVolume != null) {
+        const parsed = Number(savedVolume);
+        if (!Number.isNaN(parsed)) setAssistantVolume(parsed);
+      }
+      if (savedSound) setAssistantSound(savedSound);
+    };
+    applySettings();
+    const handler = () => applySettings();
+    window.addEventListener("matsim-assistant-settings", handler);
+    window.addEventListener("storage", handler);
+    return () => {
+      window.removeEventListener("matsim-assistant-settings", handler);
+      window.removeEventListener("storage", handler);
+    };
+  }, []);
 
   const handleScroll = () => {
     const el = scrollContainerRef.current;
@@ -281,6 +323,7 @@ export function AssistantChat() {
           content: data?.answer || "I couldn't generate a response right now.",
         },
       ]);
+      playChime();
     } catch (error) {
       setMessages([
         ...nextMessages,
@@ -289,52 +332,174 @@ export function AssistantChat() {
           content: "Sorry, I hit an error. Please try again.",
         },
       ]);
+      playChime();
     } finally {
       setIsLoading(false);
     }
   };
+  const handleClose = () => {
+    setIsOpen(false);
+    setMessages(initialMessages);
+    setInput("");
+    setIsLoading(false);
+  };
 
-  const normalizedPage = page.startsWith("/") ? page : `/${page}`;
+  const playChime = () => {
+    if (assistantMuted || assistantVolume <= 0) return;
+    const volume = Math.max(0, Math.min(1, assistantVolume / 100));
+    const ctx = audioContextRef.current ?? new AudioContext();
+    audioContextRef.current = ctx;
+    if (ctx.state === "suspended") {
+      ctx.resume();
+    }
+    const now = ctx.currentTime;
+
+    const playOsc = (
+      type: OscillatorType,
+      freq: number,
+      duration: number,
+      gainValue: number,
+      freqEnd?: number
+    ) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, now);
+      if (freqEnd != null) {
+        osc.frequency.exponentialRampToValueAtTime(
+          freqEnd,
+          now + duration
+        );
+      }
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.linearRampToValueAtTime(gainValue, now + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(now + duration + 0.02);
+      osc.onended = () => {
+        osc.disconnect();
+        gain.disconnect();
+      };
+    };
+
+    const playNoise = (duration: number, gainValue: number) => {
+      const bufferSize = Math.max(1, Math.floor(ctx.sampleRate * duration));
+      const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i += 1) {
+        data[i] = (Math.random() * 2 - 1) * 0.4;
+      }
+      const source = ctx.createBufferSource();
+      const gain = ctx.createGain();
+      source.buffer = buffer;
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.linearRampToValueAtTime(gainValue, now + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+      source.connect(gain);
+      gain.connect(ctx.destination);
+      source.start();
+      source.stop(now + duration + 0.02);
+      source.onended = () => {
+        source.disconnect();
+        gain.disconnect();
+      };
+    };
+
+    const level = Math.max(0.03, volume * 0.25);
+    switch (assistantSound) {
+      case "bubble-pop":
+        playOsc("triangle", 700, 0.12, level * 0.6, 220);
+        break;
+      case "paper-tick":
+        playNoise(0.06, level * 0.35);
+        break;
+      case "soft-bell":
+        playOsc("sine", 660, 0.45, level * 0.55);
+        playOsc("triangle", 990, 0.35, level * 0.35);
+        break;
+      case "synth-ping":
+        playOsc("square", 780, 0.18, level * 0.5);
+        break;
+      case "soft-chime":
+      default:
+        playOsc("sine", 880, 0.3, level * 0.55);
+        playOsc("sine", 1320, 0.22, level * 0.35);
+        break;
+    }
+  };
+
+  const pageKey = page.startsWith("/") ? page.slice(1) : page;
+  const normalizedPage = pageKey.toLowerCase();
   const quickPrompts = (() => {
-    if (normalizedPage.startsWith("/compare-simulations")) {
+    if (
+      normalizedPage.startsWith("compare-simulations") ||
+      normalizedPage === "compare-simulations"
+    ) {
       return [
         "Compare the selected simulations.",
+        "Explain the results comparison and weights.",
         "How should I interpret the heatmap?",
         "What does the 3D metrics space show?",
+        "How do the overlay curves help?",
       ];
     }
-    if (
-      normalizedPage.startsWith("/simulations/") &&
-      normalizedPage !== "/simulations/create"
-    ) {
+    if (normalizedPage === "simulation-detail" || normalizedPage.startsWith("simulations/")) {
       return [
         "Summarize this run and the key metrics.",
         "What does the stress-strain chart show?",
         "How do I use the 3D results viewer playback?",
+        "What is an iso-surface vs a slice?",
       ];
     }
-    if (normalizedPage.startsWith("/materials")) {
+    if (normalizedPage === "materials" || normalizedPage.startsWith("materials")) {
       return [
         "How should I compare materials using the charts?",
         "What does the thermal expansion chart tell me?",
+        "What does the stress-strain curve represent?",
       ];
     }
-    if (normalizedPage.startsWith("/geometries")) {
+    if (normalizedPage === "geometries" || normalizedPage.startsWith("geometries")) {
       return [
         "What should I check when choosing a geometry?",
         "What does the STL preview represent?",
+        "How do geometry size and shape affect results?",
       ];
     }
-    if (normalizedPage.startsWith("/simulations")) {
+    if (normalizedPage === "create-simulation" || normalizedPage === "simulations/create") {
+      return [
+        "What are the required inputs to run a simulation?",
+        "How do boundary conditions work on faces?",
+        "What does damping ratio control?",
+      ];
+    }
+    if (normalizedPage === "material-detail") {
+      return [
+        "Summarize this material's key properties.",
+        "How do I interpret the stress-strain chart?",
+        "How does thermal expansion impact tests?",
+      ];
+    }
+    if (normalizedPage === "compare-materials") {
+      return [
+        "Compare selected materials and key differences.",
+        "How do I read the thermal expansion overlay?",
+        "Which material is stiffer based on the curves?",
+      ];
+    }
+    if (normalizedPage.startsWith("simulations")) {
       return [
         "How do I use the filters and sorting on this page?",
         "What do the simulation statuses mean?",
+        "How do I rerun or edit a simulation?",
       ];
     }
-    if (normalizedPage === "/") {
+    if (normalizedPage === "" || normalizedPage === "dashboard") {
       return [
         "What can I do from the dashboard?",
         "How do I start a new simulation?",
+        "What do the status tiles mean?",
       ];
     }
     return ["What can I do on this page?"];
@@ -343,29 +508,61 @@ export function AssistantChat() {
   return (
     <div className="fixed bottom-5 right-5 z-50">
       <div
-        className={`w-[400px] max-w-[90vw] rounded-2xl border border-border bg-white/75 dark:bg-slate-950/70 backdrop-blur-sm dark:backdrop-blur-md shadow-xl overflow-hidden relative transition-all duration-200 ease-out origin-bottom-right ${
+        className={`${
+          isExpanded
+            ? "w-[560px] max-w-[95vw]"
+            : "w-[400px] max-w-[90vw]"
+        } rounded-2xl border border-border bg-white/75 dark:bg-slate-950/70 backdrop-blur-sm dark:backdrop-blur-md shadow-xl overflow-hidden relative transition-all duration-200 ease-out origin-bottom-right ${
           isOpen
             ? "opacity-100 scale-100 translate-y-0 pointer-events-auto"
             : "opacity-0 scale-95 translate-y-3 pointer-events-none hidden"
         }`}
+        aria-hidden={!isOpen}
       >
           <div className="flex items-center justify-between px-4 py-3 border-b border-border">
             <div className="text-sm flex items-center gap-2 font-semibold text-foreground">
               <BotMessageSquare className="h-4 w-4 text-primary" />
               <span>MatSim Assistant</span>
             </div>
-            <button
-              type="button"
-              className="text-muted-foreground p-1 rounded-full hover:text-destructive hover:bg-destructive/15 transition-colors"
-              onClick={() => setIsOpen(false)}
-              aria-label="Close assistant"
-            >
-              <X className="h-4 w-4" />
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                className="text-muted-foreground p-1 rounded-full hover:text-primary hover:bg-primary/10 transition-colors"
+                onClick={() => setIsOpen(false)}
+                aria-label="Minimize assistant"
+                title="Minimize"
+              >
+                <Minus className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                className="text-muted-foreground p-1 rounded-full hover:text-primary hover:bg-primary/10 transition-colors"
+                onClick={() => setIsExpanded((prev) => !prev)}
+                aria-label={isExpanded ? "Restore assistant size" : "Expand assistant"}
+                title={isExpanded ? "Restore" : "Expand"}
+              >
+                {isExpanded ? (
+                  <Minimize2 className="h-4 w-4" />
+                ) : (
+                  <Maximize2 className="h-4 w-4" />
+                )}
+              </button>
+              <button
+                type="button"
+                className="text-muted-foreground p-1 rounded-full hover:text-destructive hover:bg-destructive/15 transition-colors"
+                onClick={handleClose}
+                aria-label="Close assistant"
+                title="End Chat"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
           </div>
           <div
             ref={scrollContainerRef}
-            className="max-h-[360px] overflow-y-auto space-y-3 px-4 pt-8 text-sm relative"
+            className={`${
+              isExpanded ? "max-h-[520px]" : "max-h-[360px]"
+            } overflow-y-auto space-y-3 px-4 pt-8 text-sm relative`}
             onScroll={handleScroll}
           >
             {messages.map((message, index) => {

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
 import { useMaterials, useUpdateMaterial, useDeleteMaterial } from "@/hooks/use-materials";
@@ -58,19 +58,43 @@ export default function Materials() {
     m.category.toLowerCase().includes(search.toLowerCase())
   );
 
-  useEffect(() => {
+  const assistantContext = useMemo(() => {
     const sample = (filteredMaterials ?? []).slice(0, 8).map((material) => ({
       id: material.id,
       name: material.name,
       category: material.category,
     }));
-    setContext("materials", {
+    return {
+      pageSummary:
+        "Browse the material library, compare material behavior using charts, and manage material properties.",
+      sections: ["Material Cards", "Compare Materials"],
+      charts: ["Stress-Strain Comparison", "Thermal Expansion Comparison"],
+      actions: ["Search materials", "Add material", "Edit material", "Delete material"],
       search,
       totalCount: materials?.length ?? 0,
       filteredCount: filteredMaterials?.length ?? 0,
       sample,
-    });
-  }, [materials?.length, filteredMaterials, search, setContext]);
+    };
+  }, [filteredMaterials, materials?.length, search]);
+
+  const assistantContextKey = useMemo(
+    () =>
+      JSON.stringify({
+        search,
+        totalCount: materials?.length ?? 0,
+        filteredCount: filteredMaterials?.length ?? 0,
+        sampleIds: (filteredMaterials ?? []).slice(0, 8).map((material) => material.id),
+      }),
+    [materials?.length, filteredMaterials, search]
+  );
+
+  const assistantContextKeyRef = useRef("");
+
+  useEffect(() => {
+    if (assistantContextKeyRef.current === assistantContextKey) return;
+    assistantContextKeyRef.current = assistantContextKey;
+    setContext("materials", assistantContext);
+  }, [assistantContext, assistantContextKey, setContext]);
 
   const activeMaterial = useMemo(
     () => materials?.find((material) => material.id === activeMaterialId) || null,

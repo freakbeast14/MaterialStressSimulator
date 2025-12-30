@@ -11,6 +11,9 @@ const STORAGE_KEYS = {
   refresh: "matsim.refreshInterval",
   defaultType: "matsim.defaultSimType",
   notifications: "matsim.notifications",
+  assistantMute: "matsim.assistant.mute",
+  assistantVolume: "matsim.assistant.volume",
+  assistantSound: "matsim.assistant.sound",
 };
 
 export default function Settings() {
@@ -20,16 +23,28 @@ export default function Settings() {
   const [refreshInterval, setRefreshInterval] = useState("10");
   const [defaultSimType, setDefaultSimType] = useState("Tensile Test");
   const [notifications, setNotifications] = useState(true);
+  const [assistantMuted, setAssistantMuted] = useState(false);
+  const [assistantVolume, setAssistantVolume] = useState(60);
+  const [assistantSound, setAssistantSound] = useState("soft-chime");
 
   useEffect(() => {
     const savedUnits = localStorage.getItem(STORAGE_KEYS.units);
     const savedRefresh = localStorage.getItem(STORAGE_KEYS.refresh);
     const savedType = localStorage.getItem(STORAGE_KEYS.defaultType);
     const savedNotifications = localStorage.getItem(STORAGE_KEYS.notifications);
+    const savedAssistantMute = localStorage.getItem(STORAGE_KEYS.assistantMute);
+    const savedAssistantVolume = localStorage.getItem(STORAGE_KEYS.assistantVolume);
+    const savedAssistantSound = localStorage.getItem(STORAGE_KEYS.assistantSound);
     if (savedUnits) setUnits(savedUnits);
     if (savedRefresh) setRefreshInterval(savedRefresh);
     if (savedType) setDefaultSimType(savedType);
     if (savedNotifications) setNotifications(savedNotifications === "true");
+    if (savedAssistantMute) setAssistantMuted(savedAssistantMute === "true");
+    if (savedAssistantVolume) {
+      const parsed = Number(savedAssistantVolume);
+      if (!Number.isNaN(parsed)) setAssistantVolume(parsed);
+    }
+    if (savedAssistantSound) setAssistantSound(savedAssistantSound);
   }, []);
 
   useEffect(() => {
@@ -37,7 +52,22 @@ export default function Settings() {
     localStorage.setItem(STORAGE_KEYS.refresh, refreshInterval);
     localStorage.setItem(STORAGE_KEYS.defaultType, defaultSimType);
     localStorage.setItem(STORAGE_KEYS.notifications, String(notifications));
-  }, [units, refreshInterval, defaultSimType, notifications]);
+    localStorage.setItem(STORAGE_KEYS.assistantMute, String(assistantMuted));
+    localStorage.setItem(
+      STORAGE_KEYS.assistantVolume,
+      String(assistantVolume)
+    );
+    localStorage.setItem(STORAGE_KEYS.assistantSound, assistantSound);
+    window.dispatchEvent(new Event("matsim-assistant-settings"));
+  }, [
+    units,
+    refreshInterval,
+    defaultSimType,
+    notifications,
+    assistantMuted,
+    assistantVolume,
+    assistantSound,
+  ]);
 
 
   return (
@@ -111,6 +141,57 @@ export default function Settings() {
                 <p className="text-xs text-muted-foreground">Notify on completion/failure.</p>
               </div>
               <Switch checked={notifications} onCheckedChange={setNotifications} />
+            </div>
+
+            <div className="space-y-2 pt-2 border-t border-border/60">
+              <Label className="text-sm">Assistant Sounds</Label>
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label className="text-xs">Mute assistant</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Disable chat reply sounds.
+                  </p>
+                </div>
+                <Switch
+                  checked={assistantMuted}
+                  onCheckedChange={setAssistantMuted}
+                />
+              </div>
+              <div>
+                <div className="flex justify-between items-center">
+                  <Label className="text-xs">Volume</Label>
+                  <p className="text-[11px] text-muted-foreground">
+                    {assistantMuted ? "Muted" : `${assistantVolume}%`}
+                  </p>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  step={5}
+                  value={assistantVolume}
+                  onChange={(event) =>
+                    setAssistantVolume(Number(event.target.value))
+                  }
+                  className="w-full accent-primary"
+                  disabled={assistantMuted}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs">Reply sound</Label>
+                <Select value={assistantSound} onValueChange={setAssistantSound}>
+                  <SelectTrigger disabled={assistantMuted}>
+                    <SelectValue placeholder="Select sound" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="soft-chime">Soft chime</SelectItem>
+                    <SelectItem value="bubble-pop">Bubble pop</SelectItem>
+                    <SelectItem value="paper-tick">Paper tick</SelectItem>
+                    <SelectItem value="soft-bell">Soft bell</SelectItem>
+                    <SelectItem value="synth-ping">Tiny synth ping</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
         </div>

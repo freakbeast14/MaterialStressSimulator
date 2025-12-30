@@ -31,11 +31,23 @@ MatSim is a finite-element simulation workspace for materials and geometries. Yo
 - Key metrics:
   - Max/avg/min stress, stress range.
   - Max deformation, max/avg strain, safety factor.
+- Mesh Outputs:
+  - Shows generated mesh artifacts (VTU/XML) for the run.
+  - Use download buttons to inspect meshes in tools like ParaView.
+  - Source indicates the solver that produced the mesh; warnings may appear if formats are legacy.
 - Tabs/graphs:
   - Stress-Strain Curve.
   - Stress Distribution.
   - 3D Stress-Displacement Surface.
   - 3D Results Viewer (iso-surface, slice, volume).
+- Chart/controls guidance:
+  - Stress-Strain Curve: shows material response; slope indicates stiffness, curve shape shows yielding/softening.
+  - Stress Distribution: shows how stress and displacement evolve over time.
+  - 3D Results Viewer: interactive field view of stress/displacement with playback controls.
+  - Playback: scrub through time steps to inspect peaks and transient behavior.
+  - Iso-surface: highlights regions above a stress threshold.
+  - Slice: shows a cross-section of the field to inspect internal gradients.
+  - Volume: semi-transparent rendering for overall distribution.
 - Use cases: interpret results, diagnose high-stress areas, verify design limits.
 
 ## Create Simulation
@@ -61,6 +73,7 @@ MatSim is a finite-element simulation workspace for materials and geometries. Yo
 - Results comparison tabs:
   - Stress-strain overlays: compare material response curves across runs.
   - Geometry overlays: compare mesh/geometry previews for selected runs.
+  - Results comparison: weighted scoring view that blends stress, safety factor, and deformation.
 - Charts:
   - Results Comparison: weighted ranking view that blends stress, safety factor, and deformation using adjustable weights.
   - Overlay curves: compare time-series stress/displacement traces on shared axes and stress-strain overlays to compare material response curves across run.
@@ -85,6 +98,13 @@ MatSim is a finite-element simulation workspace for materials and geometries. Yo
 - Geometry detail:
   - Preview and metadata.
 - Use cases: manage shapes used across simulations and ensure correct geometry input.
+
+## Core Concepts (MatSim-specific)
+- Stress: internal force intensity (MPa); higher values indicate higher load concentration.
+- Strain: deformation per length (dimensionless or microstrain); indicates how much the material stretches.
+- Safety factor: allowable stress divided by max stress; higher is safer.
+- Deformation: maximum displacement magnitude; indicates deflection under load.
+- Boundary conditions: fixed supports and applied loads that define how the part is constrained.
 
 ## Settings
 - Theme: dark mode toggle.

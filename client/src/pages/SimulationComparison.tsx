@@ -112,22 +112,43 @@ export default function SimulationComparison() {
       }),
     [selected, materials, geometries]
   );
-  const contextKeyRef = useRef<string>("");
-  useEffect(() => {
-    const contextValue = {
+  const assistantContext = useMemo(
+    () => ({
+      pageSummary:
+        "Select completed runs to compare key metrics, overlay curves, and evaluate weighted rankings.",
+      tabs: ["Results Comparison", "Overlay Curves", "Heatmap", "3D Metrics Space"],
+      activeTab,
+      charts: [
+        "Results Comparison (bars + line)",
+        "Overlay Stress-Time",
+        "Overlay Stress-Strain",
+        "Heatmap (stress/def/safety)",
+        "3D Metrics Space",
+      ],
+      weights,
       selectedCount: selected.length,
       selected: selectedForContext,
-      weights,
-    };
-    const nextKey = JSON.stringify({
-      selectedIds: selectedForContext.map((sim) => sim.id),
-      weights,
-      count: selected.length,
-    });
-    if (contextKeyRef.current === nextKey) return;
-    contextKeyRef.current = nextKey;
-    setContext("compare-simulations", contextValue);
-  }, [selected.length, selectedForContext, weights, setContext]);
+    }),
+    [activeTab, selected.length, selectedForContext, weights]
+  );
+
+  const assistantContextKey = useMemo(
+    () =>
+      JSON.stringify({
+        activeTab,
+        selectedIds: selectedForContext.map((sim) => sim.id),
+        weights,
+        count: selected.length,
+      }),
+    [activeTab, selected.length, selectedForContext, weights]
+  );
+
+  const contextKeyRef = useRef<string>("");
+  useEffect(() => {
+    if (contextKeyRef.current === assistantContextKey) return;
+    contextKeyRef.current = assistantContextKey;
+    setContext("compare-simulations", assistantContext);
+  }, [assistantContext, assistantContextKey, setContext]);
 
   // Prepare data for 3D surface plot
   const prepare3DData = () => {

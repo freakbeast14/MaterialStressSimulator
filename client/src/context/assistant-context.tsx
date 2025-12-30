@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useMemo, useState } from "react";
+import React, { createContext, useCallback, useContext, useMemo, useRef, useState } from "react";
 
 type AssistantContextState = {
   page: string;
@@ -16,11 +16,23 @@ export function AssistantProvider({ children }: { children: React.ReactNode }) {
     page: "unknown",
     context: null,
   });
+  const contextKeyRef = useRef<string>("");
+
+  const buildContextKey = (page: string, context: Record<string, unknown> | null) => {
+    if (!context) return `${page}::null`;
+    try {
+      return `${page}::${JSON.stringify(context)}`;
+    } catch {
+      return `${page}::${Object.keys(context).join("|")}`;
+    }
+  };
 
   const setContext = useCallback(
     (page: string, context: Record<string, unknown> | null) => {
       setState((prev) => {
-        if (prev.page === page && prev.context === context) return prev;
+        const nextKey = buildContextKey(page, context);
+        if (contextKeyRef.current === nextKey) return prev;
+        contextKeyRef.current = nextKey;
         return { page, context };
       });
     },

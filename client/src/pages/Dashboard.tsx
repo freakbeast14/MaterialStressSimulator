@@ -248,6 +248,10 @@ export default function Dashboard() {
 
   const assistantContext = useMemo(() => {
     return {
+      pageSummary:
+        "High-level overview of simulations, materials, and geometries with quick links to create or explore.",
+      sections: ["Status Tiles", "Recent Simulations", "Materials", "Geometries"],
+      actions: ["Create Simulation", "View All Simulations", "View All Materials", "View All Geometries"],
       totals: {
         materials: materials?.length ?? 0,
         geometries: geometries?.length ?? 0,

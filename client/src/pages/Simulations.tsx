@@ -7,7 +7,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { ArrowDown, ArrowUp, ArrowUpDown, Eye, Filter, Pause, Pencil, Play, Search, Trash2, MinusCircle, PlusCircle, Zap } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -194,7 +194,7 @@ export default function Simulations() {
     return list;
   }, [filteredSimulations, sortKey, sortDir, getMaterialName, getGeometryName]);
 
-  useEffect(() => {
+  const assistantContext = useMemo(() => {
     const sample = sortedSimulations.slice(0, 8).map((sim) => ({
       id: sim.id,
       name: sim.name,
@@ -203,7 +203,11 @@ export default function Simulations() {
       material: getMaterialName(sim.materialId),
       geometry: getGeometryName(sim.geometryId),
     }));
-    setContext("simulations", {
+    return {
+      pageSummary:
+        "Browse and manage simulation runs with filters, sorting, and actions for edit, rerun, and delete.",
+      tableColumns: ["ID", "Name", "Test Type", "Material", "Geometry", "Status", "Date"],
+      actions: ["View", "Edit", "Run", "Pause/Cancel", "Delete"],
       search,
       filters: {
         material: materialFilter,
@@ -215,7 +219,7 @@ export default function Simulations() {
       totalCount: simulations?.length ?? 0,
       filteredCount: filteredSimulations?.length ?? 0,
       sample,
-    });
+    };
   }, [
     search,
     materialFilter,
@@ -227,10 +231,46 @@ export default function Simulations() {
     simulations?.length,
     filteredSimulations?.length,
     sortedSimulations,
-    setContext,
     getMaterialName,
     getGeometryName,
   ]);
+
+  const assistantContextKey = useMemo(
+    () =>
+      JSON.stringify({
+        search,
+        filters: {
+          material: materialFilter,
+          geometry: geometryFilter,
+          type: typeFilter,
+          status: statusFilter,
+        },
+        sort: { key: sortKey, direction: sortDir },
+        totalCount: simulations?.length ?? 0,
+        filteredCount: filteredSimulations?.length ?? 0,
+        sampleIds: sortedSimulations.slice(0, 8).map((sim) => sim.id),
+      }),
+    [
+      search,
+      materialFilter,
+      geometryFilter,
+      typeFilter,
+      statusFilter,
+      sortKey,
+      sortDir,
+      simulations?.length,
+      filteredSimulations?.length,
+      sortedSimulations,
+    ]
+  );
+
+  const assistantContextKeyRef = useRef("");
+
+  useEffect(() => {
+    if (assistantContextKeyRef.current === assistantContextKey) return;
+    assistantContextKeyRef.current = assistantContextKey;
+    setContext("simulations", assistantContext);
+  }, [assistantContext, assistantContextKey, setContext]);
 
   const handleSort = (
     key: "id" | "name" | "type" | "material" | "geometry" | "date" | "status"

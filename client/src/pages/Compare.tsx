@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMaterials } from "@/hooks/use-materials";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -28,8 +28,10 @@ export default function Compare({ embedded = false }: CompareProps) {
   // Here we assume strain points are consistent or we just overlay them visually
   const selectedMaterials = materials?.filter(m => selectedIds.includes(m.id)) || [];
 
-  useEffect(() => {
-    setContext("compare-materials", {
+  const assistantContext = useMemo(
+    () => ({
+      pageSummary:
+        "Compare materials by overlaying their stress-strain and thermal expansion curves.",
       selectedCount: selectedMaterials.length,
       selected: selectedMaterials.slice(0, 8).map((mat) => ({
         id: mat.id,
@@ -40,8 +42,31 @@ export default function Compare({ embedded = false }: CompareProps) {
         poissonRatio: mat.poissonRatio,
         meltingPoint: mat.meltingPoint,
       })),
-    });
-  }, [selectedMaterials, setContext]);
+      charts: ["Stress-Strain Comparison", "Thermal Expansion Comparison"],
+      interactions: [
+        "Select materials from the list to overlay curves.",
+        "Export chart as SVG.",
+      ],
+    }),
+    [selectedMaterials]
+  );
+
+  const assistantContextKey = useMemo(
+    () =>
+      JSON.stringify({
+        selectedIds: selectedMaterials.map((mat) => mat.id),
+        selectedCount: selectedMaterials.length,
+      }),
+    [selectedMaterials]
+  );
+
+  const assistantContextKeyRef = useRef("");
+
+  useEffect(() => {
+    if (assistantContextKeyRef.current === assistantContextKey) return;
+    assistantContextKeyRef.current = assistantContextKey;
+    setContext("compare-materials", assistantContext);
+  }, [assistantContext, assistantContextKey, setContext]);
 
   const colors = [
     "hsl(var(--primary))",

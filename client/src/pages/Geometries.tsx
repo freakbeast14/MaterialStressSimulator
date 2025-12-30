@@ -203,21 +203,36 @@ export default function Geometries() {
     [filteredGeometries]
   );
 
-  useEffect(() => {
-    const sample = assistantSample;
-    const totalCount = geometries?.length ?? 0;
-    const filteredCount = filteredGeometries.length;
-    const contextPayload = { search, totalCount, filteredCount, sample };
-    const key = JSON.stringify({
+  const assistantContext = useMemo(
+    () => ({
+      pageSummary:
+        "Manage geometry assets, preview STL shapes, and upload new geometry files for simulations.",
+      sections: ["Geometry Cards", "STL Preview", "Upload Geometry"],
+      actions: ["Search geometries", "Add geometry", "Edit geometry", "Delete geometry"],
       search,
-      totalCount,
-      filteredCount,
-      ids: sample.map((item) => item.id),
-    });
-    if (contextKeyRef.current === key) return;
-    contextKeyRef.current = key;
-    setContext("geometries", contextPayload);
-  }, [assistantSample, geometries?.length, filteredGeometries.length, search, setContext]);
+      totalCount: geometries?.length ?? 0,
+      filteredCount: filteredGeometries.length,
+      sample: assistantSample,
+    }),
+    [assistantSample, filteredGeometries.length, geometries?.length, search]
+  );
+
+  const assistantContextKey = useMemo(
+    () =>
+      JSON.stringify({
+        search,
+        totalCount: geometries?.length ?? 0,
+        filteredCount: filteredGeometries.length,
+        ids: assistantSample.map((item) => item.id),
+      }),
+    [assistantSample, filteredGeometries.length, geometries?.length, search]
+  );
+
+  useEffect(() => {
+    if (contextKeyRef.current === assistantContextKey) return;
+    contextKeyRef.current = assistantContextKey;
+    setContext("geometries", assistantContext);
+  }, [assistantContext, assistantContextKey, setContext]);
 
   const activeGeometry = useMemo(
     () => geometries?.find((geometry) => geometry.id === activeGeometryId) || null,

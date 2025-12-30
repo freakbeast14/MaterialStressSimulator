@@ -291,6 +291,26 @@ export default function SimulationDetail() {
   const assistantContext = useMemo(() => {
     if (!simulation) return null;
     return {
+      pageSummary:
+        "Inspect a simulation run, review key metrics, and explore time-series and 3D results.",
+      tabs: [
+        "Summary",
+        "Time Series",
+        "3D Results Viewer",
+        "3D Surface",
+      ],
+      charts: [
+        "Stress-Strain Curve",
+        "Stress Over Time",
+        "Displacement Over Time",
+        "3D Stress-Displacement Surface",
+      ],
+      viewerControls: {
+        viewMode: fieldViewMode,
+        sliceAxis,
+        intensityThreshold: fieldThreshold,
+        playbackEnabled: timeSeriesData.length > 0,
+      },
       simulation: {
         id: simulation.id,
         name: simulation.name,
@@ -335,6 +355,9 @@ export default function SimulationDetail() {
     bcItems,
     timeSeriesData,
     stressStrainData,
+    fieldViewMode,
+    sliceAxis,
+    fieldThreshold,
   ]);
 
   const assistantContextKey = useMemo(() => {
@@ -349,6 +372,9 @@ export default function SimulationDetail() {
       boundaryConditions: assistantContext.boundaryConditions,
       timeSeriesCount: assistantContext.timeSeriesSample.length,
       stressStrainCount: assistantContext.stressStrainSample.length,
+      viewMode: assistantContext.viewerControls.viewMode,
+      sliceAxis: assistantContext.viewerControls.sliceAxis,
+      threshold: assistantContext.viewerControls.intensityThreshold,
     });
   }, [assistantContext]);
 
