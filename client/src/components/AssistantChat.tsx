@@ -506,190 +506,198 @@ export function AssistantChat() {
   })();
 
   return (
-    <div className="fixed bottom-5 right-5 z-50">
+    <>
       <div
-        className={`${
-          isExpanded
-            ? "w-[560px] max-w-[95vw]"
-            : "w-[400px] max-w-[90vw]"
-        } rounded-2xl border border-border bg-white/75 dark:bg-slate-950/70 backdrop-blur-sm dark:backdrop-blur-md shadow-xl overflow-hidden relative transition-all duration-200 ease-out origin-bottom-right ${
-          isOpen
-            ? "opacity-100 scale-100 translate-y-0 pointer-events-auto"
-            : "opacity-0 scale-95 translate-y-3 pointer-events-none hidden"
+        className={`fixed bottom-5 right-5 z-50 ${
+          isOpen ? "pointer-events-auto" : "pointer-events-none"
         }`}
-        aria-hidden={!isOpen}
       >
-          <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-            <div className="text-sm flex items-center gap-2 font-semibold text-foreground">
-              <BotMessageSquare className="h-4 w-4 text-primary" />
-              <span>MatSim Assistant</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                className="text-muted-foreground p-1 rounded-full hover:text-primary hover:bg-primary/10 transition-colors"
-                onClick={() => setIsOpen(false)}
-                aria-label="Minimize assistant"
-                title="Minimize"
-              >
-                <Minus className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                className="text-muted-foreground p-1 rounded-full hover:text-primary hover:bg-primary/10 transition-colors"
-                onClick={() => setIsExpanded((prev) => !prev)}
-                aria-label={isExpanded ? "Restore assistant size" : "Expand assistant"}
-                title={isExpanded ? "Restore" : "Expand"}
-              >
-                {isExpanded ? (
-                  <Minimize2 className="h-4 w-4" />
-                ) : (
-                  <Maximize2 className="h-4 w-4" />
-                )}
-              </button>
-              <button
-                type="button"
-                className="text-muted-foreground p-1 rounded-full hover:text-destructive hover:bg-destructive/15 transition-colors"
-                onClick={handleClose}
-                aria-label="Close assistant"
-                title="End Chat"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-          <div
-            ref={scrollContainerRef}
-            className={`${
-              isExpanded ? "max-h-[520px]" : "max-h-[360px]"
-            } overflow-y-auto space-y-3 px-4 pt-8 text-sm relative`}
-            onScroll={handleScroll}
-          >
-            {messages.map((message, index) => {
-              const isAssistant = message.role === "assistant";
-              return (
-                <div
-                  key={`${message.role}-${index}`}
-                  className={`flex w-full items-end gap-2 ${
-                    isAssistant ? "justify-start" : "justify-end"
-                  }`}
+        <div
+          className={`${
+            isExpanded
+              ? "w-[560px] max-w-[95vw]"
+              : "w-[400px] max-w-[90vw]"
+          } rounded-2xl border border-border bg-white/75 dark:bg-slate-950/70 backdrop-blur-sm dark:backdrop-blur-md shadow-xl overflow-hidden relative transition-all duration-200 ease-out origin-bottom-right ${
+            isOpen
+              ? "opacity-100 scale-100 translate-y-0 pointer-events-auto"
+              : "opacity-0 scale-50 translate-y-3 pointer-events-none"
+          }`}
+          // aria-hidden={!isOpen}
+        >
+            <div className="flex items-center justify-between p-3 border-b border-border">
+              <div className="text-sm flex items-center gap-2 font-semibold text-foreground">
+                <BotMessageSquare className="h-4 w-4 text-primary" />
+                <span>MatSim Assistant</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  className="text-muted-foreground p-1 rounded-sm hover:text-indigo-500 hover:bg-indigo-500/10 transition-colors"
+                  onClick={() => setIsOpen(false)}
+                  aria-label="Minimize assistant"
+                  title="Minimize"
                 >
-                  {isAssistant && (
-                    <div className="h-7 w-7 rounded-full bg-primary/20 text-primary flex items-center justify-center">
-                      <BotMessageSquare className="h-3.5 w-3.5" />
-                    </div>
+                  <Minus className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  className="text-muted-foreground p-1 rounded-sm hover:text-orange-500 hover:bg-orange-500/10 transition-colors"
+                  onClick={() => setIsExpanded((prev) => !prev)}
+                  aria-label={isExpanded ? "Restore assistant size" : "Expand assistant"}
+                  title={isExpanded ? "Restore" : "Expand"}
+                >
+                  {isExpanded ? (
+                    <Minimize2 className="h-4 w-4" />
+                  ) : (
+                    <Maximize2 className="h-4 w-4" />
                   )}
+                </button>
+                <button
+                  type="button"
+                  className="text-muted-foreground p-1 rounded-sm hover:text-destructive hover:bg-destructive/15 transition-colors"
+                  onClick={handleClose}
+                  aria-label="Close assistant"
+                  title="End Chat"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+            <div
+              ref={scrollContainerRef}
+              className={`${
+                isExpanded ? "max-h-[520px]" : "max-h-[360px]"
+              } overflow-y-auto space-y-3 px-4 pt-8 text-sm relative`}
+              onScroll={handleScroll}
+            >
+              {messages.map((message, index) => {
+                const isAssistant = message.role === "assistant";
+                return (
                   <div
-                    className={
-                      isAssistant
-                        ? "max-w-[75%] rounded-xl rounded-bl-none bg-primary/10 px-4 py-3 -translate-y-[20px] text-foreground text-xs space-y-2"
-                        : "max-w-[75%] rounded-xl rounded-br-none bg-muted/50 px-4 py-3 -translate-y-[20px] text-foreground text-xs"
-                    }
+                    key={`${message.role}-${index}`}
+                    className={`flex w-full items-end gap-2 ${
+                      isAssistant ? "justify-start" : "justify-end"
+                    }`}
                   >
-                    {isAssistant
-                      ? renderAssistantContent(message.content)
-                      : message.content}
-                  </div>
-                  {!isAssistant && (
-                    <div className="h-7 w-7 rounded-full bg-muted text-muted-foreground flex items-center justify-center">
-                      <User className="h-3.5 w-3.5" />
+                    {isAssistant && (
+                      <div className="h-7 w-7 rounded-full bg-primary/20 text-primary flex items-center justify-center">
+                        <BotMessageSquare className="h-3.5 w-3.5" />
+                      </div>
+                    )}
+                    <div
+                      className={
+                        isAssistant
+                          ? "max-w-[75%] rounded-xl rounded-bl-none bg-primary/10 px-4 py-3 -translate-y-[20px] text-foreground text-xs space-y-2"
+                          : "max-w-[75%] rounded-xl rounded-br-none bg-muted/50 px-4 py-3 -translate-y-[20px] text-foreground text-xs"
+                      }
+                    >
+                      {isAssistant
+                        ? renderAssistantContent(message.content)
+                        : message.content}
                     </div>
-                  )}
-                </div>
-              );
-            })}
-            {isLoading && (
-              <div className="flex w-full items-end gap-2 justify-start">
-                <div className="h-7 w-7 rounded-full bg-primary/20 text-primary flex items-center justify-center translate-y-4">
-                  <BotMessageSquare className="h-3.5 w-3.5" />
-                </div>
-                <div className="max-w-[75%] rounded-xl rounded-bl-sm bg-primary/10 px-4 py-3 text-foreground text-xs">
-                  <div className="flex items-center gap-1">
-                    <span className="h-1.5 w-1.5 rounded-full bg-foreground/60 animate-pulse" />
-                    <span
-                      className="h-1.5 w-1.5 rounded-full bg-foreground/60 animate-pulse"
-                      style={{ animationDelay: "0.15s" }}
-                    />
-                    <span
-                      className="h-1.5 w-1.5 rounded-full bg-foreground/60 animate-pulse"
-                      style={{ animationDelay: "0.3s" }}
-                    />
+                    {!isAssistant && (
+                      <div className="h-7 w-7 rounded-full bg-muted text-muted-foreground flex items-center justify-center">
+                        <User className="h-3.5 w-3.5" />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+              {isLoading && (
+                <div className="flex w-full items-end gap-2 justify-start">
+                  <div className="h-7 w-7 rounded-full bg-primary/20 text-primary flex items-center justify-center translate-y-4">
+                    <BotMessageSquare className="h-3.5 w-3.5" />
+                  </div>
+                  <div className="max-w-[75%] rounded-xl rounded-bl-sm bg-primary/10 px-4 py-3 text-foreground text-xs">
+                    <div className="flex items-center gap-1">
+                      <span className="h-1.5 w-1.5 rounded-full bg-foreground/60 animate-pulse" />
+                      <span
+                        className="h-1.5 w-1.5 rounded-full bg-foreground/60 animate-pulse"
+                        style={{ animationDelay: "0.15s" }}
+                      />
+                      <span
+                        className="h-1.5 w-1.5 rounded-full bg-foreground/60 animate-pulse"
+                        style={{ animationDelay: "0.3s" }}
+                      />
+                    </div>
                   </div>
                 </div>
+              )}
+              <div
+                ref={messagesEndRef}
+              />
+            </div>
+            {showScrollToBottom && (
+              <div className="flex justify-center absolute w-full -translate-y-8">
+                <button
+                  type="button"
+                  className="h-8 w-8 rounded-full border border-border bg-primary/10 shadow-sm text-muted-foreground hover:text-foreground hover:border-primary/40 absolute right-[22px]"
+                  onClick={() => scrollToBottom("smooth")}
+                  aria-label="Scroll to latest message"
+                  title="Go to latest chat"
+                >
+                  <ChevronDown className="h-4 w-4 mx-auto" />
+                </button>
               </div>
             )}
-            <div
-              ref={messagesEndRef}
-            />
-          </div>
-          {showScrollToBottom && (
-            <div className="flex justify-center absolute w-full -translate-y-8">
-              <button
-                type="button"
-                className="h-8 w-8 rounded-full border border-border bg-primary/10 shadow-sm text-muted-foreground hover:text-foreground hover:border-primary/40 absolute right-[22px]"
-                onClick={() => scrollToBottom("smooth")}
-                aria-label="Scroll to latest message"
-                title="Go to latest chat"
-              >
-                <ChevronDown className="h-4 w-4 mx-auto" />
-              </button>
+            <div className="flex flex-wrap gap-2 px-4 py-3">
+              {quickPrompts.map((prompt) => (
+                <button
+                  key={prompt}
+                  type="button"
+                  className="rounded-full border border-border bg-background px-3 py-1 text-[11px] text-muted-foreground hover:text-foreground hover:border-primary/40 hover:bg-primary/5 transition-colors disabled:hover:text-muted-foreground disabled:hover:bg-background disabled:hover:border-border disabled:opacity-70 disabled:cursor-not-allowed"
+                  onClick={() => handleSend(prompt)}
+                  disabled={isLoading}
+                >
+                  {prompt}
+                </button>
+              ))}
             </div>
-          )}
-          <div className="flex flex-wrap gap-2 px-4 py-3">
-            {quickPrompts.map((prompt) => (
-              <button
-                key={prompt}
-                type="button"
-                className="rounded-full border border-border bg-background px-3 py-1 text-[11px] text-muted-foreground hover:text-foreground hover:border-primary/40 hover:bg-primary/5 transition-colors disabled:hover:text-muted-foreground disabled:hover:bg-background disabled:hover:border-border disabled:opacity-70 disabled:cursor-not-allowed"
-                onClick={() => handleSend(prompt)}
-                disabled={isLoading}
+            <div className="flex items-center gap-2 border-t border-border px-3 py-3">
+              <Input
+                placeholder="Ask about this page or results..."
+                className="text-xs placeholder:text-xs"
+                value={input}
+                onChange={(event) => setInput(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") handleSend();
+                }}
+              />
+              <Button 
+                size="icon" 
+                onClick={() => handleSend()} 
+                disabled={isLoading || !input}
+                className={`opacity-90 hover:opacity-100 disabled:pointer-events-auto disabled:hover:opacity-50 disabled:cursor-not-allowed ${!isOpen ? "!pointer-events-none" : ""}`}
               >
-                {prompt}
-              </button>
-            ))}
-          </div>
-          <div className="flex items-center gap-2 border-t border-border px-3 py-3">
-            <Input
-              placeholder="Ask about this page or results..."
-              className="text-xs placeholder:text-xs"
-              value={input}
-              onChange={(event) => setInput(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") handleSend();
-              }}
-            />
-            <Button 
-              size="icon" 
-              onClick={() => handleSend()} 
-              disabled={isLoading || !input}
-              className="opacity-90 hover:opacity-100 disabled:pointer-events-auto disabled:hover:opacity-50 disabled:cursor-not-allowed"
-            >
-              <SendHorizontal className="h-4 w-4" />
-            </Button>
-          </div>
-      </div>
-      <div
-        className={`absolute bottom-0 right-0 transition-all duration-200 ease-out ${
-          isOpen
-            ? "opacity-0 scale-90 translate-y-2 pointer-events-none"
-            : "opacity-100 scale-100 translate-y-0 pointer-events-auto"
-        }`}
-      >
-        <div className="relative group">
-          <Button
-            className="rounded-full h-12 w-12 shadow-lg"
-            onClick={() => setIsOpen(true)}
-          >
-            <BotMessageSquare className="!h-6 !w-6" />
-          </Button>
-          <span className="pointer-events-none absolute bottom-full -left-5 mb-3 w-max -translate-x-1/2 translate-y-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-            <span className="relative rounded-lg bg-slate-900 px-4 py-2 text-xs font-semibold text-white shadow-lg">
-              MatSim Assistant
-              <span className="absolute right-2.5 top-full h-3 w-3 -translate-x-1/2 -translate-y-1/2 rotate-45 bg-slate-900" />
-            </span>
-          </span>
+                <SendHorizontal className="h-4 w-4" />
+              </Button>
+            </div>
         </div>
       </div>
-    </div>
+      <div className="fixed bottom-5 right-5 z-50">
+        <div
+          className={`absolute bottom-0 right-0 transition-all duration-200 ease-out ${
+            isOpen
+              ? "opacity-0 scale-80 translate-y-2 translate-x-2 pointer-events-none"
+              : "opacity-100 scale-100 translate-y-0 translate-x-0 pointer-events-auto"
+          }`}
+        >
+          <div className="relative group">
+            <Button
+              className="rounded-full h-12 w-12 shadow-lg"
+              onClick={() => setIsOpen(true)}
+            >
+              <BotMessageSquare className="!h-6 !w-6" />
+            </Button>
+            <span className="pointer-events-none absolute bottom-full -left-5 mb-3 w-max -translate-x-1/2 translate-y-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+              <span className="relative rounded-lg bg-slate-900 px-4 py-2 text-xs font-semibold text-white shadow-lg">
+                MatSim Assistant
+                <span className="absolute right-2.5 top-full h-3 w-3 -translate-x-1/2 -translate-y-1/2 rotate-45 bg-slate-900" />
+              </span>
+            </span>
+          </div>
+        </div>
+      </div>
+    </>
   );
 }
