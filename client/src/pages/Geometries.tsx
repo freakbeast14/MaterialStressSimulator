@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useGeometries, useCreateGeometry, useUpdateGeometry, useDeleteGeometry } from "@/hooks/use-geometries";
 import { useToast } from "@/hooks/use-toast";
-import { Search, Pencil, Plus, Trash2 } from "lucide-react";
+import { Download, Pencil, Plus, Search, Trash2, Box } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -385,6 +385,33 @@ export default function Geometries() {
     setIsDeleteOpen(true);
   };
 
+  const handleDownload = async (geometry: typeof geometries[number]) => {
+    try {
+      const res = await fetch(`/api/geometries/${geometry.id}/content`);
+      if (!res.ok) throw new Error("Failed to download geometry");
+      const data = await res.json();
+      const raw = data.contentBase64 || "";
+      const [header, base64] = raw.includes(",") ? raw.split(",", 2) : ["", raw];
+      const mimeMatch = header.match(/data:(.*);base64/);
+      const mimeType = mimeMatch?.[1] || "application/octet-stream";
+      const binary = atob(base64);
+      const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+      const blob = new Blob([bytes], { type: mimeType });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      const fallbackName = `${geometry.name}.${geometry.format || "stl"}`;
+      link.href = url;
+      link.download = data.name || geometry.originalName || fallbackName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to download geometry.";
+      toast({ title: "Download failed", description: message, variant: "destructive" });
+    }
+  };
+
   const confirmDelete = async () => {
     if (!deleteTarget) return;
     try {
@@ -416,14 +443,26 @@ export default function Geometries() {
           <h1 className="text-3xl font-display font-bold text-foreground">Geometry Library</h1>
           <p className="text-muted-foreground mt-1">Manage geometry files used in simulations.</p>
         </div>
-        <div className="relative w-full sm:w-72">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search geometries..."
-            className="pl-9 bg-card"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-          />
+        <div className="flex w-full sm:w-auto flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="relative w-full sm:w-72">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search..."
+              className="pl-9 bg-card"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+          </div>
+          <Button 
+            className="w-full sm:w-auto font-semibold opacity-90 hover:opacity-100" 
+            onClick={() => {
+              resetForm();
+              setIsCreateOpen(true);
+            }}
+          >
+            <Box className="h-4 w-4" />
+            Add
+          </Button>
         </div>
       </div>
 
@@ -448,6 +487,15 @@ export default function Geometries() {
                   {geometry.format.toUpperCase()}
                 </div>
                 <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    className="rounded-lg mr-2 p-2 m-[-8px] text-muted-foreground hover:text-primary hover:bg-primary/10 transition"
+                    onClick={() => handleDownload(geometry)}
+                    aria-label={`Download ${geometry.name}`}
+                    title="Download"
+                  >
+                    <Download className="h-4 w-4" />
+                  </button>
                   <button
                     type="button"
                     className="rounded-lg p-2 m-[-8px] mr-2 text-muted-foreground hover:text-indigo-500 hover:bg-indigo-500/10 transition"

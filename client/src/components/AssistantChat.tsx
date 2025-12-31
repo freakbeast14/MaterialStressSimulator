@@ -532,7 +532,7 @@ export function AssistantChat() {
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  className="text-muted-foreground p-1 rounded-sm hover:text-indigo-500 hover:bg-indigo-500/10 transition-colors"
+                  className="text-muted-foreground p-1 rounded-sm hover:text-primary hover:bg-primary/10 transition-colors"
                   onClick={() => setIsOpen(false)}
                   aria-label="Minimize assistant"
                   title="Minimize"
@@ -541,7 +541,7 @@ export function AssistantChat() {
                 </button>
                 <button
                   type="button"
-                  className="text-muted-foreground p-1 rounded-sm hover:text-orange-500 hover:bg-orange-500/10 transition-colors"
+                  className="text-muted-foreground p-1 rounded-sm hover:text-indigo-500 hover:bg-indigo-500/10 transition-colors"
                   onClick={() => setIsExpanded((prev) => !prev)}
                   aria-label={isExpanded ? "Restore assistant size" : "Expand assistant"}
                   title={isExpanded ? "Restore" : "Expand"}
