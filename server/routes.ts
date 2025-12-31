@@ -10,6 +10,55 @@ import {
   readStoragePath,
   saveGeometryFile,
 } from "./storage-backend";
+import fs from "fs";
+import path from "path";
+
+const assistantRequestSchema = z.object({
+  question: z.string().min(1).max(1000),
+  page: z.string().optional(),
+  context: z.record(z.unknown()).nullable().optional(),
+});
+
+const ASSISTANT_SYSTEM_PROMPT =
+  "You are the MatSim assistant. You may answer questions about MatSim features, pages, UI controls, workflows, and MatSim-specific simulation concepts (stress, strain, stress-strain curves, safety factor, boundary conditions, mesh outputs, 3D results viewer concepts such as iso-surface, slice, volume, playback controls, and chart interpretation). Use the provided page context and the App Guide to summarize or analyze results. If the question is about MatSim features or concepts, answer even if no context data is provided. Treat questions that mention MatSim UI sections or terms (e.g., mesh outputs, stress, strain, iso-surface, playback, heatmap, metrics space, results comparison) as in-scope and answer them. If a question is unrelated to MatSim or requires specific data not present, refuse with: \"I can only answer questions related to **MatSim**.\" Do not guess missing values or invent results. Keep responses concise and helpful.\n\nAccepted examples: \"What is stress?\", \"What does the stress-strain chart show?\", \"How do I use the 3D Results Viewer playback?\", \"Explain the results comparison weights.\", \"What are mesh outputs?\" Refuse examples: general trivia, coding help, or anything not about MatSim.";
+const ASSISTANT_APP_GUIDE_INDEX =
+  "Use the MatSim knowledge base to answer feature and how-to questions. The guide covers pages, tabs, charts, 3D viewer modes, data model, and API routes.";
+const ASSISTANT_GUIDE_PATH = path.join(process.cwd(), "docs", "assistant_guide.md");
+let assistantGuideCache: string | null = null;
+
+const loadAssistantGuide = () => {
+  if (assistantGuideCache !== null) return assistantGuideCache;
+  try {
+    assistantGuideCache = fs.readFileSync(ASSISTANT_GUIDE_PATH, "utf8");
+  } catch {
+    assistantGuideCache = "";
+  }
+  return assistantGuideCache;
+};
+
+const selectGuideSnippets = (guide: string, page: string, question: string) => {
+  if (!guide) return "";
+  const sections = guide.split(/\n(?=##\s)/g);
+  const tokens = `${page} ${question}`
+    .toLowerCase()
+    .match(/[a-z0-9]+/g);
+  if (!tokens || tokens.length === 0) {
+    return sections.slice(0, 2).join("\n");
+  }
+  const scored = sections
+    .map((section) => {
+      const lower = section.toLowerCase();
+      const score = tokens.reduce((sum, token) => {
+        if (token.length < 3) return sum;
+        return sum + (lower.includes(token) ? 1 : 0);
+      }, 0);
+      return { section, score };
+    })
+    .sort((a, b) => b.score - a.score);
+  const top = scored.filter((item) => item.score > 0).slice(0, 3);
+  if (top.length) return top.map((item) => item.section).join("\n");
+  return sections.slice(0, 2).join("\n");
+};
 
 const seedGeometries = [
   {
@@ -687,6 +736,85 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+
+  app.post("/api/assistant", async (req, res) => {
+    try {
+      const input = assistantRequestSchema.parse(req.body);
+      const apiKey = process.env.OPENAI_API_KEY;
+      if (!apiKey) {
+        return res.status(500).json({
+          answer:
+            "Assistant is not configured yet. Please set the OpenAI API key.",
+        });
+      }
+
+      const page = input.page ?? "unknown";
+      const contextText = input.context ? JSON.stringify(input.context) : "null";
+      const trimmedContext =
+        contextText.length > 6000 ? contextText.slice(0, 6000) : contextText;
+
+      const guide = loadAssistantGuide();
+      const guideSnippets = selectGuideSnippets(guide, page, input.question);
+      const response = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: process.env.OPENAI_MODEL || "gpt-4o-mini",
+          messages: [
+            { role: "system", content: ASSISTANT_SYSTEM_PROMPT },
+            { role: "system", content: ASSISTANT_APP_GUIDE_INDEX },
+            ...(guideSnippets
+              ? [{ role: "system", content: `MatSim Guide Snippets:\n${guideSnippets}` }]
+              : []),
+            {
+              role: "user",
+              content: `Page: ${page}\nContext: ${trimmedContext}\nQuestion: ${input.question}`,
+            },
+          ],
+          max_completion_tokens: 300,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        return res.status(502).json({
+          answer: "The assistant service is unavailable right now.",
+          details: errorText,
+        });
+      }
+
+      const data = await response.json();
+      if (data?.error) {
+        return res.status(502).json({
+          answer: "The assistant service is unavailable right now.",
+          details: JSON.stringify(data.error, null, 2),
+        });
+      }
+      const answer = data?.choices?.[0]?.message?.content?.trim();
+      if (!answer) {
+        return res.status(502).json({
+          answer: "The assistant service is unavailable right now.",
+          details: JSON.stringify(data, null, 2),
+        });
+      }
+      return res.json({
+        answer,
+      });
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({
+          answer: "Invalid assistant request.",
+          details: err.errors,
+        });
+      }
+      return res.status(500).json({
+        answer: "Unexpected error while generating a response.",
+      });
+    }
+  });
   
   // === Materials Routes ===
   app.get(api.materials.list.path, async (req, res) => {

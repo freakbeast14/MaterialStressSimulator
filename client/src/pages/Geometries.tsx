@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useGeometries, useCreateGeometry, useUpdateGeometry, useDeleteGeometry } from "@/hooks/use-geometries";
 import { useToast } from "@/hooks/use-toast";
@@ -14,6 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useAssistantContext } from "@/context/assistant-context";
 
 type GeometryFormState = {
   name: string;
@@ -168,6 +169,7 @@ export default function Geometries() {
   const { mutateAsync: updateGeometry, isPending: isUpdating } = useUpdateGeometry();
   const { mutateAsync: deleteGeometry, isPending: isDeleting } = useDeleteGeometry();
   const { toast } = useToast();
+  const { setContext } = useAssistantContext();
   const [search, setSearch] = useState("");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -180,10 +182,57 @@ export default function Geometries() {
   });
   const [createPreview, setCreatePreview] = useState<string | null>(null);
   const [editPreview, setEditPreview] = useState<string | null>(null);
+  const contextKeyRef = useRef("");
 
-  const filteredGeometries = geometries?.filter((geometry) =>
-    geometry.name.toLowerCase().includes(search.toLowerCase())
+  const filteredGeometries = useMemo(
+    () =>
+      geometries?.filter((geometry) =>
+        geometry.name.toLowerCase().includes(search.toLowerCase())
+      ) ?? [],
+    [geometries, search]
   );
+
+  const assistantSample = useMemo(
+    () =>
+      filteredGeometries.slice(0, 8).map((geometry) => ({
+        id: geometry.id,
+        name: geometry.name,
+        format: geometry.format,
+        sizeBytes: geometry.sizeBytes,
+      })),
+    [filteredGeometries]
+  );
+
+  const assistantContext = useMemo(
+    () => ({
+      pageSummary:
+        "Manage geometry assets, preview STL shapes, and upload new geometry files for simulations.",
+      sections: ["Geometry Cards", "STL Preview", "Upload Geometry"],
+      actions: ["Search geometries", "Add geometry", "Edit geometry", "Delete geometry"],
+      search,
+      totalCount: geometries?.length ?? 0,
+      filteredCount: filteredGeometries.length,
+      sample: assistantSample,
+    }),
+    [assistantSample, filteredGeometries.length, geometries?.length, search]
+  );
+
+  const assistantContextKey = useMemo(
+    () =>
+      JSON.stringify({
+        search,
+        totalCount: geometries?.length ?? 0,
+        filteredCount: filteredGeometries.length,
+        ids: assistantSample.map((item) => item.id),
+      }),
+    [assistantSample, filteredGeometries.length, geometries?.length, search]
+  );
+
+  useEffect(() => {
+    if (contextKeyRef.current === assistantContextKey) return;
+    contextKeyRef.current = assistantContextKey;
+    setContext("geometries", assistantContext);
+  }, [assistantContext, assistantContextKey, setContext]);
 
   const activeGeometry = useMemo(
     () => geometries?.find((geometry) => geometry.id === activeGeometryId) || null,

@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMaterials } from "@/hooks/use-materials";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useAssistantContext } from "@/context/assistant-context";
 
 type CompareProps = {
   embedded?: boolean;
@@ -12,6 +13,7 @@ type CompareProps = {
 export default function Compare({ embedded = false }: CompareProps) {
   const { data: materials, isLoading } = useMaterials();
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const { setContext } = useAssistantContext();
 
   const toggleMaterial = (id: number) => {
     setSelectedIds(prev => 
@@ -25,6 +27,46 @@ export default function Compare({ embedded = false }: CompareProps) {
   // This is simplified; in a real app you'd need to normalize X-axis points
   // Here we assume strain points are consistent or we just overlay them visually
   const selectedMaterials = materials?.filter(m => selectedIds.includes(m.id)) || [];
+
+  const assistantContext = useMemo(
+    () => ({
+      pageSummary:
+        "Compare materials by overlaying their stress-strain and thermal expansion curves.",
+      selectedCount: selectedMaterials.length,
+      selected: selectedMaterials.slice(0, 8).map((mat) => ({
+        id: mat.id,
+        name: mat.name,
+        category: mat.category,
+        density: mat.density,
+        youngsModulus: mat.youngsModulus,
+        poissonRatio: mat.poissonRatio,
+        meltingPoint: mat.meltingPoint,
+      })),
+      charts: ["Stress-Strain Comparison", "Thermal Expansion Comparison"],
+      interactions: [
+        "Select materials from the list to overlay curves.",
+        "Export chart as SVG.",
+      ],
+    }),
+    [selectedMaterials]
+  );
+
+  const assistantContextKey = useMemo(
+    () =>
+      JSON.stringify({
+        selectedIds: selectedMaterials.map((mat) => mat.id),
+        selectedCount: selectedMaterials.length,
+      }),
+    [selectedMaterials]
+  );
+
+  const assistantContextKeyRef = useRef("");
+
+  useEffect(() => {
+    if (assistantContextKeyRef.current === assistantContextKey) return;
+    assistantContextKeyRef.current = assistantContextKey;
+    setContext("compare-materials", assistantContext);
+  }, [assistantContext, assistantContextKey, setContext]);
 
   const colors = [
     "hsl(var(--primary))",

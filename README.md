@@ -44,6 +44,13 @@ flowchart LR
 - DB: PostgreSQL (Neon)
 - File Storage: Supabase Storage
 
+## AI Assistant (OpenAI)
+
+The MatSim assistant uses OpenAI on the server side. Set these env vars:
+
+- `OPENAI_API_KEY` (required)
+- `OPENAI_MODEL` (optional, defaults to `gpt-4o-mini`)
+
 ## Local Setup (Brief)
 
 1) Install dependencies
@@ -56,6 +63,8 @@ npm install
 # .env
 DATABASE_URL=postgres://...
 FENICS_API_URL=http://127.0.0.1:8001
+OPENAI_API_KEY=your_openai_key_here
+OPENAI_MODEL=gpt-4o-mini
 ```
 
 3) Run the API + client

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { useMaterials } from "@/hooks/use-materials";
 import { useCreateGeometry, useGeometries } from "@/hooks/use-geometries";
@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/select";
 import { AlertCircle, Loader2, Play, MinusCircle, PlusCircle } from "lucide-react";
 import Plot from "react-plotly.js";
+import { useAssistantContext } from "@/context/assistant-context";
 
 type SimulationFormProps = {
   initialMaterialId?: string;
@@ -33,6 +34,7 @@ export function SimulationForm({
   const { data: geometries, isLoading: isGeometriesLoading } = useGeometries();
   const { mutate: createGeometry, isPending: isUploadingGeometry } =
     useCreateGeometry();
+  const { setContext } = useAssistantContext();
 
   const [materialId, setMaterialId] = useState<string>("");
   const [simName, setSimName] = useState("");
@@ -82,6 +84,10 @@ export function SimulationForm({
   const selectedGeometry = useMemo(
     () => sortedGeometries.find((geometry) => String(geometry.id) === geometryId),
     [sortedGeometries, geometryId],
+  );
+  const selectedMaterial = useMemo(
+    () => materials?.find((material) => String(material.id) === materialId),
+    [materials, materialId],
   );
 
   const clampDampingRatio = (value: string) => {
@@ -356,6 +362,99 @@ export function SimulationForm({
     });
     return warnings;
   }, [boundaryConditions]);
+
+  const assistantContext = useMemo(
+    () => ({
+      pageSummary:
+        "Create a new simulation by choosing a material and geometry, setting boundary conditions, and defining test parameters.",
+      sections: [
+        "Basic Information",
+        "Load & Environment",
+        "Boundary Conditions",
+        "Material Model",
+        "Time & Dynamics",
+      ],
+      selections: {
+        material: selectedMaterial?.name || null,
+        geometry: selectedGeometry?.name || null,
+        analysisType: simType,
+        materialModel,
+      },
+      inputs: {
+        name: simName,
+        appliedLoad,
+        temperature,
+        duration,
+        frequency,
+        dampingRatio,
+        yieldStrength,
+        hardeningModulus,
+      },
+      boundaryConditions: boundaryConditions.map((condition) => ({
+        type: condition.type,
+        face: condition.face,
+        magnitude: condition.magnitude,
+        unit: condition.unit,
+      })),
+      warnings: bcWarnings,
+    }),
+    [
+      simName,
+      simType,
+      selectedMaterial?.name,
+      selectedGeometry?.name,
+      appliedLoad,
+      temperature,
+      duration,
+      frequency,
+      dampingRatio,
+      materialModel,
+      yieldStrength,
+      hardeningModulus,
+      boundaryConditions,
+      bcWarnings,
+    ]
+  );
+
+  const assistantContextKey = useMemo(
+    () =>
+      JSON.stringify({
+        name: simName,
+        type: simType,
+        material: selectedMaterial?.name || null,
+        geometry: selectedGeometry?.name || null,
+        appliedLoad,
+        temperature,
+        duration,
+        frequency,
+        dampingRatio,
+        materialModel,
+        boundaryConditionCount: boundaryConditions.length,
+        warningCount: bcWarnings.length,
+      }),
+    [
+      simName,
+      simType,
+      selectedMaterial?.name,
+      selectedGeometry?.name,
+      appliedLoad,
+      temperature,
+      duration,
+      frequency,
+      dampingRatio,
+      materialModel,
+      boundaryConditions.length,
+      bcWarnings.length,
+    ]
+  );
+
+  const assistantContextKeyRef = useRef("");
+
+  useEffect(() => {
+    if (assistantContextKeyRef.current === assistantContextKey) return;
+    assistantContextKeyRef.current = assistantContextKey;
+    setContext("create-simulation", assistantContext);
+  }, [assistantContext, assistantContextKey, setContext]);
 
   return (
     <div className="space-y-6 max-w-3xl mx-auto">

@@ -7,7 +7,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { ArrowDown, ArrowUp, ArrowUpDown, Eye, Filter, Pause, Pencil, Play, Search, Trash2, MinusCircle, PlusCircle, Zap } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import Plot from "react-plotly.js";
+import { useAssistantContext } from "@/context/assistant-context";
 
 export default function Simulations() {
   const queryClient = useQueryClient();
@@ -31,6 +32,7 @@ export default function Simulations() {
   const { data: geometries } = useGeometries();
   const { mutateAsync: createGeometry, isPending: isUploadingGeometry } = useCreateGeometry();
   const { toast } = useToast();
+  const { setContext } = useAssistantContext();
   const [activeSimulationId, setActiveSimulationId] = useState<number | null>(null);
   const { data: boundaryConditions } = useBoundaryConditions(activeSimulationId ?? undefined);
   const [search, setSearch] = useState("");
@@ -191,6 +193,84 @@ export default function Simulations() {
     });
     return list;
   }, [filteredSimulations, sortKey, sortDir, getMaterialName, getGeometryName]);
+
+  const assistantContext = useMemo(() => {
+    const sample = sortedSimulations.slice(0, 8).map((sim) => ({
+      id: sim.id,
+      name: sim.name,
+      status: sim.paramsDirty ? "updated" : sim.status,
+      type: sim.type,
+      material: getMaterialName(sim.materialId),
+      geometry: getGeometryName(sim.geometryId),
+    }));
+    return {
+      pageSummary:
+        "Browse and manage simulation runs with filters, sorting, and actions for edit, rerun, and delete.",
+      tableColumns: ["ID", "Name", "Test Type", "Material", "Geometry", "Status", "Date"],
+      actions: ["View", "Edit", "Run", "Pause/Cancel", "Delete"],
+      search,
+      filters: {
+        material: materialFilter,
+        geometry: geometryFilter,
+        type: typeFilter,
+        status: statusFilter,
+      },
+      sort: { key: sortKey, direction: sortDir },
+      totalCount: simulations?.length ?? 0,
+      filteredCount: filteredSimulations?.length ?? 0,
+      sample,
+    };
+  }, [
+    search,
+    materialFilter,
+    geometryFilter,
+    typeFilter,
+    statusFilter,
+    sortKey,
+    sortDir,
+    simulations?.length,
+    filteredSimulations?.length,
+    sortedSimulations,
+    getMaterialName,
+    getGeometryName,
+  ]);
+
+  const assistantContextKey = useMemo(
+    () =>
+      JSON.stringify({
+        search,
+        filters: {
+          material: materialFilter,
+          geometry: geometryFilter,
+          type: typeFilter,
+          status: statusFilter,
+        },
+        sort: { key: sortKey, direction: sortDir },
+        totalCount: simulations?.length ?? 0,
+        filteredCount: filteredSimulations?.length ?? 0,
+        sampleIds: sortedSimulations.slice(0, 8).map((sim) => sim.id),
+      }),
+    [
+      search,
+      materialFilter,
+      geometryFilter,
+      typeFilter,
+      statusFilter,
+      sortKey,
+      sortDir,
+      simulations?.length,
+      filteredSimulations?.length,
+      sortedSimulations,
+    ]
+  );
+
+  const assistantContextKeyRef = useRef("");
+
+  useEffect(() => {
+    if (assistantContextKeyRef.current === assistantContextKey) return;
+    assistantContextKeyRef.current = assistantContextKey;
+    setContext("simulations", assistantContext);
+  }, [assistantContext, assistantContextKey, setContext]);
 
   const handleSort = (
     key: "id" | "name" | "type" | "material" | "geometry" | "date" | "status"
@@ -969,16 +1049,18 @@ export default function Simulations() {
                             <Play className="w-4 h-4" />
                           </Button>
                         )}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 text-destructive bg-destructive/10 hover:text-destructive hover:bg-destructive/15"
-                          onClick={() => handleDelete(sim.id, sim.name)}
-                          disabled={isDeleting && deletingId === sim.id}
-                          title="Delete"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                        {sim.status !== "running" && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 text-destructive bg-destructive/10 hover:text-destructive hover:bg-destructive/15"
+                            onClick={() => handleDelete(sim.id, sim.name)}
+                            disabled={isDeleting && deletingId === sim.id}
+                            title="Delete"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        )}
                       </div>
                     </td>
                   </tr>

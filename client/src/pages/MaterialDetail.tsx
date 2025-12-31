@@ -6,8 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { ChevronLeft, Play } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "wouter";
+import { useAssistantContext } from "@/context/assistant-context";
 
 export default function MaterialDetail() {
   const { id } = useParams();
@@ -15,6 +16,51 @@ export default function MaterialDetail() {
   const [, setLocation] = useLocation();
   const { data: material, isLoading } = useMaterial(materialId);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const { setContext } = useAssistantContext();
+
+  const assistantContext = useMemo(() => {
+    if (!material) return null;
+    return {
+      pageSummary:
+        "Review a material’s properties and curves, then launch a simulation prefilled with this material.",
+      actions: ["Run simulation", "Review properties", "Inspect curves"],
+      material: {
+        id: material.id,
+        name: material.name,
+        category: material.category,
+        density: material.density,
+        youngsModulus: material.youngsModulus,
+        poissonRatio: material.poissonRatio,
+        thermalConductivity: material.thermalConductivity,
+        meltingPoint: material.meltingPoint,
+      },
+      charts: ["Stress-Strain Curve", "Thermal Expansion"],
+      curves: {
+        stressStrainPoints: material.stressStrainCurve?.length ?? 0,
+        thermalExpansionPoints: material.thermalExpansionCurve?.length ?? 0,
+      },
+    };
+  }, [material]);
+
+  const assistantContextKey = useMemo(() => {
+    if (!material) return "";
+    return JSON.stringify({
+      id: material.id,
+      name: material.name,
+      category: material.category,
+      stressStrainPoints: material.stressStrainCurve?.length ?? 0,
+      thermalExpansionPoints: material.thermalExpansionCurve?.length ?? 0,
+    });
+  }, [material]);
+
+  const assistantContextKeyRef = useRef("");
+
+  useEffect(() => {
+    if (!assistantContext) return;
+    if (assistantContextKeyRef.current === assistantContextKey) return;
+    assistantContextKeyRef.current = assistantContextKey;
+    setContext("material-detail", assistantContext);
+  }, [assistantContext, assistantContextKey, setContext]);
 
   if (isLoading) return <div className="p-8">Loading material data...</div>;
   if (!material) return <div className="p-8">Material not found</div>;
