@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { useMaterials, useUpdateMaterial, useDeleteMaterial } from "@/hooks/use-materials";
 import { useCreateMaterial } from "@/hooks/use-materials";
 import { useToast } from "@/hooks/use-toast";
-import { Search, ArrowRight, Pencil, Plus, Trash2, Layers } from "lucide-react";
+import { Search, ArrowRight, Pencil, Plus, Trash2, Layers, Filter } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -43,6 +43,7 @@ export default function Materials() {
   const { toast } = useToast();
   const { setContext } = useAssistantContext();
   const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("all");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
@@ -61,10 +62,19 @@ export default function Materials() {
   const [stressValid, setStressValid] = useState(true);
   const [thermalValid, setThermalValid] = useState(true);
 
-  const filteredMaterials = materials?.filter(m => 
-    m.name.toLowerCase().includes(search.toLowerCase()) || 
-    m.category.toLowerCase().includes(search.toLowerCase())
-  );
+  const materialCategories = useMemo(() => {
+    const categories = materials?.map((material) => material.category) || [];
+    return Array.from(new Set(categories)).sort();
+  }, [materials]);
+
+  const filteredMaterials = materials?.filter((material) => {
+    const matchesSearch =
+      material.name.toLowerCase().includes(search.toLowerCase()) ||
+      material.category.toLowerCase().includes(search.toLowerCase());
+    const matchesCategory =
+      categoryFilter === "all" || material.category === categoryFilter;
+    return matchesSearch && matchesCategory;
+  });
 
   const assistantContext = useMemo(() => {
     const sample = (filteredMaterials ?? []).slice(0, 8).map((material) => ({
@@ -77,23 +87,25 @@ export default function Materials() {
         "Browse the material library, compare material behavior using charts, and manage material properties.",
       sections: ["Material Cards", "Compare Materials"],
       charts: ["Stress-Strain Comparison", "Thermal Expansion Comparison"],
-      actions: ["Search materials", "Add material", "Edit material", "Delete material"],
+      actions: ["Search materials", "Filter by category", "Add material", "Edit material", "Delete material"],
       search,
+      categoryFilter,
       totalCount: materials?.length ?? 0,
       filteredCount: filteredMaterials?.length ?? 0,
       sample,
     };
-  }, [filteredMaterials, materials?.length, search]);
+  }, [filteredMaterials, materials?.length, search, categoryFilter]);
 
   const assistantContextKey = useMemo(
     () =>
       JSON.stringify({
         search,
+        categoryFilter,
         totalCount: materials?.length ?? 0,
         filteredCount: filteredMaterials?.length ?? 0,
         sampleIds: (filteredMaterials ?? []).slice(0, 8).map((material) => material.id),
       }),
-    [materials?.length, filteredMaterials, search]
+    [materials?.length, filteredMaterials, search, categoryFilter]
   );
 
   const assistantContextKeyRef = useRef("");
@@ -346,6 +358,22 @@ export default function Materials() {
           <p className="text-muted-foreground mt-1">Browse and analyze material properties.</p>
         </div>
         <div className="flex w-full sm:w-auto flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="relative w-full sm:w-auto">
+            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+              <SelectTrigger className="w-full sm:w-44 bg-card text-xs text-foreground/75 relative pl-9 hover:text-foreground transition-all">
+                <Filter className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                <SelectValue placeholder="Category" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Categories</SelectItem>
+                {materialCategories.map((category) => (
+                  <SelectItem key={category} value={category}>
+                    {category}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <div className="relative w-full sm:w-72">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input 

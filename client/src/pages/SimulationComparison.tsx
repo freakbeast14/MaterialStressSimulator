@@ -636,7 +636,7 @@ export default function SimulationComparison() {
                 </div>
                 <div className="rounded-xl border border-border p-4">
                   <h4 className="text-sm font-semibold text-muted-foreground">Weighted Ranking</h4>
-                  <div className="mt-3 space-y-2">
+                  <div className="mt-3 max-h-64 space-y-2 overflow-y-auto pr-2">
                     {scoreData
                       .slice()
                       .sort((a, b) => b.score - a.score)
