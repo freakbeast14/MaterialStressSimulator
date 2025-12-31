@@ -1049,16 +1049,18 @@ export default function Simulations() {
                             <Play className="w-4 h-4" />
                           </Button>
                         )}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 text-destructive bg-destructive/10 hover:text-destructive hover:bg-destructive/15"
-                          onClick={() => handleDelete(sim.id, sim.name)}
-                          disabled={isDeleting && deletingId === sim.id}
-                          title="Delete"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                        {sim.status !== "running" && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 text-destructive bg-destructive/10 hover:text-destructive hover:bg-destructive/15"
+                            onClick={() => handleDelete(sim.id, sim.name)}
+                            disabled={isDeleting && deletingId === sim.id}
+                            title="Delete"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        )}
                       </div>
                     </td>
                   </tr>
