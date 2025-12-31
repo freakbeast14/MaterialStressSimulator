@@ -19,6 +19,16 @@ import {
 } from "@/components/ui/dialog";
 import Compare from "@/pages/Compare";
 import { useAssistantContext } from "@/context/assistant-context";
+import { CurveEditor, type CurvePoint } from "@/components/CurveEditor";
+
+const defaultStressPoints: CurvePoint[] = [
+  { x: 0, y: 0 },
+  { x: 0.01, y: 100 },
+];
+const defaultThermalPoints: CurvePoint[] = [
+  { x: 20, y: 12 },
+  { x: 100, y: 13 },
+];
 
 export default function Materials() {
   const truncateName = (value: string | undefined, max = 30) => {
@@ -46,12 +56,10 @@ export default function Materials() {
   const [poissonRatio, setPoissonRatio] = useState("");
   const [thermalConductivity, setThermalConductivity] = useState("");
   const [meltingPoint, setMeltingPoint] = useState("");
-  const [stressStrainCurve, setStressStrainCurve] = useState(
-    '[{"strain":0,"stress":0},{"strain":0.01,"stress":100}]'
-  );
-  const [thermalExpansionCurve, setThermalExpansionCurve] = useState(
-    '[{"temperature":20,"coefficient":12},{"temperature":100,"coefficient":13}]'
-  );
+  const [stressPoints, setStressPoints] = useState<CurvePoint[]>(defaultStressPoints);
+  const [thermalPoints, setThermalPoints] = useState<CurvePoint[]>(defaultThermalPoints);
+  const [stressValid, setStressValid] = useState(true);
+  const [thermalValid, setThermalValid] = useState(true);
 
   const filteredMaterials = materials?.filter(m => 
     m.name.toLowerCase().includes(search.toLowerCase()) || 
@@ -101,27 +109,42 @@ export default function Materials() {
     [materials, activeMaterialId]
   );
 
-  const parsedCurves = useMemo(() => {
-    const parseJson = (value: string) => JSON.parse(value);
-    try {
-      return {
-        stress: parseJson(stressStrainCurve),
-        thermal: parseJson(thermalExpansionCurve),
-      };
-    } catch {
-      return null;
-    }
-  }, [stressStrainCurve, thermalExpansionCurve]);
+  const curveToPoints = (
+    curve: Array<Record<string, number>> | null | undefined,
+    xKey: string,
+    yKey: string
+  ): CurvePoint[] => {
+    if (!curve) return [];
+    return curve
+      .map((entry) => ({ x: Number(entry[xKey]), y: Number(entry[yKey]) }))
+      .filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y))
+      .sort((a, b) => a.x - b.x);
+  };
+
+  const pointsToCurve = (
+    points: CurvePoint[],
+    xKey: string,
+    yKey: string
+  ) =>
+    points
+      .slice()
+      .sort((a, b) => a.x - b.x)
+      .map((point) => ({ [xKey]: point.x, [yKey]: point.y }));
+
+  const normalizePoints = (points: CurvePoint[]) =>
+    points
+      .map((point) => ({ x: Number(point.x), y: Number(point.y) }))
+      .filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y))
+      .sort((a, b) => a.x - b.x);
+
+  const isCurvesValid =
+    stressValid &&
+    thermalValid &&
+    normalizePoints(stressPoints).length >= 2 &&
+    normalizePoints(thermalPoints).length >= 2;
 
   const hasMaterialChanges = useMemo(() => {
     if (!activeMaterial) return false;
-    const parseSafe = (value: string) => {
-      try {
-        return JSON.parse(value);
-      } catch {
-        return null;
-      }
-    };
     const normalizeNumber = (value: string | number | null | undefined) => {
       const num = typeof value === "string" ? Number(value) : value ?? null;
       return Number.isFinite(num as number) ? num : null;
@@ -135,8 +158,8 @@ export default function Materials() {
       poissonRatio: normalizeNumber(poissonRatio),
       thermalConductivity: normalizeNumber(thermalConductivity),
       meltingPoint: normalizeNumber(meltingPoint),
-      stressStrainCurve: parseSafe(stressStrainCurve),
-      thermalExpansionCurve: parseSafe(thermalExpansionCurve),
+      stressStrainCurve: normalizePoints(stressPoints),
+      thermalExpansionCurve: normalizePoints(thermalPoints),
     };
     const baseline = {
       name: activeMaterial.name,
@@ -147,8 +170,12 @@ export default function Materials() {
       poissonRatio: normalizeNumber(activeMaterial.poissonRatio),
       thermalConductivity: normalizeNumber(activeMaterial.thermalConductivity),
       meltingPoint: normalizeNumber(activeMaterial.meltingPoint),
-      stressStrainCurve: activeMaterial.stressStrainCurve ?? [],
-      thermalExpansionCurve: activeMaterial.thermalExpansionCurve ?? [],
+      stressStrainCurve: normalizePoints(
+        curveToPoints(activeMaterial.stressStrainCurve, "strain", "stress")
+      ),
+      thermalExpansionCurve: normalizePoints(
+        curveToPoints(activeMaterial.thermalExpansionCurve, "temperature", "coefficient")
+      ),
     };
     return JSON.stringify(draft) !== JSON.stringify(baseline);
   }, [
@@ -161,15 +188,15 @@ export default function Materials() {
     poissonRatio,
     thermalConductivity,
     meltingPoint,
-    stressStrainCurve,
-    thermalExpansionCurve,
+    stressPoints,
+    thermalPoints,
   ]);
 
   const handleCreateMaterial = async () => {
-    if (!parsedCurves) {
+    if (!isCurvesValid) {
       toast({
-        title: "Invalid curve JSON",
-        description: "Please fix the stress-strain or thermal expansion JSON.",
+        title: "Invalid curve data",
+        description: "Please provide at least two valid points for each curve.",
         variant: "destructive",
       });
       return;
@@ -184,8 +211,8 @@ export default function Materials() {
         poissonRatio: Number(poissonRatio),
         thermalConductivity: Number(thermalConductivity),
         meltingPoint: Number(meltingPoint),
-        stressStrainCurve: parsedCurves.stress,
-        thermalExpansionCurve: parsedCurves.thermal,
+        stressStrainCurve: pointsToCurve(stressPoints, "strain", "stress"),
+        thermalExpansionCurve: pointsToCurve(thermalPoints, "temperature", "coefficient"),
       });
       toast({ 
         title: "Material created",
@@ -216,8 +243,8 @@ export default function Materials() {
     setPoissonRatio("");
     setThermalConductivity("");
     setMeltingPoint("");
-    setStressStrainCurve('[{"strain":0,"stress":0},{"strain":0.01,"stress":100}]');
-    setThermalExpansionCurve('[{"temperature":20,"coefficient":12},{"temperature":100,"coefficient":13}]');
+    setStressPoints(defaultStressPoints);
+    setThermalPoints(defaultThermalPoints);
     setIsDialogOpen(true);
   };
 
@@ -231,17 +258,19 @@ export default function Materials() {
     setPoissonRatio(String(material.poissonRatio));
     setThermalConductivity(String(material.thermalConductivity));
     setMeltingPoint(String(material.meltingPoint));
-    setStressStrainCurve(JSON.stringify(material.stressStrainCurve ?? [], null, 2));
-    setThermalExpansionCurve(JSON.stringify(material.thermalExpansionCurve ?? [], null, 2));
+    setStressPoints(curveToPoints(material.stressStrainCurve, "strain", "stress"));
+    setThermalPoints(
+      curveToPoints(material.thermalExpansionCurve, "temperature", "coefficient")
+    );
     setIsEditOpen(true);
   };
 
   const handleUpdateMaterial = async () => {
     if (!activeMaterialId) return;
-    if (!parsedCurves) {
+    if (!isCurvesValid) {
       toast({
-        title: "Invalid curve JSON",
-        description: "Please fix the stress-strain or thermal expansion JSON.",
+        title: "Invalid curve data",
+        description: "Please provide at least two valid points for each curve.",
         variant: "destructive",
       });
       return;
@@ -258,8 +287,8 @@ export default function Materials() {
           poissonRatio: Number(poissonRatio),
           thermalConductivity: Number(thermalConductivity),
           meltingPoint: Number(meltingPoint),
-          stressStrainCurve: parsedCurves.stress,
-          thermalExpansionCurve: parsedCurves.thermal,
+          stressStrainCurve: pointsToCurve(stressPoints, "strain", "stress"),
+          thermalExpansionCurve: pointsToCurve(thermalPoints, "temperature", "coefficient"),
         },
       });
       toast({ 
@@ -429,7 +458,7 @@ export default function Materials() {
       )}
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add New Material</DialogTitle>
             <DialogDescription>
@@ -467,7 +496,7 @@ export default function Materials() {
                 <Label>Density (kg/m³)</Label>
                 <Input
                   type="number"
-                  step="0.01"
+                  step="50"
                   value={density}
                   onChange={(e) => setDensity(e.target.value)}
                 />
@@ -476,7 +505,7 @@ export default function Materials() {
                 <Label>Young's Modulus (GPa)</Label>
                 <Input
                   type="number"
-                  step="0.01"
+                  step="50"
                   value={youngsModulus}
                   onChange={(e) => setYoungsModulus(e.target.value)}
                 />
@@ -485,7 +514,7 @@ export default function Materials() {
                 <Label>Poisson's Ratio</Label>
                 <Input
                   type="number"
-                  step="0.001"
+                  step="0.01"
                   value={poissonRatio}
                   onChange={(e) => setPoissonRatio(e.target.value)}
                 />
@@ -497,7 +526,7 @@ export default function Materials() {
                 <Label>Thermal Conductivity (W/m·K)</Label>
                 <Input
                   type="number"
-                  step="0.01"
+                  step="10"
                   value={thermalConductivity}
                   onChange={(e) => setThermalConductivity(e.target.value)}
                 />
@@ -506,33 +535,42 @@ export default function Materials() {
                 <Label>Melting Point (°C)</Label>
                 <Input
                   type="number"
-                  step="0.1"
+                  step="100"
                   value={meltingPoint}
                   onChange={(e) => setMeltingPoint(e.target.value)}
                 />
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label>Stress-Strain Curve (JSON)</Label>
-              <Textarea
-                value={stressStrainCurve}
-                onChange={(e) => setStressStrainCurve(e.target.value)}
-                className={parsedCurves ? "" : "border-destructive"}
-              />
-            </div>
+            <CurveEditor
+              title="Stress-Strain Curve"
+              description="Shows how a material deforms in response to an applied load."
+              xLabel="Strain (mm)"
+              yLabel="Stress (MPa)"
+              xKey="strain"
+              yKey="stress"
+              points={stressPoints}
+              onChange={setStressPoints}
+              onValidityChange={setStressValid}
+            />
 
-            <div className="space-y-2">
-              <Label>Thermal Expansion Curve (JSON)</Label>
-              <Textarea
-                value={thermalExpansionCurve}
-                onChange={(e) => setThermalExpansionCurve(e.target.value)}
-                className={parsedCurves ? "" : "border-destructive"}
-              />
-            </div>
+            <CurveEditor
+              title="Thermal Expansion Curve"
+              description="Shows how a material's length (or volume) changes with temperature."
+              xLabel="Temperature (°C)"
+              yLabel="Expansion Coefficient (µm)"
+              xKey="temperature"
+              yKey="coefficient"
+              points={thermalPoints}
+              onChange={setThermalPoints}
+              onValidityChange={setThermalValid}
+            />
 
             <div className="flex justify-end">
-              <Button onClick={handleCreateMaterial} disabled={isPending || !name}>
+              <Button
+                onClick={handleCreateMaterial}
+                disabled={isPending || !name || !isCurvesValid}
+              >
                 {isPending ? "Saving..." : "Add"}
               </Button>
             </div>
@@ -541,7 +579,7 @@ export default function Materials() {
       </Dialog>
 
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Material</DialogTitle>
             <DialogDescription>
@@ -579,7 +617,7 @@ export default function Materials() {
                 <Label>Density (kg/m³)</Label>
                 <Input
                   type="number"
-                  step="0.01"
+                  step="50"
                   value={density}
                   onChange={(e) => setDensity(e.target.value)}
                 />
@@ -588,7 +626,7 @@ export default function Materials() {
                 <Label>Young's Modulus (GPa)</Label>
                 <Input
                   type="number"
-                  step="0.01"
+                  step="50"
                   value={youngsModulus}
                   onChange={(e) => setYoungsModulus(e.target.value)}
                 />
@@ -609,7 +647,7 @@ export default function Materials() {
                 <Label>Thermal Conductivity (W/m·K)</Label>
                 <Input
                   type="number"
-                  step="0.01"
+                  step="10"
                   value={thermalConductivity}
                   onChange={(e) => setThermalConductivity(e.target.value)}
                 />
@@ -625,28 +663,40 @@ export default function Materials() {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label>Stress-Strain Curve (JSON)</Label>
-              <Textarea
-                value={stressStrainCurve}
-                onChange={(e) => setStressStrainCurve(e.target.value)}
-                className={parsedCurves ? "" : "border-destructive"}
-              />
-            </div>
+            <CurveEditor
+              title="Stress-Strain Curve"
+              description="Shows how a material deforms in response to an applied load."
+              xLabel="Strain (mm)"
+              yLabel="Stress (MPa)"
+              xKey="strain"
+              yKey="stress"
+              points={stressPoints}
+              onChange={setStressPoints}
+              onValidityChange={setStressValid}
+            />
 
-            <div className="space-y-2">
-              <Label>Thermal Expansion Curve (JSON)</Label>
-              <Textarea
-                value={thermalExpansionCurve}
-                onChange={(e) => setThermalExpansionCurve(e.target.value)}
-                className={parsedCurves ? "" : "border-destructive"}
-              />
-            </div>
+            <CurveEditor
+              title="Thermal Expansion Curve"
+              description="Shows how a material's length (or volume) changes with temperature."
+              xLabel="Temperature (°C)"
+              yLabel="Expansion Coefficient (µm)"
+              xKey="temperature"
+              yKey="coefficient"
+              points={thermalPoints}
+              onChange={setThermalPoints}
+              onValidityChange={setThermalValid}
+            />
 
             <div className="flex justify-end">
               <Button
                 onClick={handleUpdateMaterial}
-                disabled={isUpdating || !name || !activeMaterial || !hasMaterialChanges}
+                disabled={
+                  isUpdating ||
+                  !name ||
+                  !activeMaterial ||
+                  !hasMaterialChanges ||
+                  !isCurvesValid
+                }
                 className="opacity-90 hover:opacity-100 disabled:pointer-events-auto disabled:hover:opacity-50 disabled:cursor-not-allowed"
               >
                 {isUpdating ? "Saving..." : "Save"}
