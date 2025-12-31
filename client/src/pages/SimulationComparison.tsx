@@ -21,6 +21,7 @@ export default function SimulationComparison() {
   const initialRender = useRef(true);
   const [search, setSearch] = useState("");
   const [weights, setWeights] = useState({ stress: 1, deformation: 1, safety: 1 });
+  const selectAllRef = useRef<HTMLInputElement | null>(null);
 
   const getMaterialName = (id: number) => materials?.find(m => m.id === id)?.name || "Unknown";
   const getGeometryName = (id?: number | null) =>
@@ -87,6 +88,25 @@ export default function SimulationComparison() {
     );
   });
   const selected = completedSims.filter(s => selectedSims.includes(s.id));
+  const filteredIds = filteredSims.map((sim) => sim.id);
+  const allFilteredSelected =
+    filteredIds.length > 0 && filteredIds.every((id) => selectedSims.includes(id));
+  const someFilteredSelected =
+    filteredIds.some((id) => selectedSims.includes(id)) && !allFilteredSelected;
+
+  useEffect(() => {
+    if (selectAllRef.current) {
+      selectAllRef.current.indeterminate = someFilteredSelected;
+    }
+  }, [someFilteredSelected]);
+
+  const handleToggleAll = () => {
+    if (allFilteredSelected) {
+      setSelectedSims((prev) => prev.filter((id) => !filteredIds.includes(id)));
+      return;
+    }
+    setSelectedSims((prev) => Array.from(new Set([...prev, ...filteredIds])));
+  };
 
   const selectedForContext = useMemo(
     () =>
@@ -295,7 +315,7 @@ export default function SimulationComparison() {
               </div>
             </div>
           </div>
-          <div className="border-t border-border">
+          <div className="border-border">
             {filteredSims.length === 0 ? (
               <p className="text-muted-foreground text-sm py-4">No completed simulations yet.</p>
             ) : (
@@ -310,15 +330,24 @@ export default function SimulationComparison() {
                     <col className="w-[18%]" />
                     <col className="w-[14%]" />
                   </colgroup>
-                  <thead className="text-[11px] uppercase bg-muted text-muted-foreground font-semibold">
+                  <thead className="text-muted-foreground border-b">
                     <tr>
-                      <th className="px-3 py-3"></th>
-                      <th className="px-3 py-3">ID</th>
-                      <th className="px-3 py-3">Name</th>
-                      <th className="px-3 py-3">Test</th>
-                      <th className="px-3 py-3">Material</th>
-                      <th className="px-3 py-3">Geometry</th>
-                      <th className="px-3 py-3">Status</th>
+                      <th className="px-3 py-3">
+                        <input
+                          ref={selectAllRef}
+                          type="checkbox"
+                          checked={allFilteredSelected}
+                          onChange={handleToggleAll}
+                          className="w-4 h-4 rounded border-border !cursor-pointer"
+                          aria-label="Select All"
+                        />
+                      </th>
+                      <th className="px-3 py-3 font-medium">ID</th>
+                      <th className="px-3 py-3 font-medium">Name</th>
+                      <th className="px-3 py-3 font-medium">Test</th>
+                      <th className="px-3 py-3 font-medium">Material</th>
+                      <th className="px-3 py-3 font-medium">Geometry</th>
+                      <th className="px-3 py-3 font-medium">Status</th>
                     </tr>
                   </thead>
                 </table>
@@ -337,7 +366,7 @@ export default function SimulationComparison() {
                       {filteredSims.map((sim) => (
                         <tr
                           key={sim.id}
-                          className="hover:bg-muted/30 transition-colors cursor-pointer"
+                          className="hover:bg-muted/30 transition-colors"
                           onClick={() => toggleSimulation(sim.id)}
                         >
                           <td className="px-3 py-3">
@@ -346,7 +375,7 @@ export default function SimulationComparison() {
                               checked={selectedSims.includes(sim.id)}
                               onChange={() => toggleSimulation(sim.id)}
                               onClick={(event) => event.stopPropagation()}
-                              className="w-4 h-4 rounded border-border"
+                              className="w-4 h-4 rounded border-border !cursor-pointer"
                             />
                           </td>
                           <td className="px-3 py-3 font-mono text-muted-foreground">
