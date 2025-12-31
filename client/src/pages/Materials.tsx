@@ -496,7 +496,7 @@ export default function Materials() {
                 <Label>Density (kg/m³)</Label>
                 <Input
                   type="number"
-                  step="0.01"
+                  step="50"
                   value={density}
                   onChange={(e) => setDensity(e.target.value)}
                 />
@@ -505,7 +505,7 @@ export default function Materials() {
                 <Label>Young's Modulus (GPa)</Label>
                 <Input
                   type="number"
-                  step="0.01"
+                  step="50"
                   value={youngsModulus}
                   onChange={(e) => setYoungsModulus(e.target.value)}
                 />
@@ -514,7 +514,7 @@ export default function Materials() {
                 <Label>Poisson's Ratio</Label>
                 <Input
                   type="number"
-                  step="0.001"
+                  step="0.01"
                   value={poissonRatio}
                   onChange={(e) => setPoissonRatio(e.target.value)}
                 />
@@ -526,7 +526,7 @@ export default function Materials() {
                 <Label>Thermal Conductivity (W/m·K)</Label>
                 <Input
                   type="number"
-                  step="0.01"
+                  step="10"
                   value={thermalConductivity}
                   onChange={(e) => setThermalConductivity(e.target.value)}
                 />
@@ -535,7 +535,7 @@ export default function Materials() {
                 <Label>Melting Point (°C)</Label>
                 <Input
                   type="number"
-                  step="0.1"
+                  step="100"
                   value={meltingPoint}
                   onChange={(e) => setMeltingPoint(e.target.value)}
                 />
@@ -617,7 +617,7 @@ export default function Materials() {
                 <Label>Density (kg/m³)</Label>
                 <Input
                   type="number"
-                  step="0.01"
+                  step="50"
                   value={density}
                   onChange={(e) => setDensity(e.target.value)}
                 />
@@ -626,7 +626,7 @@ export default function Materials() {
                 <Label>Young's Modulus (GPa)</Label>
                 <Input
                   type="number"
-                  step="0.01"
+                  step="50"
                   value={youngsModulus}
                   onChange={(e) => setYoungsModulus(e.target.value)}
                 />
@@ -647,7 +647,7 @@ export default function Materials() {
                 <Label>Thermal Conductivity (W/m·K)</Label>
                 <Input
                   type="number"
-                  step="0.01"
+                  step="10"
                   value={thermalConductivity}
                   onChange={(e) => setThermalConductivity(e.target.value)}
                 />
