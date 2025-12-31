@@ -73,8 +73,8 @@ export function SimulationForm({
   const sortedGeometries = useMemo(() => {
     if (!geometries) return [];
     return [...geometries].sort((a, b) => {
-      const aIsUnit = a.name.toLowerCase().includes("unit cube");
-      const bIsUnit = b.name.toLowerCase().includes("unit cube");
+      const aIsUnit = a.name.toLowerCase().includes("cube");
+      const bIsUnit = b.name.toLowerCase().includes("cube");
       if (aIsUnit && !bIsUnit) return -1;
       if (!aIsUnit && bIsUnit) return 1;
       return a.name.localeCompare(b.name);
@@ -246,7 +246,7 @@ export function SimulationForm({
   useEffect(() => {
     if (!geometries || geometryId || initialGeometryId) return;
     const unitCube = geometries.find((geometry) =>
-      geometry.name.toLowerCase().includes("unit cube")
+      geometry.name.toLowerCase().includes("cube")
     );
     if (unitCube) {
       setGeometryId(String(unitCube.id));

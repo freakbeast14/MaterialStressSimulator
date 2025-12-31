@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { useMaterials, useUpdateMaterial, useDeleteMaterial } from "@/hooks/use-materials";
 import { useCreateMaterial } from "@/hooks/use-materials";
 import { useToast } from "@/hooks/use-toast";
-import { Search, ArrowRight, Pencil, Plus, Trash2 } from "lucide-react";
+import { Search, ArrowRight, Pencil, Plus, Trash2, Layers } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -316,14 +316,22 @@ export default function Materials() {
           <h1 className="text-3xl font-display font-bold text-foreground">Material Library</h1>
           <p className="text-muted-foreground mt-1">Browse and analyze material properties.</p>
         </div>
-        <div className="relative w-full sm:w-72">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input 
-            placeholder="Search materials..." 
-            className="pl-9 bg-card"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+        <div className="flex w-full sm:w-auto flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="relative w-full sm:w-72">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input 
+              placeholder="Search..." 
+              className="pl-9 bg-card"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          <Button 
+            className="w-full sm:w-auto font-semibold opacity-90 hover:opacity-100" 
+            onClick={handleOpenCreate}>
+            <Layers className="h-4 w-4" />
+            Add
+          </Button>
         </div>
       </div>
 
