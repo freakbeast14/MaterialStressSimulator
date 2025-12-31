@@ -177,20 +177,23 @@ export function CurveEditor({
                 className="h-8 w-8 rounded-full text-primary hover:text-primary hover:bg-primary/10"
                 onClick={handleAddRow}
                 aria-label="Add Row"
+                title="Add Row"
               >
                 <PlusCircle className="!h-4 !w-4" />
               </Button>
             )}
             {activeTab === "csv" && (
               <Button type="button" variant="outline" onClick={handleApplyCsv}
-                className="text-xs px-3 py-1.5 !h-auto !min-h-0 hover:text-primary hover:bg-primary/10"  
+                className="text-xs px-3 py-1.5 !h-auto !min-h-0 hover:text-primary hover:bg-primary/10"
+                title="Apply CSV"
               >
                 Apply
               </Button>
             )}
             {activeTab === "json" && (
               <Button type="button" variant="outline" onClick={handleApplyJson}
-                className="text-xs px-3 py-1.5 !h-auto !min-h-0 hover:text-primary hover:bg-primary/10"  
+                className="text-xs px-3 py-1.5 !h-auto !min-h-0 hover:text-primary hover:bg-primary/10"
+                title="Apply JSON"  
               >
                 Apply
               </Button>
@@ -203,9 +206,9 @@ export function CurveEditor({
               <span>{yLabel}</span>
               <span className="opacity-0 ppointer-events-none z-[-1]">XXXX</span>
             </div>
-            <div className="h-[132px] space-y-2 overflow-y-auto">
+            <div className="h-[132px] space-y-2 overflow-y-auto pr-0.5">
               {sortedPoints.map((point, index) => (
-                <div key={`${point.x}-${point.y}-${index}`} className="grid grid-cols-[1fr_1fr_auto] gap-2">
+                <div key={`${point.x}-${point.y}-${index}`} className="grid grid-cols-[1fr_1fr_auto]">
                   <Input
                     type="number"
                     step={xStepAttr}
@@ -218,14 +221,15 @@ export function CurveEditor({
                     step={yStepAttr}
                     value={point.y}
                     onChange={(event) => handleTableChange(index, "y", event.target.value)}
-                    className="!text-xs !px-1.5 !py-0"
+                    className="!text-xs !px-1.5 !py-0 !ml-2"
                   />
                   <Button
                     type="button"
                     variant="ghost"
-                    className="h-7 w-7 rounded-full text-red-500 hover:text-red-500 hover:bg-red-500/10"
+                    className="h-7 w-7 rounded-full text-red-500 hover:text-red-500 hover:bg-red-500/10 ml-2.5"
                     onClick={() => handleRemoveRow(index)}
-                    aria-label="Remove boundary condition"
+                    aria-label="Remove row"
+                    title="Remove Row"
                   >
                     <MinusCircle className="h-4 w-4" />
                   </Button>

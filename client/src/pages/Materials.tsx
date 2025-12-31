@@ -665,8 +665,9 @@ export default function Materials() {
 
             <CurveEditor
               title="Stress-Strain Curve"
-              xLabel="Strain"
-              yLabel="Stress"
+              description="Shows how a material deforms in response to an applied load."
+              xLabel="Strain (mm)"
+              yLabel="Stress (MPa)"
               xKey="strain"
               yKey="stress"
               points={stressPoints}
@@ -676,8 +677,9 @@ export default function Materials() {
 
             <CurveEditor
               title="Thermal Expansion Curve"
-              xLabel="Temperature"
-              yLabel="Expansion Coefficient"
+              description="Shows how a material's length (or volume) changes with temperature."
+              xLabel="Temperature (°C)"
+              yLabel="Expansion Coefficient (µm)"
               xKey="temperature"
               yKey="coefficient"
               points={thermalPoints}
