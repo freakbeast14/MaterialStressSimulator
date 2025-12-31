@@ -775,7 +775,7 @@ export default function Simulations() {
           </div>
           <div className="flex flex-wrap gap-3">
             <Select value={materialFilter} onValueChange={setMaterialFilter}>
-              <SelectTrigger className="w-full sm:w-44 bg-card text-xs relative pl-9">
+              <SelectTrigger className="w-full sm:w-44 bg-card text-xs relative pl-9 text-foreground/75 hover:text-foreground transition-all">
                 <Filter className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                 <SelectValue placeholder="Material" />
               </SelectTrigger>
@@ -789,7 +789,7 @@ export default function Simulations() {
             </SelectContent>
           </Select>
             <Select value={geometryFilter} onValueChange={setGeometryFilter}>
-              <SelectTrigger className="w-full sm:w-44 bg-card text-xs relative pl-9">
+              <SelectTrigger className="w-full sm:w-44 bg-card text-xs relative pl-9 text-foreground/75 hover:text-foreground transition-all">
                 <Filter className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                 <SelectValue placeholder="Geometry" />
               </SelectTrigger>
@@ -803,7 +803,7 @@ export default function Simulations() {
               </SelectContent>
             </Select>
             <Select value={typeFilter} onValueChange={setTypeFilter}>
-              <SelectTrigger className="w-full sm:w-40 bg-card text-xs relative pl-9">
+              <SelectTrigger className="w-full sm:w-40 bg-card text-xs relative pl-9 text-foreground/75 hover:text-foreground transition-all">
                 <Filter className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                 <SelectValue placeholder="Test Type" />
               </SelectTrigger>
@@ -817,7 +817,7 @@ export default function Simulations() {
               </SelectContent>
             </Select>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full sm:w-36 bg-card text-xs relative pl-9">
+              <SelectTrigger className="w-full sm:w-36 bg-card text-xs relative pl-9 text-foreground/75 hover:text-foreground transition-all">
                 <Filter className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
