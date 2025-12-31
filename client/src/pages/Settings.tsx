@@ -147,48 +147,46 @@ export default function Settings() {
               <Label className="text-sm">Assistant Sounds</Label>
               <div className="flex items-center justify-between">
                 <div>
-                  <Label className="text-xs">Mute assistant</Label>
-                  <p className="text-xs text-muted-foreground">
-                    Disable chat reply sounds.
-                  </p>
+                  <Label className="text-xs">Mute</Label>
+                  <p className="text-xs text-muted-foreground">Toggle assistant reply sound.</p>
                 </div>
                 <Switch
                   checked={assistantMuted}
                   onCheckedChange={setAssistantMuted}
                 />
               </div>
-              <div>
-                <div className="flex justify-between items-center">
-                  <Label className="text-xs">Volume</Label>
+              <div className="flex items-center justify-between !mt-4">
+                <Label className="text-xs">Volume</Label>
+                <div className="flex items-center gap-2">
                   <p className="text-[11px] text-muted-foreground">
                     {assistantMuted ? "Muted" : `${assistantVolume}%`}
                   </p>
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    step={5}
+                    value={assistantVolume}
+                    onChange={(event) =>
+                      setAssistantVolume(Number(event.target.value))
+                    }
+                    className="w-full accent-primary cursor-pointer"
+                    disabled={assistantMuted}
+                  />
                 </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={100}
-                  step={5}
-                  value={assistantVolume}
-                  onChange={(event) =>
-                    setAssistantVolume(Number(event.target.value))
-                  }
-                  className="w-full accent-primary"
-                  disabled={assistantMuted}
-                />
               </div>
-              <div className="space-y-2">
-                <Label className="text-xs">Reply sound</Label>
+              <div className="flex items-center justify-between !mt-4">
+                <Label className="text-xs">Sound</Label>
                 <Select value={assistantSound} onValueChange={setAssistantSound}>
-                  <SelectTrigger disabled={assistantMuted}>
+                  <SelectTrigger disabled={assistantMuted} className="w-1/2 h-auto text-xs px-2 py-1.5">
                     <SelectValue placeholder="Select sound" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="soft-chime">Soft chime</SelectItem>
-                    <SelectItem value="bubble-pop">Bubble pop</SelectItem>
-                    <SelectItem value="paper-tick">Paper tick</SelectItem>
-                    <SelectItem value="soft-bell">Soft bell</SelectItem>
-                    <SelectItem value="synth-ping">Tiny synth ping</SelectItem>
+                    <SelectItem value="soft-chime" className="text-xs">Soft chime</SelectItem>
+                    <SelectItem value="bubble-pop" className="text-xs">Bubble pop</SelectItem>
+                    <SelectItem value="paper-tick" className="text-xs">Paper tick</SelectItem>
+                    <SelectItem value="soft-bell" className="text-xs">Soft bell</SelectItem>
+                    <SelectItem value="synth-ping" className="text-xs">Synth ping</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
