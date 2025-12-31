@@ -130,6 +130,7 @@ function GeometryPreview({
                 k: mesh.k,
                 color: "#60a5fa",
                 opacity: 0.8,
+                hoverinfo: "skip",
               } as any,
             ]}
             layout={{
@@ -145,6 +146,7 @@ function GeometryPreview({
             }}
             style={{ width: "100%", height: "100%" }}
             // config={{ displayModeBar: false }}
+            config={{ displaylogo: false }}
           />
         </div>
       ) : (

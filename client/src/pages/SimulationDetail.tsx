@@ -1264,6 +1264,7 @@ export default function SimulationDetail() {
                           k: geometryMesh.k,
                           color: "#3b82f6",
                           opacity: 0.7,
+                          hoverinfo: "skip",
                         } as any,
                       ]}
                       layout={{
@@ -1279,6 +1280,7 @@ export default function SimulationDetail() {
                       }}
                       style={{ width: "100%", height: "100%" }}
                       // config={{ displayModeBar: false }}
+                      config={{ displaylogo: false }}
                     />
                   ) : (
                     <p className="text-sm text-muted-foreground">
@@ -1482,6 +1484,7 @@ export default function SimulationDetail() {
                               k: meshPreview.k,
                               color: "#22c55e",
                               opacity: 0.7,
+                              hoverinfo: "skip",
                             } as any,
                           ]}
                           layout={{
@@ -1497,6 +1500,7 @@ export default function SimulationDetail() {
                           }}
                           style={{ width: "100%", height: "100%" }}
                           // config={{ displayModeBar: false }}
+                          config={{ displaylogo: false }}
                         />
                       </div>
                     ) : (
@@ -2053,7 +2057,7 @@ export default function SimulationDetail() {
                     plot_bgcolor: "transparent",
                     font: { color: "var(--foreground)" },
                   }}
-                  config={{ responsive: true }}
+                  config={{ responsive: true, displaylogo: false }}
                   style={{ width: "100%" }}
                   // config={{ displayModeBar: false }}
                 />
@@ -2097,6 +2101,7 @@ export default function SimulationDetail() {
                   }}
                   style={{ width: "100%" }}
                   // config={{ displayModeBar: false }}
+                  config={{ displaylogo: false }}
                 />
               </div>
             </TabsContent>
