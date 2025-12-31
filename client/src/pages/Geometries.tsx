@@ -400,8 +400,13 @@ export default function Geometries() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       const fallbackName = `${geometry.name}.${geometry.format || "stl"}`;
+      const rawName = data.name || geometry.originalName || fallbackName;
+      const hasExtension = /\.[^./\\]+$/.test(rawName);
+      const downloadName = hasExtension
+        ? rawName
+        : `${rawName}.${geometry.format || "stl"}`;
       link.href = url;
-      link.download = data.name || geometry.originalName || fallbackName;
+      link.download = downloadName;
       document.body.appendChild(link);
       link.click();
       link.remove();
