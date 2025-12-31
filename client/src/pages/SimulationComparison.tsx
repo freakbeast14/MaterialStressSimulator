@@ -709,6 +709,7 @@ export default function SimulationComparison() {
                 }}
                 style={{ width: "100%" }}
                 // config={{ displayModeBar: false }}
+                config={{ displaylogo: false }}
               />
             </div>
           </TabsContent>
@@ -753,6 +754,7 @@ export default function SimulationComparison() {
                 }}
                 style={{ width: "100%" }}
                 // config={{ displayModeBar: false }}
+                config={{ displaylogo: false }}
               />
             </div>
           </TabsContent>

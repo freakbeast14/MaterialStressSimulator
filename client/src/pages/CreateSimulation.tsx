@@ -514,6 +514,7 @@ export function SimulationForm({
                           k: geometryMesh.k,
                           color: "#60a5fa",
                           opacity: 0.8,
+                          hoverinfo: "skip",
                         } as any,
                       ]}
                       layout={{
@@ -529,6 +530,7 @@ export function SimulationForm({
                       }}
                       style={{ width: "100%", height: "100%" }}
                       // config={{ displayModeBar: false }}
+                      config={{ displaylogo: false }}
                     />
                   </div>
                 ) : geometryId ? (
