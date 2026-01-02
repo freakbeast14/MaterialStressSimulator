@@ -133,6 +133,9 @@ const sendVerificationEmail = async (email: string, token: string, name?: string
         },
       });
       const safeName = name?.trim() ? name.trim() : "there";
+      const logoUrl =
+        process.env.EMAIL_LOGO_URL ||
+        `${normalizedBaseUrl.replace(/\/$/, "")}/logo.png`;
       const html = `<!doctype html>
 <html>
   <head>
@@ -146,13 +149,11 @@ const sendVerificationEmail = async (email: string, token: string, name?: string
           <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 10px 30px rgba(15,23,42,0.08);">
             <tr>
               <td style="padding:24px 28px;background:#eef4ff;">
-                <div style="display:flex;align-items:center;gap:12px;">
-                  <div style="width:40px;height:40px;border-radius:10px;background:#2563eb;display:flex;align-items:center;justify-content:center;">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"></path>
-                    </svg>
+                <div style="display:flex;align-items:center;">
+                  <div>
+                    <img src="${logoUrl}" width="24" height="24" alt="MatSim" style="display:block;width:24px;height:24px;" />
                   </div>
-                  <div style="font-size:18px;font-weight:700;">MatSim</div>
+                  <div style="font-size:18px;font-weight:700;padding-left:12px;">MatSim</div>
                 </div>
               </td>
             </tr>
@@ -162,7 +163,7 @@ const sendVerificationEmail = async (email: string, token: string, name?: string
                 <p style="margin:0 0 18px;font-size:14px;color:#475569;">Hi ${safeName},</p>
                 <p style="margin:0 0 18px;font-size:14px;line-height:1.6;color:#334155;">
                   Welcome to MatSim! Please confirm your email address to activate your account and
-                  access simulations, materials, and geometry tools.
+                  start running simulations.
                 </p>
                 <div style="margin:20px 0;">
                   <a href="${verifyUrl.toString()}" style="display:inline-block;background:#2563eb;color:#ffffff;text-decoration:none;padding:12px 18px;border-radius:10px;font-weight:600;">
