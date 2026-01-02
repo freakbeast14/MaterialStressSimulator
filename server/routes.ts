@@ -30,6 +30,7 @@ const assistantRequestSchema = z.object({
 });
 
 const registerSchema = z.object({
+  name: z.string().min(1).max(120),
   email: z.string().email(),
   password: z
     .string()
@@ -113,7 +114,7 @@ const hashToken = (token: string) =>
 
 const getAppBaseUrl = () => process.env.APP_BASE_URL || "http://localhost:5000";
 
-const sendVerificationEmail = async (email: string, token: string) => {
+const sendVerificationEmail = async (email: string, token: string, name?: string) => {
   const baseUrl = getAppBaseUrl();
   const normalizedBaseUrl = /^https?:\/\//i.test(baseUrl)
     ? baseUrl
@@ -131,11 +132,69 @@ const sendVerificationEmail = async (email: string, token: string) => {
           pass: gmailPass,
         },
       });
+      const safeName = name?.trim() ? name.trim() : "there";
+      const html = `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Verify your MatSim email</title>
+  </head>
+  <body style="margin:0;background:#f6f8fb;font-family:Arial,Helvetica,sans-serif;color:#0f172a;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f6f8fb;padding:24px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 10px 30px rgba(15,23,42,0.08);">
+            <tr>
+              <td style="padding:24px 28px;background:#eef4ff;">
+                <div style="display:flex;align-items:center;gap:12px;">
+                  <div style="width:40px;height:40px;border-radius:10px;background:#2563eb;display:flex;align-items:center;justify-content:center;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"></path>
+                    </svg>
+                  </div>
+                  <div style="font-size:18px;font-weight:700;">MatSim</div>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:28px;">
+                <h1 style="margin:0 0 8px;font-size:22px;">Verify your email</h1>
+                <p style="margin:0 0 18px;font-size:14px;color:#475569;">Hi ${safeName},</p>
+                <p style="margin:0 0 18px;font-size:14px;line-height:1.6;color:#334155;">
+                  Welcome to MatSim! Please confirm your email address to activate your account and
+                  access simulations, materials, and geometry tools.
+                </p>
+                <div style="margin:20px 0;">
+                  <a href="${verifyUrl.toString()}" style="display:inline-block;background:#2563eb;color:#ffffff;text-decoration:none;padding:12px 18px;border-radius:10px;font-weight:600;">
+                    Verify Email
+                  </a>
+                </div>
+                <p style="margin:0 0 12px;font-size:12px;color:#64748b;">
+                  This link expires in 24 hours. If you didn’t create a MatSim account, you can ignore this email.
+                </p>
+                <p style="margin:0;font-size:12px;color:#94a3b8;">
+                  Or copy and paste this link into your browser:<br />
+                  <span style="word-break:break-all;color:#2563eb;">${verifyUrl.toString()}</span>
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:18px 28px;border-top:1px solid #e2e8f0;font-size:12px;color:#94a3b8;">
+                © ${new Date().getFullYear()} MatSim • Simulation workspace for materials & geometry
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
       await transporter.sendMail({
         from: `MatSim <${gmailUser}>`,
         to: email,
         subject: "Verify your MatSim email",
-        html: `<p>Welcome to MatSim.</p><p>Verify your email by clicking the link below:</p><p><a href="${verifyUrl.toString()}">Verify Email</a></p>`,
+        html,
+        text: `Hi ${safeName},\n\nWelcome to MatSim! Please confirm your email address to activate your account.\n\nVerify email: ${verifyUrl.toString()}\n\nThis link expires in 24 hours. If you didn’t create a MatSim account, you can ignore this email.\n\n— MatSim`,
       });
       console.log(`[auth] Gmail verification email sent to ${email}`);
       return;
@@ -873,14 +932,14 @@ export async function registerRoutes(
       }
 
       const passwordHash = await bcrypt.hash(input.password, 10);
-      const user = await storage.createUser(email, passwordHash);
+      const user = await storage.createUser(email, passwordHash, input.name);
       await seedUserData(user.id);
 
       const token = crypto.randomBytes(32).toString("hex");
       const tokenHash = hashToken(token);
       const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24);
       await storage.createEmailVerificationToken(user.id, tokenHash, expiresAt);
-      await sendVerificationEmail(email, token);
+      await sendVerificationEmail(email, token, input.name);
 
       res.status(201).json({
         id: user.id,
@@ -983,7 +1042,7 @@ export async function registerRoutes(
         const tokenHash = hashToken(token);
         const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24);
         await storage.createEmailVerificationToken(updated.id, tokenHash, expiresAt);
-        await sendVerificationEmail(updated.email, token);
+        await sendVerificationEmail(updated.email, token, updated.name);
       }
 
       res.json({

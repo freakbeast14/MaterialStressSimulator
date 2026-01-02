@@ -33,7 +33,7 @@ export interface IStorage {
   countUsers(): Promise<number>;
   getUserByEmail(email: string): Promise<User | undefined>;
   getUserById(id: number): Promise<User | undefined>;
-  createUser(email: string, passwordHash: string): Promise<User>;
+  createUser(email: string, passwordHash: string, name: string): Promise<User>;
   updateUserProfile(
     id: number,
     data: { name?: string; email?: string; emailVerified?: boolean },
@@ -105,10 +105,10 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  async createUser(email: string, passwordHash: string): Promise<User> {
+  async createUser(email: string, passwordHash: string, name: string): Promise<User> {
     const [user] = await db
       .insert(users)
-      .values({ email, passwordHash, name: "" })
+      .values({ email, passwordHash, name })
       .returning();
     return user;
   }

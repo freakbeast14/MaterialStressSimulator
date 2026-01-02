@@ -52,6 +52,7 @@ export const api = {
       method: 'POST' as const,
       path: '/api/auth/register',
       input: z.object({
+        name: z.string().min(1).max(120),
         email: z.string().email(),
         password: z.string().min(8),
       }),

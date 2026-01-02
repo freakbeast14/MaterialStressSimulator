@@ -7,6 +7,7 @@ import { Eye, EyeOff, Info, Mail } from "lucide-react";
 
 export default function Register() {
   const { register } = useAuth();
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -20,6 +21,10 @@ export default function Register() {
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setError(null);
+    if (!name.trim()) {
+      setError("Name is required.");
+      return;
+    }
     if (password !== confirm) {
       setError("Passwords do not match.");
       return;
@@ -30,7 +35,7 @@ export default function Register() {
     }
     setIsSubmitting(true);
     try {
-      await register(email, password);
+      await register(name.trim(), email, password);
       setIsSuccess(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Registration failed.");
@@ -73,6 +78,18 @@ export default function Register() {
           Create your account
         </h1>
         <form className="mt-2 space-y-4" onSubmit={handleSubmit}>
+          <div>
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-200">
+              Name
+            </label>
+            <Input
+              className="mt-2"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              placeholder="Your name"
+              required
+            />
+          </div>
           <div>
             <label className="text-sm font-medium text-slate-700 dark:text-slate-200">
               Email
