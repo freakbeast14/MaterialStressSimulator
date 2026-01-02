@@ -3,7 +3,6 @@ import type { Server } from "http";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { z } from "zod";
-import { materials } from "@shared/schema";
 import { cancelSimulation, enqueueSimulation } from "./fea/queue";
 import {
   ensureLocalStorageRoot,
@@ -12,11 +11,58 @@ import {
 } from "./storage-backend";
 import fs from "fs";
 import path from "path";
+import session from "express-session";
+import memorystore from "memorystore";
+import bcrypt from "bcryptjs";
+import crypto from "crypto";
+import nodemailer from "nodemailer";
+
+declare module "express-session" {
+  interface SessionData {
+    userId?: number;
+  }
+}
 
 const assistantRequestSchema = z.object({
   question: z.string().min(1).max(1000),
   page: z.string().optional(),
   context: z.record(z.unknown()).nullable().optional(),
+});
+
+const registerSchema = z.object({
+  email: z.string().email(),
+  password: z
+    .string()
+    .min(8)
+    .regex(
+      /^(?=.*[0-9])(?=.*[^A-Za-z0-9]).{8,}$/,
+      "Password must include at least a number and a special character.",
+    ),
+});
+
+const loginSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(1),
+});
+
+const updateProfileSchema = z
+  .object({
+    name: z.string().min(1).max(120).optional(),
+    email: z.string().email().optional(),
+  })
+  .refine((data) => data.name || data.email, {
+    message: "Provide a name or email to update.",
+  });
+
+const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1),
+  newPassword: z
+    .string()
+    .min(8)
+    .regex(
+      /^(?=.*[0-9])(?=.*[^A-Za-z0-9]).{8,}$/,
+      "Password must include at least a number and a special character.",
+    ),
 });
 
 const ASSISTANT_SYSTEM_PROMPT =
@@ -58,6 +104,48 @@ const selectGuideSnippets = (guide: string, page: string, question: string) => {
   const top = scored.filter((item) => item.score > 0).slice(0, 3);
   if (top.length) return top.map((item) => item.section).join("\n");
   return sections.slice(0, 2).join("\n");
+};
+
+const normalizeEmail = (email: string) => email.trim().toLowerCase();
+
+const hashToken = (token: string) =>
+  crypto.createHash("sha256").update(token).digest("hex");
+
+const getAppBaseUrl = () => process.env.APP_BASE_URL || "http://localhost:5000";
+
+const sendVerificationEmail = async (email: string, token: string) => {
+  const baseUrl = getAppBaseUrl();
+  const normalizedBaseUrl = /^https?:\/\//i.test(baseUrl)
+    ? baseUrl
+    : `https://${baseUrl}`;
+  const verifyUrl = new URL("/verify", normalizedBaseUrl);
+  verifyUrl.searchParams.set("token", token);
+  const gmailUser = process.env.GMAIL_SMTP_USER;
+  const gmailPass = process.env.GMAIL_SMTP_PASS;
+  if (gmailUser && gmailPass) {
+    try {
+      const transporter = nodemailer.createTransport({
+        service: "gmail",
+        auth: {
+          user: gmailUser,
+          pass: gmailPass,
+        },
+      });
+      await transporter.sendMail({
+        from: `MatSim <${gmailUser}>`,
+        to: email,
+        subject: "Verify your MatSim email",
+        html: `<p>Welcome to MatSim.</p><p>Verify your email by clicking the link below:</p><p><a href="${verifyUrl.toString()}">Verify Email</a></p>`,
+      });
+      console.log(`[auth] Gmail verification email sent to ${email}`);
+      return;
+    } catch (err) {
+      console.error("[auth] Gmail SMTP send failed:", err);
+      console.log(`[auth] Verification link for ${email}: ${verifyUrl.toString()}`);
+      return;
+    }
+  }
+  console.log(`[auth] Verification link for ${email}: ${verifyUrl.toString()}`);
 };
 
 const seedGeometries = [
@@ -736,6 +824,238 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  const MemoryStore = memorystore(session);
+  const sessionStore = new MemoryStore({ checkPeriod: 1000 * 60 * 60 * 24 });
+  const sessionSecret = process.env.SESSION_SECRET || "matsim-dev-secret";
+
+  app.use(
+    session({
+      secret: sessionSecret,
+      resave: false,
+      saveUninitialized: false,
+      store: sessionStore,
+      cookie: {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+      },
+    }),
+  );
+
+  const requireAuth = async (
+    req: Express.Request,
+    res: Express.Response,
+    next: Express.NextFunction,
+  ) => {
+    if (!req.session?.userId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const user = await storage.getUserById(req.session.userId);
+    if (!user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    if (!user.emailVerified) {
+      return res.status(403).json({ message: "Email verification required" });
+    }
+    return next();
+  };
+
+  await ensureLocalStorageRoot();
+  await seedDefaultData();
+
+  app.post("/api/auth/register", async (req, res) => {
+    try {
+      const input = registerSchema.parse(req.body);
+      const email = normalizeEmail(input.email);
+      const existing = await storage.getUserByEmail(email);
+      if (existing) {
+        return res.status(400).json({ message: "Email already registered" });
+      }
+
+      const passwordHash = await bcrypt.hash(input.password, 10);
+      const user = await storage.createUser(email, passwordHash);
+      await seedUserData(user.id);
+
+      const token = crypto.randomBytes(32).toString("hex");
+      const tokenHash = hashToken(token);
+      const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24);
+      await storage.createEmailVerificationToken(user.id, tokenHash, expiresAt);
+      await sendVerificationEmail(email, token);
+
+      res.status(201).json({
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        emailVerified: user.emailVerified,
+      });
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({
+          message: err.errors[0].message,
+          field: err.errors[0].path.join("."),
+        });
+      }
+      throw err;
+    }
+  });
+
+  app.post("/api/auth/login", async (req, res) => {
+    try {
+      const input = loginSchema.parse(req.body);
+      const email = normalizeEmail(input.email);
+      const user = await storage.getUserByEmail(email);
+      if (!user) {
+        return res.status(400).json({ message: "Invalid email or password" });
+      }
+      if (!user.emailVerified) {
+        return res.status(403).json({ message: "Please verify your email before logging in" });
+      }
+      const valid = await bcrypt.compare(input.password, user.passwordHash);
+      if (!valid) {
+        return res.status(400).json({ message: "Invalid email or password" });
+      }
+      req.session.userId = user.id;
+      res.json({ id: user.id, name: user.name, email: user.email, emailVerified: user.emailVerified });
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({
+          message: err.errors[0].message,
+          field: err.errors[0].path.join("."),
+        });
+      }
+      throw err;
+    }
+  });
+
+  app.post("/api/auth/logout", (req, res) => {
+    req.session.destroy(() => {
+      res.json({ success: true });
+    });
+  });
+
+  app.get("/api/auth/me", async (req, res) => {
+    const userId = req.session?.userId;
+    if (!userId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const user = await storage.getUserById(userId);
+    if (!user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    if (!user.emailVerified) {
+      return res.status(403).json({ message: "Email verification required" });
+    }
+    res.json({ id: user.id, name: user.name, email: user.email, emailVerified: user.emailVerified });
+  });
+
+  app.put("/api/auth/profile", async (req, res) => {
+    try {
+      const userId = req.session?.userId;
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      const input = updateProfileSchema.parse(req.body);
+      const user = await storage.getUserById(userId);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const normalizedEmail = input.email ? normalizeEmail(input.email) : undefined;
+      const emailChanged = normalizedEmail && normalizedEmail !== user.email;
+      if (emailChanged) {
+        const existing = await storage.getUserByEmail(normalizedEmail);
+        if (existing && existing.id !== userId) {
+          return res.status(400).json({ message: "Email already registered" });
+        }
+      }
+
+      const updated = await storage.updateUserProfile(userId, {
+        name: input.name ?? user.name,
+        email: normalizedEmail ?? user.email,
+        emailVerified: emailChanged ? false : user.emailVerified,
+      });
+      if (!updated) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      if (emailChanged) {
+        const token = crypto.randomBytes(32).toString("hex");
+        const tokenHash = hashToken(token);
+        const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24);
+        await storage.createEmailVerificationToken(updated.id, tokenHash, expiresAt);
+        await sendVerificationEmail(updated.email, token);
+      }
+
+      res.json({
+        id: updated.id,
+        name: updated.name,
+        email: updated.email,
+        emailVerified: updated.emailVerified,
+      });
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({
+          message: err.errors[0].message,
+          field: err.errors[0].path.join("."),
+        });
+      }
+      throw err;
+    }
+  });
+
+  app.post("/api/auth/password", async (req, res) => {
+    try {
+      const userId = req.session?.userId;
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      const input = changePasswordSchema.parse(req.body);
+      const user = await storage.getUserById(userId);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const valid = await bcrypt.compare(input.currentPassword, user.passwordHash);
+      if (!valid) {
+        return res.status(400).json({ message: "Current password is incorrect" });
+      }
+
+      const nextHash = await bcrypt.hash(input.newPassword, 10);
+      await storage.updateUserPassword(userId, nextHash);
+      res.json({ success: true });
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({
+          message: err.errors[0].message,
+          field: err.errors[0].path.join("."),
+        });
+      }
+      throw err;
+    }
+  });
+
+  app.get("/api/auth/verify", async (req, res) => {
+    const token = typeof req.query.token === "string" ? req.query.token : "";
+    if (!token) {
+      return res.status(400).json({ message: "Missing token" });
+    }
+    const tokenHash = hashToken(token);
+    const record = await storage.getEmailVerificationTokenByHash(tokenHash);
+    if (!record || record.usedAt) {
+      return res.status(400).json({ message: "Invalid or expired token" });
+    }
+    if (record.expiresAt.getTime() < Date.now()) {
+      return res.status(400).json({ message: "Token expired" });
+    }
+    await storage.markEmailVerificationTokenUsed(record.id);
+    await storage.markUserVerified(record.userId);
+    res.json({ success: true });
+  });
+
+  app.use("/api", (req, res, next) => {
+    if (req.path.startsWith("/auth")) return next();
+    return Promise.resolve(requireAuth(req, res, next)).catch(next);
+  });
 
   app.post("/api/assistant", async (req, res) => {
     try {
@@ -818,12 +1138,14 @@ export async function registerRoutes(
   
   // === Materials Routes ===
   app.get(api.materials.list.path, async (req, res) => {
-    const allMaterials = await storage.getMaterials();
+    const userId = req.session.userId!;
+    const allMaterials = await storage.getMaterials(userId);
     res.json(allMaterials);
   });
 
   app.get(api.materials.get.path, async (req, res) => {
-    const material = await storage.getMaterial(Number(req.params.id));
+    const userId = req.session.userId!;
+    const material = await storage.getMaterial(Number(req.params.id), userId);
     if (!material) {
       return res.status(404).json({ message: 'Material not found' });
     }
@@ -833,7 +1155,8 @@ export async function registerRoutes(
   app.post(api.materials.create.path, async (req, res) => {
     try {
       const input = api.materials.create.input.parse(req.body);
-      const material = await storage.createMaterial(input);
+      const userId = req.session.userId!;
+      const material = await storage.createMaterial(userId, input);
       res.status(201).json(material);
     } catch (err) {
       if (err instanceof z.ZodError) {
@@ -848,8 +1171,9 @@ export async function registerRoutes(
 
   app.put(api.materials.update.path, async (req, res) => {
     try {
+      const userId = req.session.userId!;
       const input = api.materials.update.input.parse(req.body);
-      const updated = await storage.updateMaterial(Number(req.params.id), input);
+      const updated = await storage.updateMaterial(Number(req.params.id), userId, input);
       if (!updated) {
         return res.status(404).json({ message: "Material not found" });
       }
@@ -866,7 +1190,8 @@ export async function registerRoutes(
   });
 
   app.delete(api.materials.delete.path, async (req, res) => {
-    const deleted = await storage.deleteMaterial(Number(req.params.id));
+    const userId = req.session.userId!;
+    const deleted = await storage.deleteMaterial(Number(req.params.id), userId);
     if (!deleted) {
       return res.status(404).json({ message: "Material not found" });
     }
@@ -875,12 +1200,14 @@ export async function registerRoutes(
 
   // === Simulations Routes ===
   app.get(api.simulations.list.path, async (req, res) => {
-    const allSimulations = await storage.getSimulations();
+    const userId = req.session.userId!;
+    const allSimulations = await storage.getSimulations(userId);
     res.json(allSimulations);
   });
 
   app.get(api.simulations.get.path, async (req, res) => {
-    const simulation = await storage.getSimulation(Number(req.params.id));
+    const userId = req.session.userId!;
+    const simulation = await storage.getSimulation(Number(req.params.id), userId);
     if (!simulation) {
       return res.status(404).json({ message: 'Simulation not found' });
     }
@@ -890,14 +1217,15 @@ export async function registerRoutes(
   app.put(api.simulations.update.path, async (req, res) => {
     try {
       const simulationId = Number(req.params.id);
-      const simulation = await storage.getSimulation(simulationId);
+      const userId = req.session.userId!;
+      const simulation = await storage.getSimulation(simulationId, userId);
       if (!simulation) {
         return res.status(404).json({ message: "Simulation not found" });
       }
       const input = api.simulations.update.input.parse(req.body);
       const { boundaryConditions, run, ...updateFields } = input;
       const shouldRun = Boolean(run);
-      const existingConditions = await storage.getBoundaryConditions(simulationId);
+      const existingConditions = await storage.getBoundaryConditions(simulationId, userId);
       const existingPayload = existingConditions.map((condition) => ({
         type: condition.type,
         face: condition.face,
@@ -947,7 +1275,7 @@ export async function registerRoutes(
           ? true
           : simulation.paramsDirty ?? false,
       };
-      const updated = await storage.updateSimulation(simulationId, {
+      const updated = await storage.updateSimulation(simulationId, userId, {
         name: merged.name,
         materialId: merged.materialId,
         geometryId: merged.geometryId,
@@ -971,11 +1299,11 @@ export async function registerRoutes(
       }
 
       if (boundaryConditions) {
-        await storage.deleteBoundaryConditions(simulationId);
+        await storage.deleteBoundaryConditions(simulationId, userId);
         if (boundaryConditions.length) {
           await Promise.all(
             boundaryConditions.map((condition) =>
-              storage.createBoundaryCondition({
+              storage.createBoundaryCondition(userId, {
                 simulationId,
                 type: condition.type,
                 face: condition.face,
@@ -1001,9 +1329,9 @@ export async function registerRoutes(
           materialModel: updated.materialModel,
           yieldStrength: updated.yieldStrength,
           hardeningModulus: updated.hardeningModulus,
-          boundaryConditions: boundaryConditions ?? (await storage.getBoundaryConditions(simulationId)),
+          boundaryConditions: boundaryConditions ?? (await storage.getBoundaryConditions(simulationId, userId)),
         };
-        enqueueSimulation(simulationId, payload);
+        enqueueSimulation(simulationId, userId, payload);
       }
 
       res.json(updated);
@@ -1020,17 +1348,19 @@ export async function registerRoutes(
 
   app.post(api.simulations.cancel.path, async (req, res) => {
     const simulationId = Number(req.params.id);
-    const simulation = await storage.getSimulation(simulationId);
+    const userId = req.session.userId!;
+    const simulation = await storage.getSimulation(simulationId, userId);
     if (!simulation) {
       return res.status(404).json({ message: "Simulation not found" });
     }
-    await cancelSimulation(simulationId);
-    const updated = await storage.getSimulation(simulationId);
+    await cancelSimulation(simulationId, userId);
+    const updated = await storage.getSimulation(simulationId, userId);
     return res.json(updated ?? simulation);
   });
 
   app.delete(api.simulations.delete.path, async (req, res) => {
-    const deleted = await storage.deleteSimulation(Number(req.params.id));
+    const userId = req.session.userId!;
+    const deleted = await storage.deleteSimulation(Number(req.params.id), userId);
     if (!deleted) {
       return res.status(404).json({ message: 'Simulation not found' });
     }
@@ -1039,15 +1369,16 @@ export async function registerRoutes(
 
   app.post(api.simulations.create.path, async (req, res) => {
     try {
+      const userId = req.session.userId!;
       const input = api.simulations.create.input.parse(req.body);
       const { boundaryConditions, ...simulationInput } = input;
-      const simulation = await storage.createSimulation(simulationInput);
+      const simulation = await storage.createSimulation(userId, simulationInput);
       
       if (simulation) {
         if (boundaryConditions?.length) {
           await Promise.all(
             boundaryConditions.map((condition) =>
-              storage.createBoundaryCondition({
+              storage.createBoundaryCondition(userId, {
                 simulationId: simulation.id,
                 type: condition.type,
                 face: condition.face,
@@ -1057,7 +1388,7 @@ export async function registerRoutes(
             )
           );
         }
-        enqueueSimulation(simulation.id, input);
+        enqueueSimulation(simulation.id, userId, input);
       }
 
       res.status(201).json(simulation);
@@ -1073,13 +1404,15 @@ export async function registerRoutes(
   });
 
   // === Geometry Routes ===
-  app.get(api.geometries.list.path, async (_req, res) => {
-    const allGeometries = await storage.getGeometries();
+  app.get(api.geometries.list.path, async (req, res) => {
+    const userId = req.session.userId!;
+    const allGeometries = await storage.getGeometries(userId);
     res.json(allGeometries);
   });
 
   app.get(api.geometries.get.path, async (req, res) => {
-    const geometry = await storage.getGeometry(Number(req.params.id));
+    const userId = req.session.userId!;
+    const geometry = await storage.getGeometry(Number(req.params.id), userId);
     if (!geometry) {
       return res.status(404).json({ message: "Geometry not found" });
     }
@@ -1087,7 +1420,8 @@ export async function registerRoutes(
   });
 
   app.get(api.geometries.content.path, async (req, res) => {
-    const geometry = await storage.getGeometry(Number(req.params.id));
+    const userId = req.session.userId!;
+    const geometry = await storage.getGeometry(Number(req.params.id), userId);
     if (!geometry) {
       return res.status(404).json({ message: "Geometry not found" });
     }
@@ -1111,6 +1445,7 @@ export async function registerRoutes(
       );
       await storage.updateGeometryStorage(
         geometry.id,
+        userId,
         saved.storagePath,
         saved.sizeBytes,
       );
@@ -1125,6 +1460,7 @@ export async function registerRoutes(
 
   app.post(api.geometries.create.path, async (req, res) => {
     try {
+      const userId = req.session.userId!;
       const input = api.geometries.create.input.parse(req.body);
       const { name, originalName, format, contentBase64 } = input;
       const normalized = contentBase64.includes(",")
@@ -1136,7 +1472,7 @@ export async function registerRoutes(
       const fileName = `${Date.now()}-${safeName}.${safeFormat}`;
       const saved = await saveGeometryFile(fileName, buffer);
 
-      const geometry = await storage.createGeometry({
+      const geometry = await storage.createGeometry(userId, {
         name,
         originalName,
         format: safeFormat,
@@ -1160,7 +1496,8 @@ export async function registerRoutes(
     try {
       const input = api.geometries.update.input.parse(req.body);
       const geometryId = Number(req.params.id);
-      const geometry = await storage.getGeometry(geometryId);
+      const userId = req.session.userId!;
+      const geometry = await storage.getGeometry(geometryId, userId);
       if (!geometry) {
         return res.status(404).json({ message: "Geometry not found" });
       }
@@ -1191,7 +1528,7 @@ export async function registerRoutes(
         };
       }
 
-      const updated = await storage.updateGeometry(geometryId, updatePayload);
+      const updated = await storage.updateGeometry(geometryId, userId, updatePayload);
       if (!updated) {
         return res.status(404).json({ message: "Geometry not found" });
       }
@@ -1208,7 +1545,8 @@ export async function registerRoutes(
   });
 
   app.delete(api.geometries.delete.path, async (req, res) => {
-    const deleted = await storage.deleteGeometry(Number(req.params.id));
+    const userId = req.session.userId!;
+    const deleted = await storage.deleteGeometry(Number(req.params.id), userId);
     if (!deleted) {
       return res.status(404).json({ message: "Geometry not found" });
     }
@@ -1218,12 +1556,14 @@ export async function registerRoutes(
   // === Simulation Mesh Routes ===
   app.get(api.simulationMeshes.listBySimulation.path, async (req, res) => {
     const simulationId = Number(req.params.id);
-    const meshes = await storage.getSimulationMeshes(simulationId);
+    const userId = req.session.userId!;
+    const meshes = await storage.getSimulationMeshes(simulationId, userId);
     res.json(meshes);
   });
 
   app.get(api.simulationMeshes.content.path, async (req, res) => {
-    const mesh = await storage.getSimulationMesh(Number(req.params.id));
+    const userId = req.session.userId!;
+    const mesh = await storage.getSimulationMesh(Number(req.params.id), userId);
     if (!mesh) {
       return res.status(404).json({ message: "Simulation mesh not found" });
     }
@@ -1247,23 +1587,25 @@ export async function registerRoutes(
   // === Simulation Boundary Conditions ===
   app.get(api.simulationBoundaryConditions.listBySimulation.path, async (req, res) => {
     const simulationId = Number(req.params.id);
-    const simulation = await storage.getSimulation(simulationId);
+    const userId = req.session.userId!;
+    const simulation = await storage.getSimulation(simulationId, userId);
     if (!simulation) {
       return res.status(404).json({ message: "Simulation not found" });
     }
-    const conditions = await storage.getBoundaryConditions(simulationId);
+    const conditions = await storage.getBoundaryConditions(simulationId, userId);
     res.json(conditions);
   });
 
   app.post(api.simulationBoundaryConditions.create.path, async (req, res) => {
     try {
       const simulationId = Number(req.params.id);
-      const simulation = await storage.getSimulation(simulationId);
+      const userId = req.session.userId!;
+      const simulation = await storage.getSimulation(simulationId, userId);
       if (!simulation) {
         return res.status(404).json({ message: "Simulation not found" });
       }
       const input = api.simulationBoundaryConditions.create.input.parse(req.body);
-      const condition = await storage.createBoundaryCondition({
+      const condition = await storage.createBoundaryCondition(userId, {
         simulationId,
         type: input.type,
         face: input.face,
@@ -1282,18 +1624,13 @@ export async function registerRoutes(
     }
   });
 
-  // Seed if empty
-  await seedDatabase();
-
   return httpServer;
 }
 
-export async function seedDatabase() {
-  await ensureLocalStorageRoot();
-  const existingMaterials = await storage.getMaterials();
-  if (existingMaterials.length === 0) {
-    // Seed some materials
-    await storage.createMaterial({
+async function seedDefaultData() {
+  const existingDefaults = await storage.getDefaultMaterials();
+  if (existingDefaults.length === 0) {
+    await storage.createDefaultMaterial({
       name: "Structural Steel ASTM A36",
       category: "Metal",
       description: "Common structural steel used in construction and machinery.",
@@ -1316,10 +1653,10 @@ export async function seedDatabase() {
         { temperature: 200, coefficient: 13 },
         { temperature: 300, coefficient: 13.6 },
         { temperature: 400, coefficient: 14.2 },
-      ]
+      ],
     });
 
-    await storage.createMaterial({
+    await storage.createDefaultMaterial({
       name: "Aluminum Alloy 6061-T6",
       category: "Metal",
       description: "Precipitation-hardened aluminum alloy, used in aircraft structures.",
@@ -1340,10 +1677,10 @@ export async function seedDatabase() {
         { temperature: 100, coefficient: 24 },
         { temperature: 200, coefficient: 25.2 },
         { temperature: 300, coefficient: 26.5 },
-      ]
+      ],
     });
 
-    await storage.createMaterial({
+    await storage.createDefaultMaterial({
       name: "Titanium Ti-6Al-4V",
       category: "Metal",
       description: "Workhorse titanium alloy for aerospace and biomedical applications.",
@@ -1357,17 +1694,17 @@ export async function seedDatabase() {
         { strain: 0.005, stress: 800 },
         { strain: 0.008, stress: 880 }, // Yield
         { strain: 0.05, stress: 950 },
-        { strain: 0.10, stress: 900 },
+        { strain: 0.1, stress: 900 },
       ],
       thermalExpansionCurve: [
         { temperature: 20, coefficient: 8.6 },
         { temperature: 100, coefficient: 8.9 },
         { temperature: 300, coefficient: 9.5 },
         { temperature: 500, coefficient: 10.1 },
-      ]
+      ],
     });
-    
-    await storage.createMaterial({
+
+    await storage.createDefaultMaterial({
       name: "Polyetheretherketone (PEEK)",
       category: "Polymer",
       description: "High-performance organic thermoplastic polymer.",
@@ -1380,18 +1717,18 @@ export async function seedDatabase() {
         { strain: 0, stress: 0 },
         { strain: 0.02, stress: 80 },
         { strain: 0.05, stress: 100 },
-        { strain: 0.20, stress: 90 },
+        { strain: 0.2, stress: 90 },
       ],
       thermalExpansionCurve: [
         { temperature: 20, coefficient: 45 },
         { temperature: 100, coefficient: 55 },
         { temperature: 150, coefficient: 120 }, // Glass transition area
-      ]
+      ],
     });
   }
 
-  const existingGeometries = await storage.getGeometries();
-  if (existingGeometries.length === 0) {
+  const existingDefaultGeometries = await storage.getDefaultGeometries();
+  if (existingDefaultGeometries.length === 0) {
     for (const sample of seedGeometries) {
       const safeName = sample.originalName.replace(/[^a-z0-9-_.]+/gi, "_");
       const fileName = `${Date.now()}-${safeName}`;
@@ -1399,7 +1736,7 @@ export async function seedDatabase() {
         fileName,
         Buffer.from(sample.content),
       );
-      await storage.createGeometry({
+      await storage.createDefaultGeometry({
         name: sample.name,
         originalName: sample.originalName,
         format: sample.format,
@@ -1407,27 +1744,26 @@ export async function seedDatabase() {
         sizeBytes: saved.sizeBytes,
       });
     }
-    return;
+  }
+}
+
+async function seedUserData(userId: number) {
+  const existingMaterials = await storage.getMaterials(userId);
+  if (existingMaterials.length === 0) {
+    const defaults = await storage.getDefaultMaterials();
+    for (const material of defaults) {
+      const { id, createdAt, ...payload } = material;
+      await storage.createMaterial(userId, payload);
+    }
   }
 
-  for (const geometry of existingGeometries) {
-    try {
-      await readStoragePath(geometry.storagePath);
-    } catch {
-      const seedMatch = seedGeometries.find(
-        (item) => item.originalName === geometry.originalName
-      );
-      if (!seedMatch) continue;
-      const fileName = `${Date.now()}-${seedMatch.originalName}`;
-      const saved = await saveGeometryFile(
-        fileName,
-        Buffer.from(seedMatch.content),
-      );
-      await storage.updateGeometryStorage(
-        geometry.id,
-        saved.storagePath,
-        saved.sizeBytes,
-      );
+  const existingGeometries = await storage.getGeometries(userId);
+  if (existingGeometries.length === 0) {
+    const defaults = await storage.getDefaultGeometries();
+    for (const geometry of defaults) {
+      const { id, createdAt, ...payload } = geometry;
+      await storage.createGeometry(userId, payload);
     }
+    return;
   }
 }

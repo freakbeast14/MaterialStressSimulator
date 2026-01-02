@@ -31,12 +31,97 @@ export const errorSchemas = {
   internal: z.object({
     message: z.string(),
   }),
+  unauthorized: z.object({
+    message: z.string(),
+  }),
 };
+
+const userResponseSchema = z.object({
+  id: z.number(),
+  name: z.string(),
+  email: z.string().email(),
+  emailVerified: z.boolean(),
+});
 
 // ============================================
 // API CONTRACT
 // ============================================
 export const api = {
+  auth: {
+    register: {
+      method: 'POST' as const,
+      path: '/api/auth/register',
+      input: z.object({
+        email: z.string().email(),
+        password: z.string().min(8),
+      }),
+      responses: {
+        201: userResponseSchema,
+        400: errorSchemas.validation,
+      },
+    },
+    login: {
+      method: 'POST' as const,
+      path: '/api/auth/login',
+      input: z.object({
+        email: z.string().email(),
+        password: z.string().min(8),
+      }),
+      responses: {
+        200: userResponseSchema,
+        400: errorSchemas.validation,
+      },
+    },
+    logout: {
+      method: 'POST' as const,
+      path: '/api/auth/logout',
+      responses: {
+        200: z.object({ success: z.literal(true) }),
+      },
+    },
+    me: {
+      method: 'GET' as const,
+      path: '/api/auth/me',
+      responses: {
+        200: userResponseSchema,
+        401: errorSchemas.unauthorized,
+      },
+    },
+    verify: {
+      method: 'GET' as const,
+      path: '/api/auth/verify',
+      responses: {
+        200: z.object({ success: z.literal(true) }),
+        400: errorSchemas.validation,
+      },
+    },
+    updateProfile: {
+      method: "PUT" as const,
+      path: "/api/auth/profile",
+      input: z.object({
+        name: z.string().min(1).max(120).optional(),
+        email: z.string().email().optional(),
+      }),
+      responses: {
+        200: userResponseSchema,
+        400: errorSchemas.validation,
+        401: errorSchemas.unauthorized,
+      },
+    },
+    changePassword: {
+      method: "POST" as const,
+      path: "/api/auth/password",
+      input: z.object({
+        currentPassword: z.string().min(1),
+        newPassword: z.string().min(8),
+      }),
+      responses: {
+        200: z.object({ success: z.literal(true) }),
+        400: errorSchemas.validation,
+        401: errorSchemas.unauthorized,
+      },
+    },
+  },
   materials: {
     list: {
       method: 'GET' as const,

@@ -309,6 +309,7 @@ export function AssistantChat() {
       const res = await fetch("/api/assistant", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({
           question: trimmed,
           page,

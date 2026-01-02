@@ -3,9 +3,52 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 // === TABLE DEFINITIONS ===
+export const users = pgTable("users", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull().default(""),
+  email: text("email").notNull(),
+  passwordHash: text("password_hash").notNull(),
+  emailVerified: boolean("email_verified").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const emailVerificationTokens = pgTable("email_verification_tokens", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  tokenHash: text("token_hash").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  usedAt: timestamp("used_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const defaultMaterials = pgTable("default_materials", {
+ id: serial("id" ).primaryKey(),
+ name: text("name" ).notNull(),
+ category: text("category" ).notNull(),
+ description: text("description" ).notNull(),
+ density: doublePrecision("density" ).notNull(),
+ youngsModulus: doublePrecision("youngs_modulus" ).notNull(),
+ poissonRatio: doublePrecision("poisson_ratio" ).notNull(),
+ thermalConductivity: doublePrecision("thermal_conductivity" ).notNull(),
+ meltingPoint: doublePrecision("melting_point" ).notNull(),
+ stressStrainCurve: jsonb("stress_strain_curve" ).$type<{ strain: number; stress: number }[]>().notNull(),
+ thermalExpansionCurve: jsonb("thermal_expansion_curve" ).$type<{ temperature: number; coefficient: number }[]>().notNull(),
+ createdAt: timestamp("created_at" ).defaultNow(),
+});
+
+export const defaultGeometries = pgTable("default_geometries", {
+ id: serial("id" ).primaryKey(),
+ name: text("name" ).notNull(),
+ originalName: text("original_name" ).notNull(),
+ format: text("format" ).notNull(),
+ storagePath: text("storage_path" ).notNull(),
+ sizeBytes: integer("size_bytes" ).notNull(),
+ createdAt: timestamp("created_at" ).defaultNow(),
+});
 
 export const materials = pgTable("materials", {
   id: serial("id").primaryKey(),
+  userId: integer("user_id"),
   name: text("name").notNull(),
   category: text("category").notNull(), // Metal, Polymer, Composite
   description: text("description").notNull(),
@@ -25,6 +68,7 @@ export const materials = pgTable("materials", {
 
 export const simulations = pgTable("simulations", {
   id: serial("id").primaryKey(),
+  userId: integer("user_id"),
   name: text("name").notNull(),
   materialId: integer("material_id").notNull(),
   geometryId: integer("geometry_id"),
@@ -59,6 +103,7 @@ export const simulations = pgTable("simulations", {
 
 export const geometries = pgTable("geometries", {
   id: serial("id").primaryKey(),
+  userId: integer("user_id"),
   name: text("name").notNull(),
   originalName: text("original_name").notNull(),
   format: text("format").notNull(),
@@ -69,6 +114,7 @@ export const geometries = pgTable("geometries", {
 
 export const simulationMeshes = pgTable("simulation_meshes", {
   id: serial("id").primaryKey(),
+  userId: integer("user_id"),
   simulationId: integer("simulation_id").notNull(),
   geometryId: integer("geometry_id"),
   name: text("name").notNull(),
@@ -82,6 +128,7 @@ export const simulationMeshes = pgTable("simulation_meshes", {
 
 export const simulationBoundaryConditions = pgTable("simulation_boundary_conditions", {
   id: serial("id").primaryKey(),
+  userId: integer("user_id"),
   simulationId: integer("simulation_id").notNull(),
   type: text("type").notNull(), // fixed, pressure
   face: text("face").notNull(), // x+, x-, y+, y-, z+, z-
@@ -91,24 +138,44 @@ export const simulationBoundaryConditions = pgTable("simulation_boundary_conditi
 });
 
 // === BASE SCHEMAS ===
-export const insertMaterialSchema = createInsertSchema(materials).omit({ id: true, createdAt: true });
-export const insertSimulationSchema = createInsertSchema(simulations).omit({ id: true, createdAt: true, completedAt: true, results: true, progress: true });
-export const insertGeometrySchema = createInsertSchema(geometries).omit({ id: true, createdAt: true });
-export const insertSimulationMeshSchema = createInsertSchema(simulationMeshes).omit({ id: true, createdAt: true });
-export const insertSimulationBoundaryConditionSchema = createInsertSchema(simulationBoundaryConditions).omit({ id: true, createdAt: true });
+export const insertMaterialSchema = createInsertSchema(materials).omit({ id: true, createdAt: true, userId: true });
+export const insertDefaultMaterialSchema = createInsertSchema(defaultMaterials).omit({ id: true, createdAt: true });
+export const insertSimulationSchema = createInsertSchema(simulations).omit({
+  id: true,
+  createdAt: true,
+  completedAt: true,
+  results: true,
+  progress: true,
+  userId: true,
+});
+export const insertGeometrySchema = createInsertSchema(geometries).omit({ id: true, createdAt: true, userId: true });
+export const insertDefaultGeometrySchema = createInsertSchema(defaultGeometries).omit({ id: true, createdAt: true });
+export const insertSimulationMeshSchema = createInsertSchema(simulationMeshes).omit({ id: true, createdAt: true, userId: true });
+export const insertSimulationBoundaryConditionSchema = createInsertSchema(simulationBoundaryConditions).omit({
+  id: true,
+  createdAt: true,
+  userId: true,
+});
 
 // === EXPLICIT API CONTRACT TYPES ===
 export type Material = typeof materials.$inferSelect;
 export type InsertMaterial = z.infer<typeof insertMaterialSchema>;
+export type DefaultMaterial = typeof defaultMaterials.$inferSelect;
+export type InsertDefaultMaterial = z.infer<typeof insertDefaultMaterialSchema>;
 
 export type Simulation = typeof simulations.$inferSelect;
 export type InsertSimulation = z.infer<typeof insertSimulationSchema>;
 export type Geometry = typeof geometries.$inferSelect;
 export type InsertGeometry = z.infer<typeof insertGeometrySchema>;
+export type DefaultGeometry = typeof defaultGeometries.$inferSelect;
+export type InsertDefaultGeometry = z.infer<typeof insertDefaultGeometrySchema>;
 export type SimulationMesh = typeof simulationMeshes.$inferSelect;
 export type InsertSimulationMesh = z.infer<typeof insertSimulationMeshSchema>;
 export type SimulationBoundaryCondition = typeof simulationBoundaryConditions.$inferSelect;
 export type InsertSimulationBoundaryCondition = z.infer<typeof insertSimulationBoundaryConditionSchema>;
+
+export type User = typeof users.$inferSelect;
+export type EmailVerificationToken = typeof emailVerificationTokens.$inferSelect;
 
 export type CreateSimulationRequest = {
   name: string;
@@ -119,3 +186,12 @@ export type CreateSimulationRequest = {
 // Response types
 export type MaterialResponse = Material;
 export type SimulationResponse = Simulation;
+
+
+
+
+
+
+
+
+
