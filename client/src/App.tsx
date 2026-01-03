@@ -10,6 +10,7 @@ import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/Dashboard";
 import Materials from "@/pages/Materials";
 import MaterialDetail from "@/pages/MaterialDetail";
+import Home from "@/pages/Home";
 import Geometries from "@/pages/Geometries";
 import Simulations from "@/pages/Simulations";
 import SimulationDetail from "@/pages/SimulationDetail";
@@ -20,21 +21,24 @@ import Settings from "@/pages/Settings";
 
 function Router() {
   return (
-    <Layout>
-      <Switch>
-        <Route path="/" component={Dashboard} />
-        <Route path="/materials" component={Materials} />
-        <Route path="/geometries" component={Geometries} />
-        <Route path="/materials/:id" component={MaterialDetail} />
-        <Route path="/simulations" component={Simulations} />
-        <Route path="/simulations/create" component={CreateSimulation} />
-        <Route path="/simulations/:id" component={SimulationDetail} />
-        <Route path="/compare-simulations" component={SimulationComparison} />
-        <Route path="/settings" component={Settings} />
-        <Route path="/compare" component={Compare} />
-        <Route component={NotFound} />
-      </Switch>
-    </Layout>
+    <Switch>
+      <Route path="/" component={Home} />
+      <Layout>
+        <Switch>
+          <Route path="/dashboard" component={Dashboard} />
+          <Route path="/materials" component={Materials} />
+          <Route path="/geometries" component={Geometries} />
+          <Route path="/materials/:id" component={MaterialDetail} />
+          <Route path="/simulations" component={Simulations} />
+          <Route path="/simulations/create" component={CreateSimulation} />
+          <Route path="/simulations/:id" component={SimulationDetail} />
+          <Route path="/compare-simulations" component={SimulationComparison} />
+          <Route path="/settings" component={Settings} />
+          <Route path="/compare" component={Compare} />
+          <Route component={NotFound} />
+        </Switch>
+      </Layout>
+    </Switch>
   );
 }
 

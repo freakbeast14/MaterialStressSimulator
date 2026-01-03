@@ -26,7 +26,7 @@ export function Layout({ children }: LayoutProps) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
   const navItems = [
-    { label: "Dashboard", href: "/", icon: LayoutDashboard },
+    { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
     { label: "Create", href: "/simulations/create", icon: Zap, exact: true },
     { label: "Simualtions", href: "/simulations", icon: History, exclude: ["/simulations/create"] },
     { label: "Compare", href: "/compare-simulations", icon: BarChart2, exact: true },
