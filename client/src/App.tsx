@@ -23,6 +23,7 @@ import Login from "@/pages/Login";
 import Register from "@/pages/Register";
 import VerifyEmail from "@/pages/VerifyEmail";
 import CheckEmail from "@/pages/CheckEmail";
+import Admin from "@/pages/Admin";
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
@@ -66,6 +67,7 @@ function Router() {
               <Route path="/compare-simulations" component={SimulationComparison} />
               <Route path="/settings" component={Settings} />
               <Route path="/compare" component={Compare} />
+              <Route path="/admin" component={Admin} />
               <Route component={NotFound} />
             </Switch>
           </Layout>

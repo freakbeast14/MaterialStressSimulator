@@ -21,6 +21,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import Plot from "react-plotly.js";
 import { useAssistantContext } from "@/context/assistant-context";
+import { useAuth } from "@/context/auth-context";
 
 export default function Simulations() {
   const queryClient = useQueryClient();
@@ -33,6 +34,8 @@ export default function Simulations() {
   const { mutateAsync: createGeometry, isPending: isUploadingGeometry } = useCreateGeometry();
   const { toast } = useToast();
   const { setContext } = useAssistantContext();
+  const { user } = useAuth();
+  const isAdmin = user?.roleId === 2;
   const [activeSimulationId, setActiveSimulationId] = useState<number | null>(null);
   const { data: boundaryConditions } = useBoundaryConditions(activeSimulationId ?? undefined);
   const [search, setSearch] = useState("");
@@ -80,6 +83,10 @@ export default function Simulations() {
     materials?.find(m => m.id === id)?.name || "Unknown Material";
   const getGeometryName = (id?: number | null) =>
     geometries?.find((geom) => geom.id === id)?.name || "Unknown Geometry";
+  const getUserDisplayName = (sim: typeof simulations[number]) =>
+    (sim as { userName?: string | null; userEmail?: string | null }).userName ||
+    (sim as { userName?: string | null; userEmail?: string | null }).userEmail ||
+    "Unknown User";
   const truncateText = (value: string, max: number) =>
     value.length > max ? `${value.slice(0, max)}…` : value;
   const truncateName = (value: string | undefined, max = 30) => {
@@ -206,7 +213,16 @@ export default function Simulations() {
     return {
       pageSummary:
         "Browse and manage simulation runs with filters, sorting, and actions for edit, rerun, and delete.",
-      tableColumns: ["ID", "Name", "Test Type", "Material", "Geometry", "Status", "Date"],
+      tableColumns: [
+        "ID",
+        ...(isAdmin ? ["User"] : []),
+        "Name",
+        "Test Type",
+        "Material",
+        "Geometry",
+        "Status",
+        "Date",
+      ],
       actions: ["View", "Edit", "Run", "Pause/Cancel", "Delete"],
       search,
       filters: {
@@ -219,6 +235,7 @@ export default function Simulations() {
       totalCount: simulations?.length ?? 0,
       filteredCount: filteredSimulations?.length ?? 0,
       sample,
+      isAdmin,
     };
   }, [
     search,
@@ -233,6 +250,7 @@ export default function Simulations() {
     sortedSimulations,
     getMaterialName,
     getGeometryName,
+    isAdmin,
   ]);
 
   const assistantContextKey = useMemo(
@@ -843,15 +861,16 @@ export default function Simulations() {
           <div className="border-t border-border">
             <table className="w-full table-fixed text-sm text-left">
               <colgroup>
-              <col className="w-16" />
-              <col className="w-[16%]" />
-              <col className="w-[14%]" />
-              <col className="w-[16%]" />
-              <col className="w-[16%]" />
-              <col className="w-[14%]" />
-              <col className="w-[10%]" />
-              <col className="w-[24%]" />
-            </colgroup>
+                <col className="w-16" />
+                {isAdmin && <col className="w-[14%]" />}
+                <col className="w-[16%]" />
+                <col className="w-[14%]" />
+                <col className="w-[16%]" />
+                <col className="w-[16%]" />
+                <col className="w-[14%]" />
+                <col className="w-[10%]" />
+                <col className="w-[24%]" />
+              </colgroup>
             <thead className="text-xs uppercase bg-muted text-muted-foreground font-semibold">
               <tr>
                 <th className="px-6 py-4">
@@ -864,6 +883,13 @@ export default function Simulations() {
                     {renderSortIcon("id")}
                   </button>
                 </th>
+                {isAdmin && (
+                  <th className="px-6 py-4">
+                    <span className="inline-flex items-center gap-2 uppercase">
+                      User
+                    </span>
+                  </th>
+                )}
                 <th className="px-6 py-4">
                   <button
                     type="button"
@@ -936,6 +962,7 @@ export default function Simulations() {
               <table className="w-full table-fixed text-sm text-left">
                 <colgroup>
                   <col className="w-16" />
+                  {isAdmin && <col className="w-[14%]" />}
                   <col className="w-[16%]" />
                   <col className="w-[14%]" />
                   <col className="w-[16%]" />
@@ -948,6 +975,13 @@ export default function Simulations() {
                 {sortedSimulations.map((sim) => (
                   <tr key={sim.id} className="hover:bg-muted/30 transition-colors">
                     <td className="px-6 py-4 font-mono text-xs text-muted-foreground">#{sim.id}</td>
+                    {isAdmin && (
+                      <td className="px-6 py-4 text-foreground">
+                        <span className="block truncate" title={getUserDisplayName(sim)}>
+                          {truncateName(getUserDisplayName(sim), 15)}
+                        </span>
+                      </td>
+                    )}
                     <td className="px-6 py-4 font-medium text-foreground truncate">
                       <span title={sim.name}>
                         {truncateText(sim.name, 15)}
@@ -1067,7 +1101,7 @@ export default function Simulations() {
                 ))}
                 {sortedSimulations.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="px-6 py-12 text-center text-muted-foreground">
+                    <td colSpan={isAdmin ? 9 : 8} className="px-6 py-12 text-center text-muted-foreground">
                       No simulations found.
                     </td>
                   </tr>

@@ -6,7 +6,7 @@ import { Download, Pencil, Plus, Search, Trash2, Box } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import Plot from "react-plotly.js";
+import { GeometryPreview } from "@/components/GeometryPreview";
 import {
   Dialog,
   DialogContent,
@@ -14,6 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import Plot from "react-plotly.js";
 import { useAssistantContext } from "@/context/assistant-context";
 
 type GeometryFormState = {
@@ -21,19 +22,19 @@ type GeometryFormState = {
   file: File | null;
 };
 
-type GeometryPreviewProps = {
+type GeometryCardPreviewProps = {
   geometryId?: number;
   format: string;
   contentBase64?: string | null;
   refreshToken?: string;
 };
 
-function GeometryPreview({
+function GeometryCardPreview({
   geometryId,
   format,
   contentBase64,
   refreshToken,
-}: GeometryPreviewProps) {
+}: GeometryCardPreviewProps) {
   const [content, setContent] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -535,7 +536,7 @@ export default function Geometries() {
               >
                 {truncateFileName(geometry.originalName)}
               </p>
-              <GeometryPreview
+              <GeometryCardPreview
                 geometryId={geometry.id}
                 format={geometry.format}
                 refreshToken={`${geometry.originalName}-${geometry.sizeBytes}`}

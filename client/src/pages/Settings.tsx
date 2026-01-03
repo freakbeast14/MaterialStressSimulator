@@ -10,6 +10,16 @@ import { useAuth } from "@/context/auth-context";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Info } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const STORAGE_KEYS = {
   units: "matsim.units",
@@ -41,6 +51,7 @@ export default function Settings() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordSaving, setPasswordSaving] = useState(false);
+  const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
   const passwordRule = /^(?=.*[0-9])(?=.*[^A-Za-z0-9]).{8,}$/;
 
   useEffect(() => {
@@ -182,7 +193,6 @@ export default function Settings() {
       setPasswordSaving(false);
     }
   };
-
 
   return (
     <div className="space-y-8">
@@ -342,7 +352,11 @@ export default function Settings() {
               >
                 {profileSaving ? "Saving..." : "Save"}
               </Button>
-              <Button variant="destructive" onClick={() => void logout()} className="opacity-90 hover:opacity-100 border-none">
+              <Button
+                variant="destructive"
+                onClick={() => setIsLogoutConfirmOpen(true)}
+                className="opacity-90 hover:opacity-100 border-none"
+              >
                 Logout
               </Button>
             </div>
@@ -406,6 +420,20 @@ export default function Settings() {
           </div>
         </div>
       </div>
+      <AlertDialog open={isLogoutConfirmOpen} onOpenChange={setIsLogoutConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm logout</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to log out of MatSim?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => void logout()}>Logout</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

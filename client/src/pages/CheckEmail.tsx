@@ -23,7 +23,7 @@ export default function CheckEmail() {
           .
         </p>
         <div className="mt-6">
-          <Link href="/login" className="text-sm font-semibold text-primary">
+          <Link href="/login" className="text-sm font-semibold text-primary hover:underline">
             Go to login
           </Link>
         </div>

@@ -3,13 +3,20 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 // === TABLE DEFINITIONS ===
+export const roles = pgTable("roles", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+});
+
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
+  roleId: integer("role_id").notNull().default(1),
   name: text("name").notNull().default(""),
   email: text("email").notNull(),
   passwordHash: text("password_hash").notNull(),
   emailVerified: boolean("email_verified").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow(),
+  deletedAt: timestamp("deleted_at"),
 });
 
 export const emailVerificationTokens = pgTable("email_verification_tokens", {
@@ -49,6 +56,7 @@ export const defaultGeometries = pgTable("default_geometries", {
 export const materials = pgTable("materials", {
   id: serial("id").primaryKey(),
   userId: integer("user_id"),
+  defaultMaterialId: integer("default_material_id"),
   name: text("name").notNull(),
   category: text("category").notNull(), // Metal, Polymer, Composite
   description: text("description").notNull(),
@@ -99,11 +107,13 @@ export const simulations = pgTable("simulations", {
   
   createdAt: timestamp("created_at").defaultNow(),
   completedAt: timestamp("completed_at"),
+  deletedAt: timestamp("deleted_at"),
 });
 
 export const geometries = pgTable("geometries", {
   id: serial("id").primaryKey(),
   userId: integer("user_id"),
+  defaultGeometryId: integer("default_geometry_id"),
   name: text("name").notNull(),
   originalName: text("original_name").notNull(),
   format: text("format").notNull(),
@@ -138,7 +148,12 @@ export const simulationBoundaryConditions = pgTable("simulation_boundary_conditi
 });
 
 // === BASE SCHEMAS ===
-export const insertMaterialSchema = createInsertSchema(materials).omit({ id: true, createdAt: true, userId: true });
+export const insertMaterialSchema = createInsertSchema(materials).omit({
+  id: true,
+  createdAt: true,
+  userId: true,
+  defaultMaterialId: true,
+});
 export const insertDefaultMaterialSchema = createInsertSchema(defaultMaterials).omit({ id: true, createdAt: true });
 export const insertSimulationSchema = createInsertSchema(simulations).omit({
   id: true,
@@ -147,8 +162,14 @@ export const insertSimulationSchema = createInsertSchema(simulations).omit({
   results: true,
   progress: true,
   userId: true,
+  deletedAt: true,
 });
-export const insertGeometrySchema = createInsertSchema(geometries).omit({ id: true, createdAt: true, userId: true });
+export const insertGeometrySchema = createInsertSchema(geometries).omit({
+  id: true,
+  createdAt: true,
+  userId: true,
+  defaultGeometryId: true,
+});
 export const insertDefaultGeometrySchema = createInsertSchema(defaultGeometries).omit({ id: true, createdAt: true });
 export const insertSimulationMeshSchema = createInsertSchema(simulationMeshes).omit({ id: true, createdAt: true, userId: true });
 export const insertSimulationBoundaryConditionSchema = createInsertSchema(simulationBoundaryConditions).omit({
@@ -174,6 +195,7 @@ export type InsertSimulationMesh = z.infer<typeof insertSimulationMeshSchema>;
 export type SimulationBoundaryCondition = typeof simulationBoundaryConditions.$inferSelect;
 export type InsertSimulationBoundaryCondition = z.infer<typeof insertSimulationBoundaryConditionSchema>;
 
+export type Role = typeof roles.$inferSelect;
 export type User = typeof users.$inferSelect;
 export type EmailVerificationToken = typeof emailVerificationTokens.$inferSelect;
 

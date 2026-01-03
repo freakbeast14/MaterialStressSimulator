@@ -13,6 +13,7 @@ type AuthUser = {
   name: string;
   email: string;
   emailVerified: boolean;
+  roleId: number;
 };
 
 type AuthContextValue = {
