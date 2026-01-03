@@ -30,7 +30,7 @@ export function Layout({ children }: LayoutProps) {
   const isAdmin = user?.roleId === 2;
 
   const navItems = [
-    { label: "Dashboard", href: "/", icon: LayoutDashboard },
+    { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
     { label: "Create", href: "/simulations/create", icon: Zap, exact: true },
     { label: "Simualtions", href: "/simulations", icon: History, exclude: ["/simulations/create"] },
     { label: "Compare", href: "/compare-simulations", icon: BarChart2, exact: true },
@@ -44,7 +44,7 @@ export function Layout({ children }: LayoutProps) {
     return (
     <div className="flex flex-col h-full bg-card border-r border-border">
       <div className="p-6">
-        <Link href="/">
+        <Link href="/dashboard">
           <div
             className="flex items-center gap-3 cursor-pointer"
             onClick={() => setIsMobileOpen(false)}
@@ -142,7 +142,7 @@ export function Layout({ children }: LayoutProps) {
 
         {/* Mobile Trigger */}
         <div className="md:hidden fixed top-0 left-0 right-0 z-30 flex items-center justify-between p-4 bg-background/80 backdrop-blur-md border-b border-border">
-          <Link href="/">
+          <Link href="/dashboard">
             <div className="flex items-center gap-2 cursor-pointer">
               <div className="h-7 w-7 rounded-md bg-primary flex items-center justify-center">
                 <Activity className="h-4 w-4 text-primary-foreground" />

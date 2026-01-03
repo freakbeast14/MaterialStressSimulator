@@ -10,6 +10,7 @@ import NotFound from "@/pages/not-found";
 
 // Pages
 import Dashboard from "@/pages/Dashboard";
+import Home from "@/pages/Home";
 import Materials from "@/pages/Materials";
 import MaterialDetail from "@/pages/MaterialDetail";
 import Geometries from "@/pages/Geometries";
@@ -24,6 +25,7 @@ import Register from "@/pages/Register";
 import VerifyEmail from "@/pages/VerifyEmail";
 import CheckEmail from "@/pages/CheckEmail";
 import Admin from "@/pages/Admin";
+import Demo from "@/pages/Demo";
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
@@ -53,11 +55,13 @@ function Router() {
       <Route path="/register" component={Register} />
       <Route path="/verify" component={VerifyEmail} />
       <Route path="/check-email" component={CheckEmail} />
+      <Route path="/demo" component={Demo} />
+      <Route path="/" component={Home} />
       <Route>
         <RequireAuth>
           <Layout>
             <Switch>
-              <Route path="/" component={Dashboard} />
+              <Route path="/dashboard" component={Dashboard} />
               <Route path="/materials" component={Materials} />
               <Route path="/geometries" component={Geometries} />
               <Route path="/materials/:id" component={MaterialDetail} />

@@ -74,9 +74,17 @@ export default function Register() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4 dark:bg-slate-950">
       <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <h1 className="text-2xl font-semibold text-slate-900 dark:text-white">
-          Create your account
-        </h1>
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-semibold text-slate-900 dark:text-white">
+            Create your account
+          </h1>
+          <Link
+            href="/"
+            className="text-xs font-semibold text-primary hover:underline"
+          >
+            Back to home
+          </Link>
+        </div>
         <form className="mt-2 space-y-4" onSubmit={handleSubmit}>
           <div>
             <label className="text-sm font-medium text-slate-700 dark:text-slate-200">
