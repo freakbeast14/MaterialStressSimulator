@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import Plot from "react-plotly.js";
 import { useAssistantContext } from "@/context/assistant-context";
+import { useAuth } from "@/context/auth-context";
 
 type GeometryFormState = {
   name: string;
@@ -186,11 +187,14 @@ export default function Geometries() {
   const [createPreview, setCreatePreview] = useState<string | null>(null);
   const [editPreview, setEditPreview] = useState<string | null>(null);
   const contextKeyRef = useRef("");
+  const { user } = useAuth();
+  const userId = user?.id;
 
   const filteredGeometries = useMemo(
     () =>
       geometries?.filter((geometry) =>
-        geometry.name.toLowerCase().includes(search.toLowerCase())
+        geometry.name.toLowerCase().includes(search.toLowerCase()) &&
+        geometry.userId == userId
       ) ?? [],
     [geometries, search]
   );

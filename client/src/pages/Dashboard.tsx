@@ -29,6 +29,7 @@ import {
 } from "recharts";
 import Plot from "react-plotly.js";
 import { useAssistantContext } from "@/context/assistant-context";
+import { useAuth } from "@/context/auth-context";
 
 type GeometryMiniPreviewProps = {
   geometryId: number;
@@ -159,6 +160,8 @@ export default function Dashboard() {
   const { data: simulations, isLoading: loadingSimulations } = useSimulations();
   const { data: geometries, isLoading: loadingGeometries } = useGeometries();
   const { setContext } = useAssistantContext();
+  const { user } = useAuth();
+  const userId = user?.id;
 
   const activeSimulations =
     simulations?.filter((s) => s.status === "running").length || 0;
@@ -246,6 +249,13 @@ export default function Dashboard() {
         })
       : [];
 
+  const filteredMaterials = materials?.filter((material) => {
+    return material.userId == userId;
+  });
+  const filteredGeometries = geometries?.filter((geometry) => {
+    return geometry.userId == userId;
+  });
+
   const assistantContext = useMemo(() => {
     return {
       pageSummary:
@@ -253,8 +263,8 @@ export default function Dashboard() {
       sections: ["Status Tiles", "Recent Simulations", "Materials", "Geometries"],
       actions: ["Create Simulation", "View All Simulations", "View All Materials", "View All Geometries"],
       totals: {
-        materials: materials?.length ?? 0,
-        geometries: geometries?.length ?? 0,
+        materials: filteredMaterials?.length ?? 0,
+        geometries: filteredGeometries?.length ?? 0,
         simulations: simulations?.length ?? 0,
         running: activeSimulations,
         pending: pendingSimulations,
@@ -269,8 +279,8 @@ export default function Dashboard() {
       })),
     };
   }, [
-    materials?.length,
-    geometries?.length,
+    filteredMaterials?.length,
+    filteredGeometries?.length,
     simulations?.length,
     activeSimulations,
     pendingSimulations,
@@ -478,7 +488,7 @@ export default function Dashboard() {
               </Link>
             </div>
             <div className="divide-y divide-border/50">
-              {materials?.slice(0, 6).map((mat) => (
+              {filteredMaterials?.slice(0, 6).map((mat) => (
                 <Link key={mat.id} href={`/materials/${mat.id}`}>
                   <div className="p-4 hover:bg-muted/50 transition-colors cursor-pointer group">
                     <div className="flex items-center justify-between gap-2">
@@ -502,7 +512,7 @@ export default function Dashboard() {
                   </div>
                 </Link>
               ))}
-              {(!materials || materials.length === 0) && (
+              {(!filteredMaterials || filteredMaterials.length === 0) && (
                 <div className="p-8 text-center text-muted-foreground">
                   No materials in database.
                 </div>
@@ -530,7 +540,7 @@ export default function Dashboard() {
               </Link>
             </div>
             <div className="divide-y divide-border/50">
-              {geometries?.slice(0, 6).map((geom) => (
+              {filteredGeometries?.slice(0, 6).map((geom) => (
                 <Link key={geom.id} href="/geometries">
                   <div className="p-4 hover:bg-muted/50 transition-colors cursor-pointer group">
                     <div className="flex items-center justify-between gap-2">
@@ -554,7 +564,7 @@ export default function Dashboard() {
                   </div>
                 </Link>
               ))}
-              {(!geometries || geometries.length === 0) && (
+              {(!filteredGeometries || filteredGeometries.length === 0) && (
                 <div className="p-8 text-center text-muted-foreground">
                   No geometries in library.
                 </div>

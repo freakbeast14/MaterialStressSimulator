@@ -1514,7 +1514,7 @@ export default function Admin() {
             <button
               key={item.id}
               type="button"
-              className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition ${
+              className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition ${
                 activeSection === item.id
                   ? "bg-primary/10 text-primary ring-1 ring-primary/20"
                   : "text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -1568,14 +1568,14 @@ export default function Admin() {
                   {filteredAdminUsers.length ? (
                     filteredAdminUsers.map((adminUser) => (
                       <tr key={adminUser.id} className="border-t border-border/70">
-                        <td className="px-4 py-3 font-medium text-foreground truncate">
+                        <td className="px-4 py-3 font-medium text-foreground truncate" title={adminUser.name}>
                           {adminUser.name}
                         </td>
-                        <td className="px-4 py-3 text-muted-foreground truncate">{adminUser.email}</td>
+                        <td className="px-4 py-3 text-muted-foreground truncate" title={adminUser.email}>{adminUser.email}</td>
                         <td className={`px-4 py-3 text-sm truncate ${adminUser.roleId == 2 ? "text-primary" : "text-muted-foreground"}`}>
                           {adminUser.roleId === 2 ? "Admin" : "User"}
                         </td>
-                        <td className="px-4 py-3 truncate">
+                        <td className="px-4 py-3 truncate" title={adminUser.emailVerified ? "Verified" : "Pending"}>
                           <span
                             className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${
                               adminUser.emailVerified
@@ -1586,9 +1586,17 @@ export default function Admin() {
                             {adminUser.emailVerified ? "Verified" : "Pending"}
                           </span>
                         </td>
-                        <td className="px-4 py-3 font-mono text-muted-foreground truncate">
+                        <td className="px-4 py-3 font-mono text-muted-foreground truncate" title={adminUser.createdAt
+                            ? new Date(adminUser.createdAt).toLocaleString("en-US", {
+                                month: "short",
+                                day: "2-digit",
+                                year: "numeric",
+                                hour: "numeric",
+                                minute: "2-digit",
+                              })
+                            : "—"}>
                           {adminUser.createdAt
-                            ? new Date(adminUser.createdAt).toLocaleString(undefined, {
+                            ? new Date(adminUser.createdAt).toLocaleString("en-US", {
                                 month: "short",
                                 day: "2-digit",
                                 year: "numeric",

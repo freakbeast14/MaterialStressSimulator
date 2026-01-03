@@ -269,7 +269,7 @@ export default function Settings() {
 
             <div className="space-y-2 pt-2 border-t border-border/60">
               <Label className="text-sm">Assistant Sounds</Label>
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between !mt-5">
                 <div>
                   <Label className="text-xs">Mute</Label>
                   <p className="text-xs text-muted-foreground">Toggle assistant reply sound.</p>
@@ -279,7 +279,7 @@ export default function Settings() {
                   onCheckedChange={setAssistantMuted}
                 />
               </div>
-              <div className="flex items-center justify-between !mt-4">
+              <div className="flex items-center justify-between !mt-6">
                 <Label className="text-xs">Volume</Label>
                 <div className="flex items-center gap-2">
                   <p className="text-[11px] text-muted-foreground">
@@ -299,7 +299,7 @@ export default function Settings() {
                   />
                 </div>
               </div>
-              <div className="flex items-center justify-between !mt-4">
+              <div className="flex items-center justify-between !mt-6">
                 <Label className="text-xs">Sound</Label>
                 <Select value={assistantSound} onValueChange={setAssistantSound}>
                   <SelectTrigger disabled={assistantMuted} className="w-1/2 h-auto text-xs px-2 py-1.5">

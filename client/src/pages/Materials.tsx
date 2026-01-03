@@ -20,6 +20,7 @@ import {
 import Compare from "@/pages/Compare";
 import { useAssistantContext } from "@/context/assistant-context";
 import { CurveEditor, type CurvePoint } from "@/components/CurveEditor";
+import { useAuth } from "@/context/auth-context";
 
 const defaultStressPoints: CurvePoint[] = [
   { x: 0, y: 0 },
@@ -61,6 +62,8 @@ export default function Materials() {
   const [thermalPoints, setThermalPoints] = useState<CurvePoint[]>(defaultThermalPoints);
   const [stressValid, setStressValid] = useState(true);
   const [thermalValid, setThermalValid] = useState(true);
+  const { user } = useAuth();
+  const userId = user?.id;
 
   const materialCategories = useMemo(() => {
     const categories = materials?.map((material) => material.category) || [];
@@ -73,7 +76,8 @@ export default function Materials() {
       material.category.toLowerCase().includes(search.toLowerCase());
     const matchesCategory =
       categoryFilter === "all" || material.category === categoryFilter;
-    return matchesSearch && matchesCategory;
+    const matchesUserId = material.userId == userId;
+    return matchesSearch && matchesCategory && matchesUserId;
   });
 
   const assistantContext = useMemo(() => {

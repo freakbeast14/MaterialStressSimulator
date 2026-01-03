@@ -1040,7 +1040,7 @@ export default function Simulations() {
                         );
                       })()}
                     </td>
-                  <td className="px-6 py-4">
+                    <td className="px-6 py-4 truncate" title={sim.paramsDirty ? "Updated" : sim.status.toUpperCase()}>
                       <StatusBadge status={sim.paramsDirty ? "Updated" : sim.status} />
                     </td>
                     <td className="px-6 py-4 text-right">

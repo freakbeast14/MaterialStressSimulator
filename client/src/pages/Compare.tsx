@@ -5,6 +5,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAssistantContext } from "@/context/assistant-context";
+import { useAuth } from "@/context/auth-context";
 
 type CompareProps = {
   embedded?: boolean;
@@ -14,6 +15,8 @@ export default function Compare({ embedded = false }: CompareProps) {
   const { data: materials, isLoading } = useMaterials();
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const { setContext } = useAssistantContext();
+  const { user } = useAuth();
+  const userId = user?.id;
 
   const toggleMaterial = (id: number) => {
     setSelectedIds(prev => 
@@ -26,7 +29,10 @@ export default function Compare({ embedded = false }: CompareProps) {
   // Prepare data for multi-line chart
   // This is simplified; in a real app you'd need to normalize X-axis points
   // Here we assume strain points are consistent or we just overlay them visually
-  const selectedMaterials = materials?.filter(m => selectedIds.includes(m.id)) || [];
+  const filteredMaterials = materials?.filter((material) => {
+    return material.userId == userId;
+  });
+  const selectedMaterials = filteredMaterials?.filter(m => selectedIds.includes(m.id)) || [];
 
   const assistantContext = useMemo(
     () => ({
@@ -119,7 +125,7 @@ export default function Compare({ embedded = false }: CompareProps) {
             </div>
           ) : (
             <div className="space-y-3">
-              {materials?.map((mat) => (
+              {filteredMaterials?.map((mat) => (
                 <div key={mat.id} className="flex items-center space-x-2">
                   <Checkbox 
                     id={`mat-${mat.id}`} 
