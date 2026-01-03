@@ -31,6 +31,7 @@ import { CurveEditor, type CurvePoint } from "@/components/CurveEditor";
 import { GeometryPreview } from "@/components/GeometryPreview";
 import {
   Box,
+  Download,
   KeyRound,
   Layers,
   Pencil,
@@ -39,6 +40,7 @@ import {
   Trash2,
   Users,
   Eye,
+  UserPlus,
 } from "lucide-react";
 
 type AdminUser = {
@@ -739,6 +741,37 @@ export default function Admin() {
     return `${gb.toFixed(1)} GB`;
   };
 
+  const formatFileLabel = (name?: string | null) => {
+    if (!name) return "No file chosen";
+    if (name.length <= 30) return name;
+    const parts = name.split(".");
+    const ext = parts.length > 1 ? `.${parts.pop()}` : "";
+    const base = parts.join(".") || name;
+    const prefix = base.slice(0, 30);
+    return `${prefix}...${ext || ""}`;
+  };
+
+  const downloadBase64File = (payload: { contentBase64?: string; name?: string }, fallbackName: string, format?: string) => {
+    const raw = payload.contentBase64 || "";
+    const [header, base64] = raw.includes(",") ? raw.split(",", 2) : ["", raw];
+    const mimeMatch = header.match(/data:(.*);base64/);
+    const mimeType = mimeMatch?.[1] || "application/octet-stream";
+    const binary = atob(base64);
+    const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+    const blob = new Blob([bytes], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    const rawName = payload.name || fallbackName;
+    const hasExtension = /\.[^./\\]+$/.test(rawName);
+    const downloadName = hasExtension ? rawName : `${rawName}.${format || "stl"}`;
+    link.href = url;
+    link.download = downloadName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  };
+
   const resetUserDialog = (target: AdminUser) => {
     setResetTarget(target);
     setResetPassword("");
@@ -881,6 +914,11 @@ export default function Admin() {
     setIsDefaultGeometryOpen(true);
   };
 
+  const truncateName = (value: string | undefined, max = 30) => {
+    if (!value) { return value };
+    return value.length > max ? `${value.slice(0, max)}...` : value;
+  }
+
   const handleCreateUser = async () => {
     try {
       await createUserMutation.mutateAsync({
@@ -890,7 +928,17 @@ export default function Admin() {
         roleId: Number(newUserRole),
         emailVerified: newUserVerified,
       });
-      toast({ title: "User created" });
+      toast({ 
+        title: "User created",
+        description: (
+          <span>
+            <span className="font-medium text-foreground italic" title={newUserName.trim()}>
+              {truncateName(newUserName.trim(), 25)}
+            </span>{" "}
+            created.
+          </span>
+        ), 
+      });
       setNewUserName("");
       setNewUserEmail("");
       setNewUserPassword("");
@@ -918,7 +966,17 @@ export default function Admin() {
           emailVerified: userEmailVerifiedDraft,
         },
       });
-      toast({ title: "User updated" });
+      toast({ 
+        title: "User updated",
+        description: (
+          <span>
+            <span className="font-medium text-foreground italic" title={userNameDraft.trim()}>
+              {truncateName(userNameDraft.trim(), 25)}
+            </span>{" "}
+            updated.
+          </span>
+        ), 
+      });
       setIsUserDialogOpen(false);
     } catch (err) {
       toast({
@@ -944,7 +1002,17 @@ export default function Admin() {
         id: resetTarget.id,
         newPassword: resetPassword,
       });
-      toast({ title: "Password reset" });
+      toast({ 
+        title: "Password reset",
+        description: (
+          <span>
+            Password changed for{" "}
+            <span className="font-medium text-foreground italic" title={resetTarget.name.trim()}>
+              {truncateName(resetTarget.name.trim(), 25)}
+            </span>
+          </span>
+        ), 
+      });
       setIsResetDialogOpen(false);
     } catch (err) {
       toast({
@@ -958,7 +1026,17 @@ export default function Admin() {
   const handleDeleteUser = async (target: AdminUser) => {
     try {
       await deleteUserMutation.mutateAsync(target.id);
-      toast({ title: "User deleted" });
+      toast({ 
+        title: "User deleted",
+        description: (
+          <span>
+            <span className="font-medium text-foreground italic" title={target.name.trim()}>
+              {truncateName(target.name.trim(), 25)}
+            </span>{" "}
+            deleted.
+          </span>
+        ), 
+      });
     } catch (err) {
       toast({
         title: "Failed to delete user",
@@ -1000,10 +1078,31 @@ export default function Admin() {
           id: activeDefaultMaterial.id,
           data: payload,
         });
+        toast({ 
+          title: "Default material updated",
+          description: (
+            <span>
+              <span className="font-medium text-foreground italic" title={defaultMaterialDraft.name.trim()}>
+                {truncateName(defaultMaterialDraft.name.trim(), 25)}
+              </span>{" "}
+              updated.
+            </span>
+          ), 
+        });
       } else {
         await createDefaultMaterialMutation.mutateAsync(payload);
+        toast({ 
+          title: "Default material added",
+          description: (
+            <span>
+              <span className="font-medium text-foreground italic" title={defaultMaterialDraft.name.trim()}>
+                {truncateName(defaultMaterialDraft.name.trim(), 25)}
+              </span>{" "}
+              added.
+            </span>
+          ), 
+        });
       }
-      toast({ title: "Default material saved" });
       setIsDefaultMaterialOpen(false);
     } catch (err) {
       toast({
@@ -1017,7 +1116,17 @@ export default function Admin() {
   const handleDeleteDefaultMaterial = async (target: DefaultMaterial) => {
     try {
       await deleteDefaultMaterialMutation.mutateAsync(target.id);
-      toast({ title: "Default material deleted" });
+      toast({ 
+        title: "Default material deleted",
+        description: (
+          <span>
+            <span className="font-medium text-foreground italic" title={target.name.trim()}>
+              {truncateName(target.name.trim(), 25)}
+            </span>{" "}
+            deleted.
+          </span>
+        ), 
+      });
     } catch (err) {
       toast({
         title: "Failed to delete default material",
@@ -1068,14 +1177,35 @@ export default function Admin() {
           id: activeDefaultGeometry.id,
           data: payload,
         });
+        toast({ 
+          title: "Default geometry updated",
+          description: (
+            <span>
+              <span className="font-medium text-foreground italic" title={defaultGeometryForm.name.trim()}>
+                {truncateName(defaultGeometryForm.name.trim(), 25)}
+              </span>{" "}
+              updated.
+            </span>
+          ), 
+        });
       } else {
         if (!file || !defaultGeometryPreview) {
           toast({ title: "Upload an STL file", variant: "destructive" });
           return;
         }
         await createDefaultGeometryMutation.mutateAsync(payload as typeof api.admin.defaultGeometries.create.input._type);
+        toast({ 
+          title: "Default geometry added",
+          description: (
+            <span>
+              <span className="font-medium text-foreground italic" title={defaultGeometryForm.name.trim()}>
+                {truncateName(defaultGeometryForm.name.trim(), 25)}
+              </span>{" "}
+              added.
+            </span>
+          ), 
+        });
       }
-      toast({ title: "Default geometry saved" });
       setDefaultGeometryRefreshToken(String(Date.now()));
       setIsDefaultGeometryOpen(false);
     } catch (err) {
@@ -1090,7 +1220,17 @@ export default function Admin() {
   const handleDeleteDefaultGeometry = async (target: DefaultGeometry) => {
     try {
       await deleteDefaultGeometryMutation.mutateAsync(target.id);
-      toast({ title: "Default geometry deleted" });
+      toast({ 
+        title: "Default geometry deleted",
+        description: (
+          <span>
+            <span className="font-medium text-foreground italic" title={target.name.trim()}>
+              {truncateName(target.name.trim(), 25)}
+            </span>{" "}
+            delete.
+          </span>
+        ), 
+      });
     } catch (err) {
       toast({
         title: "Failed to delete default geometry",
@@ -1134,13 +1274,33 @@ export default function Admin() {
           materialId: activeUserMaterial.id,
           data: payload,
         });
-        toast({ title: "User material updated" });
+        toast({ 
+          title: "User material updated",
+          description: (
+            <span>
+              <span className="font-medium text-foreground italic" title={userMaterialDraft.name.trim()}>
+                {truncateName(userMaterialDraft.name.trim(), 25)}
+              </span>{" "}
+              updated.
+            </span>
+          ), 
+        });
       } else {
         await createUserMaterialMutation.mutateAsync({
           userId: activeUserData.id,
           data: payload,
         });
-        toast({ title: "User material created" });
+        toast({ 
+          title: "User material added",
+          description: (
+            <span>
+              <span className="font-medium text-foreground italic" title={userMaterialDraft.name.trim()}>
+                {truncateName(userMaterialDraft.name.trim(), 25)}
+              </span>{" "}
+              added.
+            </span>
+          ), 
+        });
       }
       setIsUserMaterialOpen(false);
     } catch (err) {
@@ -1159,7 +1319,17 @@ export default function Admin() {
         userId: activeUserData.id,
         materialId: target.id,
       });
-      toast({ title: "User material deleted" });
+      toast({ 
+        title: "User material deleted",
+        description: (
+          <span>
+            <span className="font-medium text-foreground italic" title={target.name.trim()}>
+              {truncateName(target.name.trim(), 25)}
+            </span>{" "}
+            deleted.
+          </span>
+        ), 
+      });
     } catch (err) {
       toast({
         title: "Failed to delete user material",
@@ -1202,7 +1372,17 @@ export default function Admin() {
           geometryId: activeUserGeometry.id,
           data: payload,
         });
-        toast({ title: "User geometry updated" });
+        toast({ 
+          title: "User geometry updated",
+          description: (
+            <span>
+              <span className="font-medium text-foreground italic" title={userGeometryName.trim()}>
+                {truncateName(userGeometryName.trim(), 25)}
+              </span>{" "}
+              updated.
+            </span>
+          ), 
+        });
         setUserGeometryRefreshToken(String(Date.now()));
       } else {
         if (!userGeometryFile || !userGeometryPreview) {
@@ -1213,7 +1393,17 @@ export default function Admin() {
           userId: activeUserData.id,
           data: payload,
         });
-        toast({ title: "User geometry created" });
+        toast({ 
+          title: "User geometry added",
+          description: (
+            <span>
+              <span className="font-medium text-foreground italic" title={userGeometryName.trim()}>
+                {truncateName(userGeometryName.trim(), 25)}
+              </span>{" "}
+              added.
+            </span>
+          ), 
+        });
         setUserGeometryRefreshToken(String(Date.now()));
       }
       setIsUserGeometryOpen(false);
@@ -1233,13 +1423,59 @@ export default function Admin() {
         userId: activeUserData.id,
         geometryId: target.id,
       });
-      toast({ title: "User geometry deleted" });
+      toast({ 
+        title: "User geometry deleted",
+        description: (
+          <span>
+            <span className="font-medium text-foreground italic" title={target.name.trim()}>
+              {truncateName(target.name.trim(), 25)}
+            </span>{" "}
+            deleted.
+          </span>
+        ), 
+      });
     } catch (err) {
       toast({
         title: "Failed to delete user geometry",
         description: err instanceof Error ? err.message : "Try again.",
         variant: "destructive",
       });
+    }
+  };
+
+  const handleDownloadUserGeometry = async (geometry: UserGeometry) => {
+    try {
+      const res = await fetch(`/api/geometries/${geometry.id}/content`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to download geometry.");
+      const data = await res.json();
+      downloadBase64File(
+        data,
+        geometry.originalName || `${geometry.name}.${geometry.format || "stl"}`,
+        geometry.format
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to download geometry.";
+      toast({ title: "Download failed", description: message, variant: "destructive" });
+    }
+  };
+
+  const handleDownloadDefaultGeometry = async (geometry: DefaultGeometry) => {
+    try {
+      const res = await fetch(`/api/admin/default-geometries/${geometry.id}/content`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to download default geometry.");
+      const data = await res.json();
+      downloadBase64File(
+        data,
+        geometry.originalName || `${geometry.name}.${geometry.format || "stl"}`,
+        geometry.format
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to download default geometry.";
+      toast({ title: "Download failed", description: message, variant: "destructive" });
     }
   };
 
@@ -1267,7 +1503,7 @@ export default function Admin() {
           <h1 className="text-3xl font-display font-bold text-foreground">Admin Console</h1>
           <p className="text-muted-foreground mt-1">Manage users, materials, and geometries for all accounts.</p>
         </div>
-        <div className="bg-card flex gap-3 p-4 mt-4 rounded-2xl">
+        <div className="bg-card flex gap-3 p-4 mt-8 rounded-2xl">
           {(
             [
               { id: "users", label: "Users", icon: Users },
@@ -1306,12 +1542,12 @@ export default function Admin() {
                 <Input
                   value={userSearch}
                   onChange={(event) => setUserSearch(event.target.value)}
-                  placeholder="Search users..."
+                  placeholder="Search..."
                   className="h-9 w-52"
                 />
                 <Button size="sm" onClick={() => setIsCreateUserOpen(true)}>
-                  <Plus className="h-4 w-4" />
-                  Add user
+                  <UserPlus className="h-4 w-4" />
+                  Add
                 </Button>
               </div>
             </div>
@@ -1325,21 +1561,21 @@ export default function Admin() {
                     <th className="px-4 py-3 text-left font-semibold">Role</th>
                     <th className="px-4 py-3 text-left font-semibold">Verified</th>
                     <th className="px-4 py-3 text-left font-semibold">Created</th>
-                    <th className="px-4 py-3 text-right font-semibold">Actions</th>
+                    <th className="px-4 py-3 text-center font-semibold">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredAdminUsers.length ? (
                     filteredAdminUsers.map((adminUser) => (
                       <tr key={adminUser.id} className="border-t border-border/70">
-                        <td className="px-4 py-3 font-medium text-foreground">
+                        <td className="px-4 py-3 font-medium text-foreground truncate">
                           {adminUser.name}
                         </td>
-                        <td className="px-4 py-3 text-muted-foreground">{adminUser.email}</td>
-                        <td className="px-4 py-3 text-muted-foreground">
+                        <td className="px-4 py-3 text-muted-foreground truncate">{adminUser.email}</td>
+                        <td className={`px-4 py-3 text-sm truncate ${adminUser.roleId == 2 ? "text-primary" : "text-muted-foreground"}`}>
                           {adminUser.roleId === 2 ? "Admin" : "User"}
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3 truncate">
                           <span
                             className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${
                               adminUser.emailVerified
@@ -1350,7 +1586,7 @@ export default function Admin() {
                             {adminUser.emailVerified ? "Verified" : "Pending"}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-muted-foreground">
+                        <td className="px-4 py-3 font-mono text-muted-foreground truncate">
                           {adminUser.createdAt
                             ? new Date(adminUser.createdAt).toLocaleString(undefined, {
                                 month: "short",
@@ -1367,7 +1603,8 @@ export default function Admin() {
                               size="icon"
                               variant="ghost"
                               onClick={() => openUserData(adminUser)}
-                              title="View user data"
+                              title="View"
+                              className="text-primary/80 bg-primary/10 hover:bg-primary/15 hover:text-primary"
                             >
                               <Eye className="h-4 w-4" />
                             </Button>
@@ -1375,7 +1612,8 @@ export default function Admin() {
                               size="icon"
                               variant="ghost"
                               onClick={() => openUserEdit(adminUser)}
-                              title="Edit user"
+                              className="text-indigo-500 bg-indigo-500/10 hover:bg-indigo-500/15 hover:text-indigo-600"
+                              title="Edit"
                             >
                               <Pencil className="h-4 w-4" />
                             </Button>
@@ -1383,6 +1621,7 @@ export default function Admin() {
                               size="icon"
                               variant="ghost"
                               onClick={() => resetUserDialog(adminUser)}
+                              className="text-amber-500 bg-amber-500/10 hover:bg-amber-500/15 hover:text-amber-600"
                               title="Reset password"
                             >
                               <KeyRound className="h-4 w-4" />
@@ -1391,7 +1630,8 @@ export default function Admin() {
                                 size="icon"
                                 variant="ghost"
                                 onClick={() => setDeleteUserTarget(adminUser)}
-                                title="Delete user"
+                                className="text-destructive/80 bg-destructive/10 hover:bg-destructive/15 hover:text-destructive"
+                                title="Delete"
                               >
                                 <Trash2 className="h-4 w-4 text-destructive" />
                               </Button>
@@ -1425,12 +1665,12 @@ export default function Admin() {
                 <Input
                   value={defaultMaterialSearch}
                   onChange={(event) => setDefaultMaterialSearch(event.target.value)}
-                  placeholder="Search materials..."
+                  placeholder="Search..."
                   className="h-9 w-52"
                 />
                 <Button size="sm" onClick={() => openDefaultMaterialEdit(null)}>
-                  <Plus className="h-4 w-4" />
-                  Add default material
+                  <Layers className="h-4 w-4" />
+                  Add
                 </Button>
               </div>
             </div>
@@ -1444,12 +1684,13 @@ export default function Admin() {
                         <h3 className="text-sm font-semibold text-foreground">{material.name}</h3>
                         <p className="text-xs text-muted-foreground">{material.category}</p>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-4">
                         <Button
                           size="icon"
                           variant="ghost"
                           onClick={() => openDefaultMaterialEdit(material)}
-                          title="Edit default material"
+                          className="rounded-lg p-2 m-[-8px] text-indigo-500 hover:text-indigo-600 hover:bg-indigo-500/10 transition"
+                          title="Edit"
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
@@ -1457,7 +1698,8 @@ export default function Admin() {
                         size="icon"
                         variant="ghost"
                         onClick={() => setDeleteDefaultMaterialTarget(material)}
-                        title="Delete default material"
+                        className="rounded-lg p-2 m-[-8px] text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition"
+                        title="Delete"
                       >
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
@@ -1502,12 +1744,12 @@ export default function Admin() {
                 <Input
                   value={defaultGeometrySearch}
                   onChange={(event) => setDefaultGeometrySearch(event.target.value)}
-                  placeholder="Search geometries..."
+                  placeholder="Search..."
                   className="h-9 w-52"
                 />
                 <Button size="sm" onClick={() => openDefaultGeometryEdit(null)}>
-                  <Plus className="h-4 w-4" />
-                  Add default geometry
+                  <Box className="h-4 w-4" />
+                  Add
                 </Button>
               </div>
             </div>
@@ -1523,12 +1765,22 @@ export default function Admin() {
                           {geometry.format.toUpperCase()} · {formatSize(geometry.sizeBytes)}
                         </p>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-4">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => handleDownloadDefaultGeometry(geometry)}
+                          className="rounded-lg p-2 m-[-8px] text-primary/80 hover:text-primary hover:bg-primary/10 transition"
+                          title="Download"
+                        >
+                          <Download className="h-4 w-4" />
+                        </Button>
                         <Button
                           size="icon"
                           variant="ghost"
                           onClick={() => openDefaultGeometryEdit(geometry)}
-                          title="Edit default geometry"
+                          className="rounded-lg p-2 m-[-8px] text-indigo-500 hover:text-indigo-600 hover:bg-indigo-500/10 transition"
+                          title="Edit"
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
@@ -1536,13 +1788,14 @@ export default function Admin() {
                         size="icon"
                         variant="ghost"
                         onClick={() => setDeleteDefaultGeometryTarget(geometry)}
-                        title="Delete default geometry"
+                        className="rounded-lg p-2 m-[-8px] text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition"
+                        title="Delete"
                       >
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
                       </div>
                     </div>
-                    <div className="mt-3 rounded-xl border border-border bg-muted/20 p-3">
+                    <div className="mt-3 bg-card rounded-xl">
                       <AdminGeometryPreview
                         geometryId={geometry.id}
                         format={geometry.format}
@@ -1552,7 +1805,7 @@ export default function Admin() {
                   </div>
                 ))
               ) : (
-                <div className="rounded-xl border border-dashed border-border p-6 text-sm text-muted-foreground">
+                <div className="rounded-xl bg-card border border-dashed border-border p-6 text-sm text-muted-foreground">
                   No default geometries yet.
                 </div>
               )}
@@ -1565,7 +1818,7 @@ export default function Admin() {
     <Dialog open={isCreateUserOpen} onOpenChange={setIsCreateUserOpen}>
       <DialogContent className="max-w-xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Add user</DialogTitle>
+          <DialogTitle>Add User</DialogTitle>
           <DialogDescription>Create a new account with a role.</DialogDescription>
         </DialogHeader>
         <div className="grid gap-4">
@@ -1607,11 +1860,19 @@ export default function Admin() {
             </div>
           </div>
           <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setIsCreateUserOpen(false)}>
+            <Button 
+              variant="outline" 
+              onClick={() => setIsCreateUserOpen(false)}
+              className="hover:text-primary hover:bg-primary/10"
+            >
               Cancel
             </Button>
-            <Button onClick={handleCreateUser} disabled={isCreateUserDisabled}>
-              Create user
+            <Button 
+              onClick={handleCreateUser} 
+              disabled={isCreateUserDisabled}
+              className="opacity-90 hover:opacity-100 disabled:pointer-events-auto disabled:hover:opacity-50 disabled:cursor-not-allowed"
+            >
+              Create
             </Button>
           </div>
         </div>
@@ -1622,7 +1883,7 @@ export default function Admin() {
       <DialogContent className="max-w-xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Edit user</DialogTitle>
-          <DialogDescription>Update profile and access.</DialogDescription>
+          <DialogDescription>Update profile and access for <span className="text-foreground italic font-semibold">{activeUserData?.name}</span>.</DialogDescription>
         </DialogHeader>
         <div className="grid gap-4">
           <div>
@@ -1655,11 +1916,19 @@ export default function Admin() {
             </div>
           </div>
           <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setIsUserDialogOpen(false)}>
+            <Button 
+              variant="outline" 
+              onClick={() => setIsUserDialogOpen(false)}
+              className="hover:text-primary hover:bg-primary/10"
+            >
               Cancel
             </Button>
-            <Button onClick={handleUpdateUser} disabled={isUserSaveDisabled}>
-              Save changes
+            <Button 
+              onClick={handleUpdateUser} 
+              disabled={isUserSaveDisabled}
+              className="opacity-90 hover:opacity-100 disabled:pointer-events-auto disabled:hover:opacity-50 disabled:cursor-not-allowed"
+            >
+              Save
             </Button>
           </div>
         </div>
@@ -1670,7 +1939,7 @@ export default function Admin() {
       <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Reset password</DialogTitle>
-          <DialogDescription>Set a new password for this user.</DialogDescription>
+          <DialogDescription>Set a new password for <span className="text-foreground italic font-semibold">{activeUserData?.name}</span>.</DialogDescription>
         </DialogHeader>
         <div className="grid gap-4">
           <div>
@@ -1690,11 +1959,19 @@ export default function Admin() {
             />
           </div>
           <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setIsResetDialogOpen(false)}>
+            <Button 
+              variant="outline" 
+              onClick={() => setIsResetDialogOpen(false)}
+              className="hover:text-primary hover:bg-primary/10"
+            >
               Cancel
             </Button>
-            <Button onClick={handleResetPassword} disabled={isResetPasswordDisabled}>
-              Reset password
+            <Button 
+              onClick={handleResetPassword} 
+              disabled={isResetPasswordDisabled}
+              className="opacity-90 hover:opacity-100 disabled:pointer-events-auto disabled:hover:opacity-50 disabled:cursor-not-allowed"
+            >
+              Reset
             </Button>
           </div>
         </div>
@@ -1706,17 +1983,17 @@ export default function Admin() {
         <DialogHeader>
           <DialogTitle>User data</DialogTitle>
           <DialogDescription>
-            View and edit materials or geometries for {activeUserData?.name}.
+            View and edit materials or geometries for <span className="text-foreground italic font-semibold">{activeUserData?.name}</span>.
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 bg-card p-2 rounded-xl">
             {["materials", "geometries"].map((tab) => (
               <button
                 key={tab}
                 type="button"
                 onClick={() => setUserDataTab(tab as "materials" | "geometries")}
-                className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
+                className={`rounded-lg px-3 py-1 text-xs font-semibold transition ${
                   userDataTab === tab
                     ? "bg-primary/15 text-primary"
                     : "text-muted-foreground hover:bg-muted"
@@ -1731,46 +2008,47 @@ export default function Admin() {
               <Input
                 value={userMaterialSearch}
                 onChange={(event) => setUserMaterialSearch(event.target.value)}
-                placeholder="Search materials..."
+                placeholder="Search..."
                 className="h-9 w-52"
               />
             ) : (
               <Input
                 value={userGeometrySearch}
                 onChange={(event) => setUserGeometrySearch(event.target.value)}
-                placeholder="Search geometries..."
+                placeholder="Search..."
                 className="h-9 w-52"
               />
             )}
             {userDataTab === "materials" ? (
               <Button size="sm" onClick={openUserMaterialCreate}>
-                <Plus className="h-4 w-4" />
-                Add material
+                <Layers className="h-4 w-4" />
+                Add
               </Button>
             ) : (
               <Button size="sm" onClick={openUserGeometryCreate}>
-                <Plus className="h-4 w-4" />
-                Add geometry
+                <Box className="h-4 w-4" />
+                Add
               </Button>
             )}
           </div>
         </div>
         {userDataTab === "materials" ? (
-          <div className="mt-4 grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-2">
             {filteredUserMaterials.length ? (
               filteredUserMaterials.map((material) => (
-                <div key={material.id} className="rounded-xl border border-border p-4">
+                <div key={material.id} className="rounded-xl border border-border bg-card p-4">
                   <div className="flex items-start justify-between gap-2">
                     <div>
                       <p className="text-sm font-semibold text-foreground">{material.name}</p>
                       <p className="text-xs text-muted-foreground">{material.category}</p>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-4">
                       <Button
                         size="icon"
                         variant="ghost"
                         onClick={() => openUserMaterialEdit(material)}
-                        title="Edit material"
+                        className="rounded-lg p-2 m-[-8px] text-indigo-500 hover:text-indigo-600 hover:bg-indigo-500/10 transition"
+                        title="Edit"
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>
@@ -1778,13 +2056,28 @@ export default function Admin() {
                         size="icon"
                         variant="ghost"
                         onClick={() => setDeleteUserMaterialTarget(material)}
-                        title="Delete material"
+                        className="rounded-lg p-2 m-[-8px] text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition"
+                        title="Delete"
                       >
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
                     </div>
                   </div>
                   <p className="mt-3 text-xs text-muted-foreground">{material.description}</p>
+                  <div className="mt-4 grid grid-cols-2 gap-3 text-xs text-muted-foreground">
+                      <div>
+                        <p className="font-semibold text-foreground">
+                          {material.youngsModulus ?? "—"} GPa
+                        </p>
+                        <p>Young’s modulus</p>
+                      </div>
+                      <div>
+                        <p className="font-semibold text-foreground">
+                          {material.density ?? "—"} kg/m³
+                        </p>
+                        <p>Density</p>
+                      </div>
+                    </div>
                 </div>
               ))
             ) : (
@@ -1794,10 +2087,10 @@ export default function Admin() {
             )}
           </div>
         ) : (
-          <div className="mt-4 grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-2">
             {filteredUserGeometries.length ? (
               filteredUserGeometries.map((geometry) => (
-                <div key={geometry.id} className="rounded-xl border border-border p-4">
+                <div key={geometry.id} className="rounded-xl border border-border bg-card p-4">
                   <div className="flex items-start justify-between gap-2">
                     <div>
                       <p className="text-sm font-semibold text-foreground">{geometry.name}</p>
@@ -1805,12 +2098,22 @@ export default function Admin() {
                         {geometry.format.toUpperCase()} · {formatSize(geometry.sizeBytes)}
                       </p>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-4">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => handleDownloadUserGeometry(geometry)}
+                        className="rounded-lg p-2 m-[-8px] text-primary/80 hover:text-primary hover:bg-primary/10 transition"
+                        title="Download"
+                      >
+                        <Download className="h-4 w-4" />
+                      </Button>
                       <Button
                         size="icon"
                         variant="ghost"
                         onClick={() => openUserGeometryEdit(geometry)}
-                        title="Edit geometry"
+                        className="rounded-lg p-2 m-[-8px] text-indigo-500 hover:text-indigo-600 hover:bg-indigo-500/10 transition"
+                        title="Edit"
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>
@@ -1818,13 +2121,14 @@ export default function Admin() {
                         size="icon"
                         variant="ghost"
                         onClick={() => setDeleteUserGeometryTarget(geometry)}
-                        title="Delete geometry"
+                        className="rounded-lg p-2 m-[-8px] text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition"
+                        title="Delete"
                       >
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
                     </div>
                   </div>
-                  <div className="mt-3 rounded-xl border border-border bg-muted/20 p-3">
+                  <div className="mt-3">
                     <AdminUserGeometryPreview
                       geometryId={geometry.id}
                       format={geometry.format}
@@ -1847,7 +2151,7 @@ export default function Admin() {
       <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{activeUserMaterial ? "Edit user material" : "Add user material"}</DialogTitle>
-          <DialogDescription>Update the material and curves.</DialogDescription>
+          <DialogDescription>Update the material and curves for <span className="text-foreground italic font-semibold">{activeUserData?.name}</span>.</DialogDescription>
         </DialogHeader>
         <div className="grid gap-4">
           <div className="grid gap-3 md:grid-cols-2">
@@ -1960,11 +2264,19 @@ export default function Admin() {
             onValidityChange={setUserThermalValid}
           />
           <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setIsUserMaterialOpen(false)}>
+            <Button 
+              variant="outline" 
+              onClick={() => setIsUserMaterialOpen(false)}
+              className="hover:text-primary hover:bg-primary/10"
+            >
               Cancel
             </Button>
-            <Button onClick={handleSaveUserMaterial} disabled={isUserMaterialSaveDisabled}>
-              {activeUserMaterial ? "Save changes" : "Add material"}
+            <Button 
+              onClick={handleSaveUserMaterial} 
+              disabled={isUserMaterialSaveDisabled}
+              className="opacity-90 hover:opacity-100 disabled:pointer-events-auto disabled:hover:opacity-50 disabled:cursor-not-allowed"
+            >
+              {activeUserMaterial ? "Save" : "Add"}
             </Button>
           </div>
         </div>
@@ -1975,7 +2287,7 @@ export default function Admin() {
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{activeUserGeometry ? "Edit user geometry" : "Add user geometry"}</DialogTitle>
-          <DialogDescription>Update geometry metadata or STL file.</DialogDescription>
+          <DialogDescription>Update geometry metadata or STL file for <span className="text-foreground italic font-semibold">{activeUserData?.name}</span>.</DialogDescription>
         </DialogHeader>
         <div className="grid gap-4">
           <div>
@@ -1984,16 +2296,29 @@ export default function Admin() {
           </div>
           <div>
             <Label>STL file</Label>
-            <Input
-              type="file"
-              accept=".stl"
-              onChange={(event) => handleUserGeometryFile(event.target.files?.[0] ?? null)}
-            />
-            <p className="mt-2 text-xs text-muted-foreground">
-              {userGeometryFileName || activeUserGeometry?.originalName || "No file selected."}
-            </p>
+            <div className="flex items-center gap-3 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm">
+              <input
+                id="admin-user-geometry-file"
+                type="file"
+                accept=".stl"
+                className="hidden"
+                onChange={(event) => handleUserGeometryFile(event.target.files?.[0] ?? null)}
+              />
+              <Label
+                htmlFor="admin-user-geometry-file"
+                className="cursor-pointer rounded-md border border-input bg-muted/40 px-3 py-1 text-xs font-semibold text-foreground shadow-sm hover:bg-muted"
+              >
+                Choose File
+              </Label>
+              <span
+                className="text-xs text-muted-foreground"
+                title={userGeometryFileName || activeUserGeometry?.originalName || "No file chosen"}
+              >
+                {formatFileLabel(userGeometryFileName || activeUserGeometry?.originalName)}
+              </span>
+            </div>
           </div>
-          <div className="rounded-xl border border-border bg-muted/10 p-3">
+          <div>
             {userGeometryPreview ? (
               <GeometryPreview format="stl" contentBase64={userGeometryPreview.split(",")[1]} />
             ) : activeUserGeometry ? (
@@ -2003,15 +2328,23 @@ export default function Admin() {
                 refreshToken={`${activeUserGeometry.id}-${activeUserGeometry.updatedAt ?? activeUserGeometry.createdAt ?? ""}-${userGeometryRefreshToken}`}
               />
             ) : (
-              <div className="text-xs text-muted-foreground">No preview available.</div>
+              <div className="text-xs text-muted-foreground rounded-xl border border-border bg-muted/10 p-3">No preview available.</div>
             )}
           </div>
           <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setIsUserGeometryOpen(false)}>
+            <Button 
+              variant="outline" 
+              onClick={() => setIsUserGeometryOpen(false)}
+              className="hover:text-primary hover:bg-primary/10"
+            >
               Cancel
             </Button>
-            <Button onClick={handleSaveUserGeometry} disabled={isUserGeometrySaveDisabled}>
-              {activeUserGeometry ? "Save changes" : "Add geometry"}
+            <Button 
+              onClick={handleSaveUserGeometry} 
+              disabled={isUserGeometrySaveDisabled}
+              className="opacity-90 hover:opacity-100 disabled:pointer-events-auto disabled:hover:opacity-50 disabled:cursor-not-allowed"
+            >
+              {activeUserGeometry ? "Save" : "Add"}
             </Button>
           </div>
         </div>
@@ -2135,11 +2468,19 @@ export default function Admin() {
             onValidityChange={setDefaultThermalValid}
           />
           <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setIsDefaultMaterialOpen(false)}>
+            <Button 
+              variant="outline" 
+              onClick={() => setIsDefaultMaterialOpen(false)}
+              className="hover:text-primary hover:bg-primary/10"
+            >
               Cancel
             </Button>
-            <Button onClick={handleSaveDefaultMaterial} disabled={isDefaultMaterialSaveDisabled}>
-              Save default material
+            <Button 
+              onClick={handleSaveDefaultMaterial} 
+              disabled={isDefaultMaterialSaveDisabled}
+              className="opacity-90 hover:opacity-100 disabled:pointer-events-auto disabled:hover:opacity-50 disabled:cursor-not-allowed"
+            >
+              {activeDefaultMaterial ? "Save" : "Add"}
             </Button>
           </div>
         </div>
@@ -2164,16 +2505,29 @@ export default function Admin() {
           </div>
           <div>
             <Label>STL file</Label>
-            <Input
-              type="file"
-              accept=".stl"
-              onChange={(event) => handleDefaultGeometryFile(event.target.files?.[0] ?? null)}
-            />
-            <p className="mt-2 text-xs text-muted-foreground">
-              {defaultGeometryFileName || activeDefaultGeometry?.originalName || "No file selected."}
-            </p>
+            <div className="flex items-center gap-3 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm">
+              <input
+                id="admin-default-geometry-file"
+                type="file"
+                accept=".stl"
+                className="hidden"
+                onChange={(event) => handleDefaultGeometryFile(event.target.files?.[0] ?? null)}
+              />
+              <Label
+                htmlFor="admin-default-geometry-file"
+                className="cursor-pointer rounded-md border border-input bg-muted/40 px-3 py-1 text-xs font-semibold text-foreground shadow-sm hover:bg-muted"
+              >
+                Choose File
+              </Label>
+              <span
+                className="text-xs text-muted-foreground"
+                title={defaultGeometryFileName || activeDefaultGeometry?.originalName || "No file chosen"}
+              >
+                {formatFileLabel(defaultGeometryFileName || activeDefaultGeometry?.originalName)}
+              </span>
+            </div>
           </div>
-          <div className="rounded-xl border border-border bg-muted/10 p-3">
+          <div>
             {defaultGeometryPreview ? (
               <GeometryPreview format="stl" contentBase64={defaultGeometryPreview.split(",")[1]} />
             ) : activeDefaultGeometry ? (
@@ -2183,15 +2537,23 @@ export default function Admin() {
                 refreshToken={defaultGeometryRefreshToken}
               />
             ) : (
-              <div className="text-xs text-muted-foreground">Upload an STL to preview.</div>
+              <div className="text-xs text-muted-foreground rounded-xl border border-border bg-muted/10 p-3">Upload an STL to preview.</div>
             )}
           </div>
           <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setIsDefaultGeometryOpen(false)}>
+            <Button 
+              variant="outline" 
+              onClick={() => setIsDefaultGeometryOpen(false)}
+              className="hover:text-primary hover:bg-primary/10"
+            >
               Cancel
             </Button>
-            <Button onClick={handleSaveDefaultGeometry} disabled={isDefaultGeometrySaveDisabled}>
-              Save geometry
+            <Button 
+              onClick={handleSaveDefaultGeometry} 
+              disabled={isDefaultGeometrySaveDisabled}
+              className="opacity-90 hover:opacity-100 disabled:pointer-events-auto disabled:hover:opacity-50 disabled:cursor-not-allowed"
+            >
+              {activeDefaultGeometry ? "Save" : "Add"}
             </Button>
           </div>
         </div>
@@ -2208,21 +2570,23 @@ export default function Admin() {
         <AlertDialogHeader>
           <AlertDialogTitle>Delete user?</AlertDialogTitle>
           <AlertDialogDescription>
-            This will deactivate {deleteUserTarget?.name}. You can’t undo this action.
+            This will deactivate <span className="italic font-semibold text-foreground">{deleteUserTarget?.email}</span>. You can’t undo this action.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction
+          <AlertDialogCancel className="hover:text-primary hover:bg-primary/10">Cancel</AlertDialogCancel>
+          <Button
+            variant="destructive"
             onClick={() => {
               if (deleteUserTarget) {
                 void handleDeleteUser(deleteUserTarget);
               }
               setDeleteUserTarget(null);
             }}
+            className="opacity-90 hover:opacity-100 disabled:hover:opacity-50"
           >
             Delete
-          </AlertDialogAction>
+          </Button>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
@@ -2237,21 +2601,23 @@ export default function Admin() {
         <AlertDialogHeader>
           <AlertDialogTitle>Delete default material?</AlertDialogTitle>
           <AlertDialogDescription>
-            This will deactivate {deleteDefaultMaterialTarget?.name} for all users.
+            This will deactivate <span className="italic font-semibold text-foreground">{deleteDefaultMaterialTarget?.name}</span> for all users.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction
+          <AlertDialogCancel className="hover:text-primary hover:bg-primary/10">Cancel</AlertDialogCancel>
+          <Button
+            variant="destructive"
             onClick={() => {
               if (deleteDefaultMaterialTarget) {
                 void handleDeleteDefaultMaterial(deleteDefaultMaterialTarget);
               }
               setDeleteDefaultMaterialTarget(null);
             }}
+            className="opacity-90 hover:opacity-100 disabled:hover:opacity-50"
           >
             Delete
-          </AlertDialogAction>
+          </Button>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
@@ -2266,21 +2632,23 @@ export default function Admin() {
         <AlertDialogHeader>
           <AlertDialogTitle>Delete default geometry?</AlertDialogTitle>
           <AlertDialogDescription>
-            This will deactivate {deleteDefaultGeometryTarget?.name} for all users.
+            This will deactivate <span className="italic font-semibold text-foreground">{deleteDefaultGeometryTarget?.name}</span> for all users.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction
+          <AlertDialogCancel className="hover:text-primary hover:bg-primary/10">Cancel</AlertDialogCancel>
+          <Button
+            variant="destructive"
             onClick={() => {
               if (deleteDefaultGeometryTarget) {
                 void handleDeleteDefaultGeometry(deleteDefaultGeometryTarget);
               }
               setDeleteDefaultGeometryTarget(null);
             }}
+            className="opacity-90 hover:opacity-100 disabled:hover:opacity-50"
           >
             Delete
-          </AlertDialogAction>
+          </Button>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
@@ -2295,21 +2663,23 @@ export default function Admin() {
         <AlertDialogHeader>
           <AlertDialogTitle>Delete user material?</AlertDialogTitle>
           <AlertDialogDescription>
-            This will delete {deleteUserMaterialTarget?.name} from the user’s library.
+            This will delete <span className="italic font-semibold text-foreground">{deleteUserMaterialTarget?.name}</span> from the user’s library.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction
+          <AlertDialogCancel className="hover:text-primary hover:bg-primary/10">Cancel</AlertDialogCancel>
+          <Button
+            variant="destructive"
             onClick={() => {
               if (deleteUserMaterialTarget) {
                 void handleDeleteUserMaterial(deleteUserMaterialTarget);
               }
               setDeleteUserMaterialTarget(null);
             }}
+            className="opacity-90 hover:opacity-100 disabled:hover:opacity-50"
           >
             Delete
-          </AlertDialogAction>
+          </Button>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
@@ -2324,21 +2694,23 @@ export default function Admin() {
         <AlertDialogHeader>
           <AlertDialogTitle>Delete user geometry?</AlertDialogTitle>
           <AlertDialogDescription>
-            This will delete {deleteUserGeometryTarget?.name} from the user’s library.
+            This will delete <span className="italic font-semibold text-foreground">{deleteUserGeometryTarget?.name}</span> from the user’s library.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction
+          <AlertDialogCancel className="hover:text-primary hover:bg-primary/10">Cancel</AlertDialogCancel>
+          <Button
+            variant="destructive"
             onClick={() => {
               if (deleteUserGeometryTarget) {
                 void handleDeleteUserGeometry(deleteUserGeometryTarget);
               }
               setDeleteUserGeometryTarget(null);
             }}
+            className="opacity-90 hover:opacity-100 disabled:hover:opacity-50"
           >
             Delete
-          </AlertDialogAction>
+          </Button>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

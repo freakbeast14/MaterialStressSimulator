@@ -109,6 +109,7 @@ export function GeometryPreview({
                 j: mesh.j,
                 k: mesh.k,
                 color: "#60a5fa",
+                hoverinfo: "skip",
                 opacity: 0.7,
               } as any,
             ]}
