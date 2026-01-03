@@ -1,6 +1,8 @@
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 import { useAuth } from "@/context/auth-context";
+import { useTheme } from "next-themes";
+import { useEffect, useState } from "react";
 import {
   Activity,
   BarChart2,
@@ -8,6 +10,8 @@ import {
   CheckCircle2,
   ChevronRight,
   Layers,
+  Moon,
+  Sun,
   Zap,
 } from "lucide-react";
 
@@ -36,6 +40,12 @@ const sectionImages = {
 
 export default function Home() {
   const { user } = useAuth();
+  const { theme, setTheme } = useTheme();
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   return (
     <div className="min-h-screen bg-card text-foreground">
@@ -505,6 +515,29 @@ export default function Home() {
           </div>
         </footer>
       </main>
+
+      <Button
+        variant="ghost"
+        size="icon"
+        className="group fixed bottom-6 right-6 z-50 h-11 w-11 rounded-full border border-border bg-background/80 shadow-lg backdrop-blur"
+        onClick={() => {
+          if (!isMounted) return;
+          setTheme(theme === "dark" ? "light" : "dark");
+        }}
+        aria-label="Toggle dark mode"
+      >
+        {isMounted && theme === "dark" ? (
+          <Sun className="h-5 w-5" />
+        ) : (
+          <Moon className="h-5 w-5" />
+        )}
+        <span className="pointer-events-none absolute bottom-full right-0 mb-3 w-max opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+          <span className="relative rounded-lg bg-slate-900 px-4 py-2 text-xs font-semibold text-white shadow-lg">
+            Toggle {isMounted && theme === "dark" ? "light" : "dark"} mode
+            <span className="absolute right-3 top-full h-3 w-3 -translate-y-1/2 rotate-45 bg-slate-900" />
+          </span>
+        </span>
+      </Button>
     </div>
   );
 }
