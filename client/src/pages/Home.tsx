@@ -38,8 +38,8 @@ export default function Home() {
   const { user } = useAuth();
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <header className="sticky top-0 z-10 border-b border-border bg-background/80 backdrop-blur-sm">
+    <div className="min-h-screen bg-card text-foreground">
+      <header className="sticky top-0 z-10 border-b border-border bg-card/80 backdrop-blur-sm">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
@@ -72,7 +72,10 @@ export default function Home() {
                   </Button>
                 </Link>
                 <Link href="/simulations/create">
-                  <Button className="text-sm">New simulation</Button>
+                  <Button className="font-semibold opacity-90 hover:opacity-100">
+                    <Zap className="h-4 w-4 fill-current" />
+                    Create
+                  </Button>
                 </Link>
               </>
             ) : (
@@ -154,7 +157,7 @@ export default function Home() {
           </div>
 
           {/* <div className="glow-border rounded-3xl border border-border bg-muted/20 p-6 shadow-sm"> */}
-            <div className="glow-border rounded-2xl border border-border bg-background p-5 shadow-sm">
+            <div className="glow-border rounded-2xl border border-border bg-card p-5 shadow-sm">
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Simulation overview
               </p>
@@ -291,7 +294,7 @@ export default function Home() {
         </section>
 
         <section id="preview" className="mt-14 grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-          <div className="glow-border rounded-3xl border border-border bg-background p-8 shadow-sm">
+          <div className="glow-border rounded-3xl border border-border bg-card p-8 shadow-sm">
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-semibold">Simulation Detail preview</h2>
               <span className="glow-border rounded-full border border-border bg-muted/30 px-3 py-1 text-xs font-semibold text-muted-foreground">
@@ -362,7 +365,7 @@ export default function Home() {
                 </div>
               ))}
             </div>
-            <div className="glow-border mt-6 overflow-hidden rounded-2xl border border-border bg-background">
+            <div className="glow-border mt-6 overflow-hidden rounded-2xl border border-border bg-card">
               <img
                 src="/home/light/compare.PNG"
                 alt="Compare simulations preview"
@@ -398,7 +401,7 @@ export default function Home() {
           ].map((item) => (
             <div
               key={item.title}
-              className="glow-border rounded-3xl border border-border bg-background p-6 shadow-sm"
+              className="glow-border rounded-3xl border border-border bg-card p-6 shadow-sm"
             >
               <p className="text-sm font-semibold">{item.title}</p>
               <p className="mt-2 text-sm text-muted-foreground">
@@ -420,7 +423,7 @@ export default function Home() {
           ))}
         </section>
 
-        <section id="stack" className="glow-border mt-14 rounded-3xl border border-border bg-background px-8 py-8">
+        <section id="stack" className="glow-border mt-14 rounded-3xl border border-border bg-card px-8 py-8">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -450,7 +453,7 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="glow-border mt-12 flex flex-col items-start justify-between gap-4 rounded-3xl border border-border bg-background px-8 py-10 md:flex-row md:items-center">
+        <section className="glow-border mt-12 flex flex-col items-start justify-between gap-4 rounded-3xl border border-border bg-card px-8 py-10 md:flex-row md:items-center">
           <div>
             <h2 className="text-xl font-semibold">
               {user ? "Keep building your simulation workspace" : "Ready to explore MatSim?"}
