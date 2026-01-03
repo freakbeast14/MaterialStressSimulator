@@ -429,8 +429,14 @@ export default function Settings() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => void logout()}>Logout</AlertDialogAction>
+          <AlertDialogCancel className="hover:text-primary hover:bg-primary/10">Cancel</AlertDialogCancel>
+            <Button 
+              variant="destructive"
+              onClick={() => void logout()}
+              className="opacity-90 hover:opacity-100 disabled:hover:opacity-50"
+            >
+              Logout
+            </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
