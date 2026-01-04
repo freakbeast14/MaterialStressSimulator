@@ -66,7 +66,7 @@ export default function Materials() {
   const userId = user?.id;
 
   const materialCategories = useMemo(() => {
-    const categories = materials?.map((material) => material.category) || [];
+    const categories = materials?.filter((material) => { return material.userId == userId }).map((material) => material.category) || [];
     return Array.from(new Set(categories)).sort();
   }, [materials]);
 

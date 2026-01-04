@@ -125,6 +125,11 @@ export default function Simulations() {
     return Array.from(new Set(statuses)).sort();
   }, [simulations]);
 
+  const simulationMaterials = useMemo(() => {
+    const ids = simulations?.map((sim) => sim.materialId).filter(Boolean) || [];
+    return Array.from(new Set(ids)).sort((a, b) => Number(a) - Number(b));
+  }, [simulations]);
+
   const simulationGeometries = useMemo(() => {
     const ids = simulations?.map((sim) => sim.geometryId).filter(Boolean) || [];
     return Array.from(new Set(ids)).sort((a, b) => Number(a) - Number(b));
@@ -799,9 +804,9 @@ export default function Simulations() {
               </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Materials</SelectItem>
-              {materials?.map((material) => (
-                <SelectItem key={material.id} value={String(material.id)}>
-                  {material.name}
+              {simulationMaterials?.map((materialId) => (
+                <SelectItem key={materialId} value={String(materialId)}>
+                  {getMaterialName(materialId)}
                 </SelectItem>
               ))}
             </SelectContent>

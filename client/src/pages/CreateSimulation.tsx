@@ -16,6 +16,7 @@ import {
 import { AlertCircle, Loader2, Play, MinusCircle, PlusCircle } from "lucide-react";
 import Plot from "react-plotly.js";
 import { useAssistantContext } from "@/context/assistant-context";
+import { useAuth } from "@/context/auth-context";
 
 type SimulationFormProps = {
   initialMaterialId?: string;
@@ -66,28 +67,42 @@ export function SimulationForm({
     { id: "fixed-1", type: "fixed", face: "z-", magnitude: "", unit: "" },
     { id: "pressure-1", type: "pressure", face: "z+", magnitude: "1000", unit: "N" },
   ]);
+  const { user } = useAuth();
+  const userId = user?.id;
 
   const selectItemClass =
     "focus:bg-primary focus:text-primary-foreground data-[highlighted]:bg-primary data-[highlighted]:text-primary-foreground";
 
-  const sortedGeometries = useMemo(() => {
+  const visibleMaterials = useMemo(() => {
+    if (!materials) return [];
+    if (!userId) return materials;
+    return materials.filter((material) => material.userId === userId);
+  }, [materials, userId]);
+
+  const visibleGeometries = useMemo(() => {
     if (!geometries) return [];
-    return [...geometries].sort((a, b) => {
+    if (!userId) return geometries;
+    return geometries.filter((geometry) => geometry.userId === userId);
+  }, [geometries, userId]);
+
+  const sortedGeometries = useMemo(() => {
+    if (!visibleGeometries) return [];
+    return [...visibleGeometries].sort((a, b) => {
       const aIsUnit = a.name.toLowerCase().includes("cube");
       const bIsUnit = b.name.toLowerCase().includes("cube");
       if (aIsUnit && !bIsUnit) return -1;
       if (!aIsUnit && bIsUnit) return 1;
       return a.name.localeCompare(b.name);
     });
-  }, [geometries]);
+  }, [visibleGeometries]);
 
   const selectedGeometry = useMemo(
     () => sortedGeometries.find((geometry) => String(geometry.id) === geometryId),
     [sortedGeometries, geometryId],
   );
   const selectedMaterial = useMemo(
-    () => materials?.find((material) => String(material.id) === materialId),
-    [materials, materialId],
+    () => visibleMaterials.find((material) => String(material.id) === materialId),
+    [visibleMaterials, materialId],
   );
 
   const clampDampingRatio = (value: string) => {
@@ -234,24 +249,24 @@ export function SimulationForm({
   }, [geometryId, initialGeometryId]);
 
   useEffect(() => {
-    if (!materials || materialId || initialMaterialId) return;
-    const aluminum = materials.find((material) =>
+    if (!visibleMaterials.length || materialId || initialMaterialId) return;
+    const aluminum = visibleMaterials.find((material) =>
       material.name.toLowerCase().includes("aluminum")
     );
     if (aluminum) {
       setMaterialId(String(aluminum.id));
     }
-  }, [materials, materialId, initialMaterialId]);
+  }, [visibleMaterials, materialId, initialMaterialId]);
 
   useEffect(() => {
-    if (!geometries || geometryId || initialGeometryId) return;
-    const unitCube = geometries.find((geometry) =>
+    if (!visibleGeometries.length || geometryId || initialGeometryId) return;
+    const unitCube = visibleGeometries.find((geometry) =>
       geometry.name.toLowerCase().includes("cube")
     );
     if (unitCube) {
       setGeometryId(String(unitCube.id));
     }
-  }, [geometries, geometryId]);
+  }, [visibleGeometries, geometryId, initialGeometryId]);
 
   const geometryMesh = useMemo(() => {
     if (!geometryContent || !geometryFormat) return null;
@@ -604,7 +619,7 @@ export function SimulationForm({
                   <SelectValue placeholder="Select material" />
                 </SelectTrigger>
                 <SelectContent>
-                  {materials?.map((material) => (
+                  {visibleMaterials.map((material) => (
                     <SelectItem
                       key={material.id}
                       value={String(material.id)}
