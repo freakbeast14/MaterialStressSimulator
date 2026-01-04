@@ -1585,7 +1585,7 @@ export default function SimulationDetail() {
           </div>
 
           <Tabs defaultValue="stress-strain" className="space-y-6">
-            <TabsList className="w-full justify-start bg-transparent overflow-y-auto">
+            <TabsList className="w-full justify-start bg-transparent overflow-x-auto">
               <TabsTrigger value="stress-strain">Stress-Strain Curve</TabsTrigger>
               <TabsTrigger value="stress-distribution">Time-Series Playback</TabsTrigger>
               <TabsTrigger value="field-viewer">3D Results Viewer</TabsTrigger>
