@@ -39,7 +39,7 @@ export function Layout({ children }: LayoutProps) {
     return (
     <div className="flex flex-col h-full bg-card border-r border-border">
       <div className="p-6">
-        <Link href="/">
+        <Link href="/dashboard">
           <div
             className="flex items-center gap-3 cursor-pointer"
             onClick={() => setIsMobileOpen(false)}

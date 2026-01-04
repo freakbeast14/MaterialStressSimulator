@@ -3,6 +3,7 @@ import { Link } from "wouter";
 // import { useAuth } from "@/context/auth-context";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
 import {
   Activity,
   BarChart2,
@@ -46,6 +47,12 @@ export default function Home() {
   const [blobs, setBlobs] = useState<
     { x: number; y: number; size: number; color: string }[]
   >([]);
+  const reveal = {
+    initial: { opacity: 0, y: 24 },
+    whileInView: { opacity: 1, y: 0 },
+    viewport: { once: true, amount: 0.2 },
+    transition: { duration: 0.6, ease: "easeOut" },
+  };
 
   useEffect(() => {
     setIsMounted(true);
@@ -120,8 +127,8 @@ export default function Home() {
   }, [isMounted, theme]);
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-card text-foreground">
-      <div className="pointer-events-none absolute inset-0">
+    <div className="relative min-h-screen bg-card text-foreground">
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
         {blobs.map((blob, index) => (
           <div
             key={`${blob.color}-${index}`}
@@ -138,16 +145,18 @@ export default function Home() {
           />
         ))}
       </div>
-      <header className="sticky top-0 z-10 border-b border-border bg-card/80 backdrop-blur-sm">
+      <header className="sticky top-0 z-20 border-b border-border bg-card/80 backdrop-blur-sm">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
-              <Activity className="h-5 w-5 text-primary-foreground" />
+          <Link href="/">
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
+                <Activity className="h-5 w-5 text-primary-foreground" />
+              </div>
+              <span className="font-display text-lg font-semibold tracking-tight">
+                MatSim
+              </span>
             </div>
-            <span className="font-display text-lg font-semibold tracking-tight">
-              MatSim
-            </span>
-          </div>
+          </Link>
           <nav className="hidden items-center gap-6 text-sm text-muted-foreground md:flex">
             <a href="#features" className="hover:text-foreground">
               Features
@@ -194,7 +203,10 @@ export default function Home() {
       </header>
 
       <main className="mx-auto max-w-6xl px-6 py-12 md:py-16">
-        <section className="grid items-center gap-10 md:grid-cols-[1.15fr_0.85fr]">
+        <motion.section
+          className="grid items-center gap-10 md:grid-cols-[1.15fr_0.85fr]"
+          {...reveal}
+        >
           <div className="space-y-6">
             <div className="inline-flex items-center gap-2 rounded-full border border-border bg-muted/30 px-3 py-1 text-xs font-semibold text-muted-foreground">
               <Zap className="h-3.5 w-3.5 text-primary" />
@@ -256,7 +268,10 @@ export default function Home() {
           </div>
 
           {/* <div className="glow-border rounded-3xl border border-border bg-muted/20 p-6 shadow-sm"> */}
-            <div className="glow-border rounded-2xl border border-border bg-muted/20 p-5 shadow-sm">
+            <motion.div
+              className="glow-border rounded-2xl border border-border bg-muted/20 p-5 shadow-sm"
+              {...reveal}
+            >
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Simulation overview
               </p>
@@ -298,11 +313,14 @@ export default function Home() {
                     </div>
                 </div>
               </div>
-            </div>
+            </motion.div>
           {/* </div> */}
-        </section>
+        </motion.section>
 
-        <section className="glow-border mt-12 grid gap-4 rounded-3xl border border-border bg-muted/20 px-6 py-5 text-sm text-muted-foreground sm:grid-cols-2 md:grid-cols-4">
+        <motion.section
+          className="glow-border mt-12 grid gap-4 rounded-3xl border border-border bg-muted/20 px-6 py-5 text-sm text-muted-foreground sm:grid-cols-2 md:grid-cols-4"
+          {...reveal}
+        >
           {[
             { label: "Simulation runs", value: "1200+ completed" },
             { label: "Materials library", value: "Metals + polymers" },
@@ -318,9 +336,13 @@ export default function Home() {
               </p>
             </div>
           ))}
-        </section>
+        </motion.section>
 
-        <section id="features" className="scroll-mt-24 mt-14 grid gap-6 md:grid-cols-3">
+        <motion.section
+          id="features"
+          className="scroll-mt-24 mt-14 grid gap-6 md:grid-cols-3"
+          {...reveal}
+        >
           {[
             {
               title: "Materials Library",
@@ -340,10 +362,14 @@ export default function Home() {
                 "Overlay curves and rank results with weighted metrics.",
               icon: BarChart2,
             },
-          ].map((item) => (
-            <div
+          ].map((item, index) => (
+            <motion.div
               key={item.title}
               className="glow-border rounded-2xl border border-border bg-muted/10 p-6"
+              initial={reveal.initial}
+              whileInView={reveal.whileInView}
+              viewport={reveal.viewport}
+              transition={{ ...reveal.transition, delay: index * 0.05 }}
             >
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
                 <item.icon className="h-5 w-5" />
@@ -352,13 +378,14 @@ export default function Home() {
               <p className="mt-2 text-sm text-muted-foreground">
                 {item.description}
               </p>
-            </div>
+            </motion.div>
           ))}
-        </section>
+        </motion.section>
 
-        <section
+        <motion.section
           id="workflow"
           className="glow-border scroll-mt-24 mt-14 rounded-3xl border border-border bg-muted/20 p-8"
+          {...reveal}
         >
           <div className="grid gap-6 md:grid-cols-3">
             {[
@@ -380,20 +407,31 @@ export default function Home() {
                 detail:
                   "Inspect metrics, playback time series, and compare results.",
               },
-            ].map((item) => (
-              <div key={item.step} className="space-y-2">
+            ].map((item, index) => (
+              <motion.div
+                key={item.step}
+                className="space-y-2"
+                initial={reveal.initial}
+                whileInView={reveal.whileInView}
+                viewport={reveal.viewport}
+                transition={{ ...reveal.transition, delay: index * 0.05 }}
+              >
                 <span className="text-xs font-semibold text-primary">
                   {item.step}
                 </span>
                 <h3 className="text-base font-semibold">{item.title}</h3>
                 <p className="text-sm text-muted-foreground">{item.detail}</p>
-              </div>
+              </motion.div>
             ))}
           </div>
-        </section>
+        </motion.section>
 
-        <section id="preview" className="scroll-mt-24 mt-14 grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-          <div className="glow-border rounded-3xl border border-border bg-muted/20 p-8 shadow-sm">
+        <motion.section
+          id="preview"
+          className="scroll-mt-24 mt-14 grid gap-6 lg:grid-cols-[1.1fr_0.9fr]"
+          {...reveal}
+        >
+          <motion.div className="glow-border rounded-3xl border border-border bg-muted/20 p-8 shadow-sm" {...reveal}>
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-semibold">Simulation Detail preview</h2>
               <span className="glow-border rounded-full border border-border bg-muted/30 px-3 py-1 text-xs font-semibold text-muted-foreground">
@@ -436,9 +474,9 @@ export default function Home() {
                 className="hidden h-auto w-full dark:block"
               />
             </div>
-          </div>
+          </motion.div>
 
-          <div className="glow-border rounded-3xl border border-border bg-muted/20 p-8">
+          <motion.div className="glow-border rounded-3xl border border-border bg-muted/20 p-8" {...reveal}>
             <div className="flex justify-between items-center">
               <h3 className="text-lg font-semibold">Compare simulations</h3>
               <Link
@@ -476,10 +514,10 @@ export default function Home() {
                 className="hidden h-auto w-full dark:block"
               />
             </div>
-          </div>
-        </section>
+          </motion.div>
+        </motion.section>
 
-        <section className="mt-12 grid gap-6 lg:grid-cols-2">
+        <motion.section className="mt-12 grid gap-6 lg:grid-cols-2" {...reveal}>
           {[
             {
               title: "Dashboard overview",
@@ -497,10 +535,14 @@ export default function Home() {
               title: "Materials library",
               description: "Review material cards, curves, and category filters.",
             },
-          ].map((item) => (
-            <div
+          ].map((item, index) => (
+            <motion.div
               key={item.title}
               className="glow-border rounded-3xl border border-border bg-muted/20 p-6 shadow-sm"
+              initial={reveal.initial}
+              whileInView={reveal.whileInView}
+              viewport={reveal.viewport}
+              transition={{ ...reveal.transition, delay: index * 0.05 }}
             >
               <p className="text-sm font-semibold">{item.title}</p>
               <p className="mt-2 text-sm text-muted-foreground">
@@ -518,11 +560,15 @@ export default function Home() {
                   className="hidden h-auto w-full dark:block"
                 />
               </div>
-            </div>
+            </motion.div>
           ))}
-        </section>
+        </motion.section>
 
-        <section id="stack" className="glow-border scroll-mt-24 mt-14 rounded-3xl border border-border bg-muted/20 px-8 py-8">
+        <motion.section
+          id="stack"
+          className="glow-border scroll-mt-24 mt-14 rounded-3xl border border-border bg-muted/20 px-8 py-8"
+          {...reveal}
+        >
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -550,9 +596,12 @@ export default function Home() {
               ))}
             </div>
           </div>
-        </section>
+        </motion.section>
 
-        <section className="glow-border mt-12 flex flex-col items-start justify-between gap-4 rounded-3xl border border-border bg-muted/20 px-8 py-10 md:flex-row md:items-center">
+        <motion.section
+          className="glow-border mt-12 flex flex-col items-start justify-between gap-4 rounded-3xl border border-border bg-muted/20 px-8 py-10 md:flex-row md:items-center"
+          {...reveal}
+        >
           <div>
             <h2 className="text-xl font-semibold">
               {user ? "Keep building your simulation workspace" : "Ready to explore MatSim?"}
@@ -572,7 +621,7 @@ export default function Home() {
               <Button size="lg" className="opacity-90 hover:opacity-100">Get started</Button>
             </Link>
           )}
-        </section>
+        </motion.section>
 
         <footer className="mt-12 border-t border-border pt-6 text-xs text-muted-foreground">
           <div className="flex flex-wrap items-center justify-between gap-4">
