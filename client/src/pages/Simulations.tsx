@@ -857,25 +857,25 @@ export default function Simulations() {
         </div>
       </div>
 
-      <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
+      <div className="bg-card rounded-2xl border border-border shadow-sm overflow-auto lg:overflow-hidden">
         {isLoading ? (
           <div className="p-12 flex justify-center">
             <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
           </div>
         ) : (
           <div className="border-t border-border">
-            <table className="w-full table-fixed text-sm text-left">
-              <colgroup>
-                <col className="w-16" />
-                {isAdmin && <col className="w-[14%]" />}
-                <col className="w-[16%]" />
-                <col className="w-[14%]" />
-                <col className="w-[16%]" />
-                <col className="w-[16%]" />
-                <col className="w-[14%]" />
-                <col className="w-[10%]" />
-                <col className="w-[24%]" />
-              </colgroup>
+            <table className="w-[320%] lg:w-full lg:table-fixed text-sm text-left">
+            <colgroup>
+              <col className="hidden lg:table-column lg:w-16" />
+              {isAdmin && <col className="w-[5%] lg:w-[14%]" />}
+              <col className="w-[2%] lg:w-[16%]" />
+              <col className="w-[5%] lg:w-[14%]" />
+              <col className="w-[10%] lg:w-[16%]" />
+              <col className="w-[12%] lg:w-[16%]" />
+              <col className="w-[11%] lg:w-[14%]" />
+              <col className="w-[12%] lg:w-[10%]" />
+              <col className="w-[14%] lg:w-[24%]" />
+            </colgroup>
             <thead className="text-xs uppercase bg-muted text-muted-foreground font-semibold">
               <tr>
                 <th className="px-6 py-4">
@@ -955,7 +955,7 @@ export default function Simulations() {
                     {renderSortIcon("status")}
                   </button>
                 </th>
-                <th className="px-6 py-4 text-center">
+                <th className="px-6 py-4 lg:text-center">
                   {/* <div className="lg:absolute lg:bottom-[16px] lg:right-[0px]"> */}
                     Action
                   {/* </div> */}
@@ -963,8 +963,8 @@ export default function Simulations() {
               </tr>
               </thead>
             </table>
-            <div className="max-h-[70vh] overflow-y-auto overflow-x-auto">
-              <table className="w-full table-fixed text-sm text-left">
+            <div className="max-h-[70vh] lg:overflow-y-auto lg:overflow-x-auto">
+              <table className="w-full lg:table-fixed text-sm text-left">
                 <colgroup>
                   <col className="w-16" />
                   {isAdmin && <col className="w-[14%]" />}
@@ -992,7 +992,7 @@ export default function Simulations() {
                         {truncateText(sim.name, 15)}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-muted-foreground">
+                    <td className="px-6 py-4 text-muted-foreground truncate">
                       <span
                         className={`px-2 py-1 rounded-md text-xs font-medium ${getTypeBadgeClass(sim.type)}`}
                         title={sim.type}
@@ -1000,7 +1000,7 @@ export default function Simulations() {
                         {truncateText(sim.type, 10)}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-foreground">
+                    <td className="px-6 py-4 text-foreground truncate">
                       <span
                         style={
                           {
@@ -1013,7 +1013,7 @@ export default function Simulations() {
                         {truncateText(getMaterialName(sim.materialId), 10)}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-foreground">
+                    <td className="px-6 py-4 text-foreground truncate">
                       <span
                         style={
                           {
@@ -1026,7 +1026,7 @@ export default function Simulations() {
                         {truncateText(getGeometryName(sim.geometryId), 10)}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-muted-foreground font-mono text-xs">
+                    <td className="px-6 py-4 text-muted-foreground font-mono text-xs truncate">
                       {(() => {
                         const rawDate =
                           (sim as any).updatedAt || sim.completedAt || sim.createdAt;

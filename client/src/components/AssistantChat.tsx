@@ -542,7 +542,7 @@ export function AssistantChat() {
                 </button>
                 <button
                   type="button"
-                  className="text-muted-foreground p-1 rounded-sm hover:text-indigo-500 hover:bg-indigo-500/10 transition-colors"
+                  className="hidden lg:block text-muted-foreground p-1 rounded-sm hover:text-indigo-500 hover:bg-indigo-500/10 transition-colors"
                   onClick={() => setIsExpanded((prev) => !prev)}
                   aria-label={isExpanded ? "Restore assistant size" : "Expand assistant"}
                   title={isExpanded ? "Restore" : "Expand"}

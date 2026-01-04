@@ -467,7 +467,7 @@ export default function Dashboard() {
           </div>
         </motion.div>
 
-        <div className="flex w-full gap-8 lg:w-1/2">
+        <div className="flex flex-col w-full gap-8 lg:w-1/2 lg:flex-row">
           {/* Materials Library */}
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}

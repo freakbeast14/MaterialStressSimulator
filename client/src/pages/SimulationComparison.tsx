@@ -315,16 +315,16 @@ export default function SimulationComparison() {
               </div>
             </div>
           </div>
-          <div className="border-border">
+          <div className="border-border overflow-auto lg:overflow-hidden">
             {filteredSims.length === 0 ? (
               <p className="text-muted-foreground text-sm py-4">No completed simulations yet.</p>
             ) : (
               <>
-                <table className="w-full table-fixed text-xs text-left">
+                <table className="w-[180%] lg:w-full lg:table-fixed text-xs text-left">
                   <colgroup>
                     <col className="w-10" />
                     <col className="w-14" />
-                    <col className="w-[22%]" />
+                    <col className="lg:w-[22%]" />
                     <col className="w-[18%]" />
                     <col className="w-[18%]" />
                     <col className="w-[18%]" />
@@ -351,8 +351,8 @@ export default function SimulationComparison() {
                     </tr>
                   </thead>
                 </table>
-                <div className="max-h-96 overflow-y-auto">
-                  <table className="w-full table-fixed text-xs text-left">
+                <div className="max-h-96 lg:overflow-y-auto">
+                  <table className="w-full lg:table-fixed text-xs text-left">
                     <colgroup>
                       <col className="w-10" />
                       <col className="w-14" />
@@ -387,12 +387,12 @@ export default function SimulationComparison() {
                           >
                             {truncateText(sim.name)}
                           </td>
-                          <td className="px-3 py-3 text-muted-foreground">
+                          <td className="px-3 py-3 text-muted-foreground truncate">
                             <span className={`px-2 py-1 rounded-md text-[11px] font-medium ${getTypeBadgeClass(sim.type)}`} title={truncateText(sim.type)}>
                               {truncateText(sim.type)}
                             </span>
                           </td>
-                          <td className="px-3 py-3 text-foreground">
+                          <td className="px-3 py-3 text-foreground truncate">
                             <span
                               style={
                                 {
@@ -405,7 +405,7 @@ export default function SimulationComparison() {
                               {truncateText(getMaterialName(sim.materialId))}
                             </span>
                           </td>
-                          <td className="px-3 py-3 text-foreground">
+                          <td className="px-3 py-3 text-foreground truncate">
                             <span
                               style={
                                 {
@@ -551,7 +551,7 @@ export default function SimulationComparison() {
           }}
           className="space-y-6"
         >
-          <TabsList className="w-full justify-start bg-transparent">
+          <TabsList className="w-full justify-start bg-transparent overflow-x-auto">
             <TabsTrigger value="comparison">Results Comparison</TabsTrigger>
             <TabsTrigger value="overlay">Overlay Curves</TabsTrigger>
             <TabsTrigger value="heatmap">Heatmap</TabsTrigger>
