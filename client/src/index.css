@@ -77,6 +77,10 @@
   * {
     @apply border-border;
   }
+  html {
+    scroll-behavior: smooth;
+    /* scroll-padding-top: 96px; */
+  }
   body {
     @apply bg-background text-foreground antialiased selection:bg-primary/20 selection:text-primary;
     font-family: var(--font-body);
@@ -143,4 +147,37 @@
   mask-composite: exclude;
   animation: glow-slide 14s linear infinite;
   pointer-events: none;
+}
+
+@keyframes blobGlow {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+}
+
+.blob-glow {
+  animation: blobGlow 12s ease-in-out infinite;
+}
+
+@keyframes blobWobble {
+  0%,
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+  }
+  35% {
+    transform: translate(calc(-50% + 28px), calc(-50% - 22px)) scale(1.06);
+  }
+  65% {
+    transform: translate(calc(-50% - 22px), calc(-50% + 28px)) scale(0.94);
+  }
+}
+
+.blob-wobble {
+  animation: blobWobble 7s ease-in-out infinite;
 }

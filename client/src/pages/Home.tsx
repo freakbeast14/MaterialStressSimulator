@@ -8,7 +8,7 @@ import {
   BarChart2,
   Box,
   CheckCircle2,
-  ChevronRight,
+  ArrowRight,
   Layers,
   Moon,
   Sun,
@@ -42,13 +42,101 @@ export default function Home() {
   const { user } = useAuth();
   const { theme, setTheme } = useTheme();
   const [isMounted, setIsMounted] = useState(false);
+  const [blobs, setBlobs] = useState<
+    { x: number; y: number; size: number; color: string }[]
+  >([]);
 
   useEffect(() => {
     setIsMounted(true);
   }, []);
 
+  useEffect(() => {
+    if (!isMounted) return;
+    const palette =
+      theme === "dark"
+        ? [
+            "rgba(79,70,229,0.28)",
+            "rgba(16,185,129,0.22)",
+            "rgba(245,158,11,0.18)",
+            "rgba(59,130,246,0.22)",
+          ]
+        : [
+            "rgba(79,70,229,0.2)",
+            "rgba(16,185,129,0.16)",
+            "rgba(245,158,11,0.14)",
+            "rgba(59,130,246,0.18)",
+          ];
+
+    const generateBlobs = () => {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      const next: { x: number; y: number; size: number; color: string }[] = [];
+      const maxTries = 2000;
+      let attempts = 0;
+
+      while (next.length < 24 && attempts < maxTries) {
+        attempts += 1;
+        const size = 250 + Math.random() * 180;
+        const radius = size / 2;
+        const x = radius + Math.random() * (width - radius * 2);
+        const y = radius + Math.random() * (height - radius * 2);
+        const color = palette[next.length % palette.length];
+        const overlaps = next.some((blob) => {
+          const dx = x - blob.x;
+          const dy = y - blob.y;
+          const minDist = radius + blob.size / 2 + 24;
+          return dx * dx + dy * dy < minDist * minDist;
+        });
+        if (overlaps) continue;
+        const sameColorClose = next.some((blob) => {
+          if (blob.color !== color) return false;
+          const dx = x - blob.x;
+          const dy = y - blob.y;
+          const minDist = radius + blob.size / 2 + 100;
+          return dx * dx + dy * dy < minDist * minDist;
+        });
+        if (sameColorClose) continue;
+        next.push({
+          x,
+          y,
+          size,
+          color,
+        });
+      }
+
+      setBlobs(
+        next.map((blob) => ({
+          ...blob,
+          x: (blob.x / width) * 100,
+          y: (blob.y / height) * 100,
+        }))
+      );
+    };
+
+    generateBlobs();
+    window.addEventListener("resize", generateBlobs);
+    return () => window.removeEventListener("resize", generateBlobs);
+  }, [isMounted, theme]);
+
   return (
-    <div className="min-h-screen bg-card text-foreground">
+    <div className="relative min-h-screen overflow-hidden bg-card text-foreground">
+      <div className="pointer-events-none absolute inset-0">
+        {blobs.map((blob, index) => (
+          <div
+            key={`${blob.color}-${index}`}
+            className="blob-wobble absolute h-72 w-72 rounded-full blur-3xl"
+            style={{
+              left: `${blob.x}%`,
+              top: `${blob.y}%`,
+              width: `${blob.size}px`,
+              height: `${blob.size}px`,
+              background: blob.color,
+              animationDelay: `${index * 0.6}s`,
+              transform: "translate(-50%, -50%)",
+            }}
+          />
+        ))}
+      </div>
       <header className="sticky top-0 z-10 border-b border-border bg-card/80 backdrop-blur-sm">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-3">
@@ -77,7 +165,7 @@ export default function Home() {
             {user ? (
               <>
                 <Link href="/dashboard">
-                  <Button variant="ghost" className="text-sm">
+                  <Button variant="ghost" className="text-sm hover:underline">
                     Dashboard
                   </Button>
                 </Link>
@@ -91,12 +179,12 @@ export default function Home() {
             ) : (
               <>
                 <Link href="/login">
-                  <Button variant="ghost" className="text-sm">
+                  <Button variant="ghost" className="text-sm hover:underline">
                     Sign in
                   </Button>
                 </Link>
                 <Link href="/register">
-                  <Button className="text-sm">Get started</Button>
+                  <Button className="text-sm font-semibold opacity-90 hover:opacity-100">Get started</Button>
                 </Link>
               </>
             )}
@@ -122,10 +210,10 @@ export default function Home() {
               {user ? (
                 <>
                   <Link href="/dashboard">
-                    <Button size="lg">Go to dashboard</Button>
+                    <Button size="lg" className="opacity-90 hover:opacity-100">Go to dashboard</Button>
                   </Link>
                   <Link href="/simulations/create">
-                    <Button variant="outline" size="lg">
+                    <Button variant="outline" size="lg" className="hover:text-primary hover:bg-primary/10 transition">
                       Run a simulation
                     </Button>
                   </Link>
@@ -133,7 +221,7 @@ export default function Home() {
               ) : (
                 <>
                   <Link href="/register">
-                    <Button size="lg">Create your workspace</Button>
+                    <Button size="lg" className="opacity-90 hover:opacity-100">Create your workspace</Button>
                   </Link>
                 </>
               )}
@@ -167,7 +255,7 @@ export default function Home() {
           </div>
 
           {/* <div className="glow-border rounded-3xl border border-border bg-muted/20 p-6 shadow-sm"> */}
-            <div className="glow-border rounded-2xl border border-border bg-card p-5 shadow-sm">
+            <div className="glow-border rounded-2xl border border-border bg-muted/20 p-5 shadow-sm">
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Simulation overview
               </p>
@@ -231,7 +319,7 @@ export default function Home() {
           ))}
         </section>
 
-        <section id="features" className="mt-14 grid gap-6 md:grid-cols-3">
+        <section id="features" className="scroll-mt-24 mt-14 grid gap-6 md:grid-cols-3">
           {[
             {
               title: "Materials Library",
@@ -269,7 +357,7 @@ export default function Home() {
 
         <section
           id="workflow"
-          className="glow-border mt-14 rounded-3xl border border-border bg-muted/20 p-8"
+          className="glow-border scroll-mt-24 mt-14 rounded-3xl border border-border bg-muted/20 p-8"
         >
           <div className="grid gap-6 md:grid-cols-3">
             {[
@@ -303,14 +391,18 @@ export default function Home() {
           </div>
         </section>
 
-        <section id="preview" className="mt-14 grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-          <div className="glow-border rounded-3xl border border-border bg-card p-8 shadow-sm">
+        <section id="preview" className="scroll-mt-24 mt-14 grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+          <div className="glow-border rounded-3xl border border-border bg-muted/20 p-8 shadow-sm">
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-semibold">Simulation Detail preview</h2>
               <span className="glow-border rounded-full border border-border bg-muted/30 px-3 py-1 text-xs font-semibold text-muted-foreground">
                 Live metrics
               </span>
             </div>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Drill into stress, displacement, and playback controls without
+              leaving the workspace.
+            </p>
             <div className="mt-6 grid gap-4 sm:grid-cols-4">
               {[
                 { label: "Max stress", value: "1.18 MPa" },
@@ -331,10 +423,6 @@ export default function Home() {
                 </div>
               ))}
             </div>
-            <p className="mt-6 text-sm text-muted-foreground">
-              Drill into stress, displacement, and playback controls without
-              leaving the workspace.
-            </p>
             <div className="glow-border mt-6 overflow-hidden rounded-2xl border border-border bg-muted/20">
               <img
                 src="/home/light/simulation-detail.PNG"
@@ -354,10 +442,10 @@ export default function Home() {
               <h3 className="text-lg font-semibold">Compare simulations</h3>
               <Link
                 href={user ? "/compare-simulations" : "/register"}
-                className="inline-flex items-center gap-2 text-sm font-semibold text-primary"
+                className="inline-flex items-center gap-2 text-sm font-semibold text-primary/90 hover:text-primary group"
               >
                 Explore
-                <ChevronRight className="h-4 w-4" />
+                <ArrowRight className="h-5 w-5 text-muted-foreground text-primary/85 group-hover:text-primary group-hover:translate-x-1 transition-all" />
               </Link>
             </div>
             <p className="mt-2 text-sm text-muted-foreground">
@@ -411,7 +499,7 @@ export default function Home() {
           ].map((item) => (
             <div
               key={item.title}
-              className="glow-border rounded-3xl border border-border bg-card p-6 shadow-sm"
+              className="glow-border rounded-3xl border border-border bg-muted/20 p-6 shadow-sm"
             >
               <p className="text-sm font-semibold">{item.title}</p>
               <p className="mt-2 text-sm text-muted-foreground">
@@ -433,7 +521,7 @@ export default function Home() {
           ))}
         </section>
 
-        <section id="stack" className="glow-border mt-14 rounded-3xl border border-border bg-card px-8 py-8">
+        <section id="stack" className="glow-border scroll-mt-24 mt-14 rounded-3xl border border-border bg-muted/20 px-8 py-8">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -463,7 +551,7 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="glow-border mt-12 flex flex-col items-start justify-between gap-4 rounded-3xl border border-border bg-card px-8 py-10 md:flex-row md:items-center">
+        <section className="glow-border mt-12 flex flex-col items-start justify-between gap-4 rounded-3xl border border-border bg-muted/20 px-8 py-10 md:flex-row md:items-center">
           <div>
             <h2 className="text-xl font-semibold">
               {user ? "Keep building your simulation workspace" : "Ready to explore MatSim?"}
@@ -476,11 +564,11 @@ export default function Home() {
           </div>
           {user ? (
             <Link href="/dashboard">
-              <Button size="lg">Open dashboard</Button>
+              <Button size="lg" className="opacity-90 hover:opacity-100">Open dashboard</Button>
             </Link>
           ) : (
             <Link href="/register">
-              <Button size="lg">Get started</Button>
+              <Button size="lg" className="opacity-90 hover:opacity-100">Get started</Button>
             </Link>
           )}
         </section>
