@@ -181,3 +181,7 @@
 .blob-wobble {
   animation: blobWobble 7s ease-in-out infinite;
 }
+
+.recharts-legend-wrapper {
+  bottom: -8px !important;
+}

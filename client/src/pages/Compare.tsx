@@ -190,7 +190,7 @@ export default function Compare({ embedded = false }: CompareProps) {
                       />
                       <Legend
                         formatter={(value) => (
-                          <span title={String(value)}>
+                          <span title={String(value)} className="text-xs">
                             {truncateLegendLabel(String(value), 30)}
                           </span>
                         )}
@@ -249,7 +249,7 @@ export default function Compare({ embedded = false }: CompareProps) {
                       />
                       <Legend
                         formatter={(value) => (
-                          <span title={String(value)}>
+                          <span title={String(value)} className="text-xs">
                             {truncateLegendLabel(String(value), 30)}
                           </span>
                         )}
