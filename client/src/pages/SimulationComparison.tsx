@@ -627,7 +627,12 @@ export default function SimulationComparison() {
                       <YAxis yAxisId="left" />
                       <YAxis yAxisId="right" orientation="right" />
                       <Tooltip />
-                      <Legend />
+                      <Legend
+                        formatter={(value) => (
+                          <span title={String(value)} className="text-xs">
+                            {truncateChartLabel(String(value), 30)}
+                          </span>
+                        )} />
                       <Bar yAxisId="left" dataKey="maxStress" fill="#3b82f6" name="Max Stress (MPa)" />
                       <Bar yAxisId="left" dataKey="maxDeformationNanometers" fill="#8b5cf6" name="Deformation (nm)" />
                       <Line yAxisId="right" type="monotone" dataKey="safetyFactor" stroke="#10b981" name="Safety Factor" />
@@ -659,12 +664,27 @@ export default function SimulationComparison() {
                 <ResponsiveContainer width="100%" height={320}>
                   <LineChart data={overlayTimeData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                    <XAxis dataKey="time" />
-                    <YAxis />
+                    <XAxis 
+                      dataKey="time"
+                      label={{
+                        value: "Time (s)",
+                        position: "insideBottom",
+                        offset: -5,
+                      }}
+                      tick={{ fill: "hsl(var(--muted-foreground))" }}
+                    />
+                    <YAxis
+                      label={{
+                        value: "Stress (MPa)",
+                        angle: -90,
+                        position: "insideLeft",
+                      }}
+                      tick={{ fill: "hsl(var(--muted-foreground))" }}
+                    />
                     <Tooltip />
                     <Legend
                       formatter={(value) => (
-                        <span title={String(value)}>
+                        <span title={String(value)} className="text-xs">
                           {truncateChartLabel(String(value), 30)}
                         </span>
                       )}
@@ -687,12 +707,27 @@ export default function SimulationComparison() {
                 <ResponsiveContainer width="100%" height={320}>
                   <LineChart data={overlayStrainData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                    <XAxis dataKey="strain" />
-                    <YAxis />
+                    <XAxis 
+                      dataKey="strain"
+                      label={{
+                        value: "Strain (e)",
+                        position: "insideBottom",
+                        offset: -5,
+                      }}
+                      tick={{ fill: "hsl(var(--muted-foreground))" }}
+                    />
+                    <YAxis
+                      label={{
+                        value: "Stress (MPa)",
+                        angle: -90,
+                        position: "insideLeft",
+                      }}
+                      tick={{ fill: "hsl(var(--muted-foreground))" }}
+                    />
                     <Tooltip />
                     <Legend
                       formatter={(value) => (
-                        <span title={String(value)}>
+                        <span title={String(value)} className="text-xs">
                           {truncateChartLabel(String(value), 30)}
                         </span>
                       )}
