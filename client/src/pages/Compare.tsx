@@ -267,7 +267,7 @@ export default function Compare({ embedded = false }: CompareProps) {
               </div>
 
               {/* Data Table */}
-              <div className="bg-card rounded-2xl border border-border overflow-auto lg:overflow-hidden">
+              <div className="bg-card rounded-2xl border border-border overflow-auto">
                 <table className="w-full text-sm text-left">
                   <thead className="bg-muted/50 text-muted-foreground font-semibold">
                     <tr>
