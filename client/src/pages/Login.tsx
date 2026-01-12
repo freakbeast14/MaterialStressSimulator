@@ -83,6 +83,11 @@ export default function Login() {
               </button>
             </div>
           </div>
+          <div className="flex items-center justify-end">
+            <Link href="/forgot-password" className="text-xs font-semibold text-primary hover:underline">
+              Forgot password?
+            </Link>
+          </div>
           {error && (
             <p className="text-sm text-rose-600 dark:text-rose-400">{error}</p>
           )}

@@ -10,6 +10,7 @@ import {
   users,
   roles,
   emailVerificationTokens,
+  passwordResetTokens,
   type Material,
   type InsertMaterial,
   type DefaultMaterial,
@@ -27,6 +28,7 @@ import {
   type User,
   type Role,
   type EmailVerificationToken,
+  type PasswordResetToken,
 } from "@shared/schema";
 import { eq, desc, and, isNull } from "drizzle-orm";
 
@@ -51,6 +53,9 @@ export interface IStorage {
   createEmailVerificationToken(userId: number, tokenHash: string, expiresAt: Date): Promise<EmailVerificationToken>;
   getEmailVerificationTokenByHash(tokenHash: string): Promise<EmailVerificationToken | undefined>;
   markEmailVerificationTokenUsed(id: number): Promise<EmailVerificationToken | undefined>;
+  createPasswordResetToken(userId: number, tokenHash: string, expiresAt: Date): Promise<PasswordResetToken>;
+  getPasswordResetTokenByHash(tokenHash: string): Promise<PasswordResetToken | undefined>;
+  markPasswordResetTokenUsed(id: number): Promise<PasswordResetToken | undefined>;
 
   // Default materials/geometries
   getDefaultMaterials(): Promise<DefaultMaterial[]>;
@@ -242,6 +247,35 @@ export class DatabaseStorage implements IStorage {
       .update(emailVerificationTokens)
       .set({ usedAt: new Date() })
       .where(eq(emailVerificationTokens.id, id))
+      .returning();
+    return token;
+  }
+
+  async createPasswordResetToken(
+    userId: number,
+    tokenHash: string,
+    expiresAt: Date,
+  ): Promise<PasswordResetToken> {
+    const [token] = await db
+      .insert(passwordResetTokens)
+      .values({ userId, tokenHash, expiresAt })
+      .returning();
+    return token;
+  }
+
+  async getPasswordResetTokenByHash(tokenHash: string): Promise<PasswordResetToken | undefined> {
+    const [token] = await db
+      .select()
+      .from(passwordResetTokens)
+      .where(eq(passwordResetTokens.tokenHash, tokenHash));
+    return token;
+  }
+
+  async markPasswordResetTokenUsed(id: number): Promise<PasswordResetToken | undefined> {
+    const [token] = await db
+      .update(passwordResetTokens)
+      .set({ usedAt: new Date() })
+      .where(eq(passwordResetTokens.id, id))
       .returning();
     return token;
   }

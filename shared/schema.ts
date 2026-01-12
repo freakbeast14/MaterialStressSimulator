@@ -28,6 +28,15 @@ export const emailVerificationTokens = pgTable("email_verification_tokens", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const passwordResetTokens = pgTable("password_reset_tokens", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  tokenHash: text("token_hash").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  usedAt: timestamp("used_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const defaultMaterials = pgTable("default_materials", {
  id: serial("id" ).primaryKey(),
  name: text("name" ).notNull(),
@@ -198,6 +207,7 @@ export type InsertSimulationBoundaryCondition = z.infer<typeof insertSimulationB
 export type Role = typeof roles.$inferSelect;
 export type User = typeof users.$inferSelect;
 export type EmailVerificationToken = typeof emailVerificationTokens.$inferSelect;
+export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
 
 export type CreateSimulationRequest = {
   name: string;

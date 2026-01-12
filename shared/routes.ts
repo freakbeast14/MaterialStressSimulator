@@ -365,12 +365,47 @@ export const api = {
       path: "/api/auth/password",
       input: z.object({
         currentPassword: z.string().min(1),
-        newPassword: z.string().min(8),
+        newPassword: z
+          .string()
+          .min(8)
+          .regex(
+            /^(?=.*[0-9])(?=.*[^A-Za-z0-9]).{8,}$/,
+            "Password must include at least a number and a special character.",
+          ),
       }),
       responses: {
         200: z.object({ success: z.literal(true) }),
         400: errorSchemas.validation,
         401: errorSchemas.unauthorized,
+      },
+    },
+    forgotPassword: {
+      method: "POST" as const,
+      path: "/api/auth/forgot-password",
+      input: z.object({
+        email: z.string().email(),
+      }),
+      responses: {
+        200: z.object({ success: z.literal(true) }),
+        400: errorSchemas.validation,
+      },
+    },
+    resetPassword: {
+      method: "POST" as const,
+      path: "/api/auth/reset-password",
+      input: z.object({
+        token: z.string().min(1),
+        password: z
+          .string()
+          .min(8)
+          .regex(
+            /^(?=.*[0-9])(?=.*[^A-Za-z0-9]).{8,}$/,
+            "Password must include at least a number and a special character.",
+          ),
+      }),
+      responses: {
+        200: z.object({ success: z.literal(true) }),
+        400: errorSchemas.validation,
       },
     },
   },

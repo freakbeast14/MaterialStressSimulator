@@ -66,6 +66,22 @@ const changePasswordSchema = z.object({
     ),
 });
 
+
+const forgotPasswordSchema = z.object({
+  email: z.string().email(),
+});
+
+const resetPasswordSchema = z.object({
+  token: z.string().min(1),
+  password: z
+    .string()
+    .min(8)
+    .regex(
+      /^(?=.*[0-9])(?=.*[^A-Za-z0-9]).{8,}$/,
+      "Password must include at least a number and a special character.",
+    ),
+});
+
 const ASSISTANT_SYSTEM_PROMPT =
   "You are the MatSim assistant. You may answer questions about MatSim features, pages, UI controls, workflows, and MatSim-specific simulation concepts (stress, strain, stress-strain curves, safety factor, boundary conditions, mesh outputs, 3D results viewer concepts such as iso-surface, slice, volume, playback controls, and chart interpretation). Use the provided page context and the App Guide to summarize or analyze results. If the question is about MatSim features or concepts, answer even if no context data is provided. Treat questions that mention MatSim UI sections or terms (e.g., mesh outputs, stress, strain, iso-surface, playback, heatmap, metrics space, results comparison) as in-scope and answer them. If a question is unrelated to MatSim or requires specific data not present, refuse with: \"I can only answer questions related to **MatSim**.\" Do not guess missing values or invent results. Keep responses concise and helpful.\n\nAccepted examples: \"What is stress?\", \"What does the stress-strain chart show?\", \"How do I use the 3D Results Viewer playback?\", \"Explain the results comparison weights.\", \"What are mesh outputs?\" Refuse examples: general trivia, coding help, or anything not about MatSim.";
 const ASSISTANT_APP_GUIDE_INDEX =
@@ -113,6 +129,107 @@ const hashToken = (token: string) =>
   crypto.createHash("sha256").update(token).digest("hex");
 
 const getAppBaseUrl = () => process.env.APP_BASE_URL || "http://localhost:5000";
+
+
+const sendPasswordResetEmail = async (email: string, token: string, name?: string) => {
+  const baseUrl = getAppBaseUrl();
+  const normalizedBaseUrl = /^https?:\/\//i.test(baseUrl)
+    ? baseUrl
+    : `https://${baseUrl}`;
+  const resetUrl = new URL("/reset-password", normalizedBaseUrl);
+  resetUrl.searchParams.set("token", token);
+  const gmailUser = process.env.GMAIL_SMTP_USER;
+  const gmailPass = process.env.GMAIL_SMTP_PASS;
+  if (gmailUser && gmailPass) {
+    try {
+      const transporter = nodemailer.createTransport({
+        service: "gmail",
+        auth: {
+          user: gmailUser,
+          pass: gmailPass,
+        },
+      });
+      const safeName = name?.trim() ? name.trim() : "there";
+      const logoUrl =
+        process.env.EMAIL_LOGO_URL ||
+        `${normalizedBaseUrl.replace(/\/$/, "")}/logo.png`;
+      const html = `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Reset your MatSim password</title>
+  </head>
+  <body style="margin:0;background:#f6f8fb;font-family:Arial,Helvetica,sans-serif;color:#0f172a;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f6f8fb;padding:24px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 10px 30px rgba(15,23,42,0.08);">
+            <tr>
+              <td style="padding:24px 28px;background:#eef4ff;">
+                <div style="display:flex;align-items:center;">
+                  <div>
+                    <img src="${logoUrl}" width="24" height="24" alt="MatSim" style="display:block;width:24px;height:24px;" />
+                  </div>
+                  <div style="font-size:18px;font-weight:700;padding-left:12px;">MatSim</div>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:28px;">
+                <h1 style="margin:0 0 8px;font-size:22px;">Reset your password</h1>
+                <p style="margin:0 0 18px;font-size:14px;color:#475569;">Hi ${safeName},</p>
+                <p style="margin:0 0 18px;font-size:14px;line-height:1.6;color:#334155;">
+                  We received a request to reset your MatSim password. Use the button below to
+                  choose a new password.
+                </p>
+                <div style="margin:20px 0;">
+                  <a href="${resetUrl.toString()}" style="display:inline-block;background:#2563eb;color:#ffffff;text-decoration:none;padding:12px 18px;border-radius:10px;font-weight:600;">
+                    Reset Password
+                  </a>
+                </div>
+                <p style="margin:0 0 12px;font-size:12px;color:#64748b;">
+                  This link expires in 1 hour. If you did not request a reset, you can ignore this email.
+                </p>
+                <p style="margin:0;font-size:12px;color:#94a3b8;">
+                  Or copy and paste this link into your browser:<br />
+                  <span style="word-break:break-all;color:#2563eb;">${resetUrl.toString()}</span>
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:18px 28px;border-top:1px solid #e2e8f0;font-size:12px;color:#94a3b8;">
+                Copyright ${new Date().getFullYear()} MatSim - Simulation workspace for materials and geometry
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+      await transporter.sendMail({
+        from: `MatSim <${gmailUser}>`,
+        to: email,
+        subject: "Reset your MatSim password",
+        html,
+        text: `Hi ${safeName},
+
+Reset your MatSim password: ${resetUrl.toString()}
+
+This link expires in 1 hour. If you did not request a reset, you can ignore this email.
+
+- MatSim`,
+      });
+      console.log(`[auth] Gmail reset email sent to ${email}`);
+      return;
+    } catch (err) {
+      console.error("[auth] Gmail SMTP send failed:", err);
+      console.log(`[auth] Password reset link for ${email}: ${resetUrl.toString()}`);
+      return;
+    }
+  }
+  console.log(`[auth] Password reset link for ${email}: ${resetUrl.toString()}`);
+};
 
 const sendVerificationEmail = async (email: string, token: string, name?: string) => {
   const baseUrl = getAppBaseUrl();
@@ -1124,6 +1241,61 @@ export async function registerRoutes(
 
       const nextHash = await bcrypt.hash(input.newPassword, 10);
       await storage.updateUserPassword(userId, nextHash);
+      res.json({ success: true });
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({
+          message: err.errors[0].message,
+          field: err.errors[0].path.join("."),
+        });
+      }
+      throw err;
+    }
+  });
+
+
+  app.post("/api/auth/forgot-password", async (req, res) => {
+    try {
+      const input = forgotPasswordSchema.parse(req.body);
+      const email = normalizeEmail(input.email);
+      const user = await storage.getUserByEmail(email);
+      if (user) {
+        const token = crypto.randomBytes(32).toString("hex");
+        const tokenHash = hashToken(token);
+        const expiresAt = new Date(Date.now() + 1000 * 60 * 60);
+        await storage.createPasswordResetToken(user.id, tokenHash, expiresAt);
+        await sendPasswordResetEmail(user.email, token, user.name);
+      }
+      res.json({ success: true });
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({
+          message: err.errors[0].message,
+          field: err.errors[0].path.join("."),
+        });
+      }
+      throw err;
+    }
+  });
+
+  app.post("/api/auth/reset-password", async (req, res) => {
+    try {
+      const input = resetPasswordSchema.parse(req.body);
+      const tokenHash = hashToken(input.token);
+      const record = await storage.getPasswordResetTokenByHash(tokenHash);
+      if (!record || record.usedAt) {
+        return res.status(400).json({ message: "Invalid or expired token" });
+      }
+      if (record.expiresAt.getTime() < Date.now()) {
+        return res.status(400).json({ message: "Token expired" });
+      }
+      const user = await storage.getUserById(record.userId);
+      if (!user) {
+        return res.status(400).json({ message: "Invalid or expired token" });
+      }
+      const nextHash = await bcrypt.hash(input.password, 10);
+      await storage.updateUserPassword(user.id, nextHash);
+      await storage.markPasswordResetTokenUsed(record.id);
       res.json({ success: true });
     } catch (err) {
       if (err instanceof z.ZodError) {
