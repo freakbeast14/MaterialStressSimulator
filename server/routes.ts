@@ -15,7 +15,7 @@ import session from "express-session";
 import memorystore from "memorystore";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
-import nodemailer from "nodemailer";
+import sgMail from "@sendgrid/mail";
 
 declare module "express-session" {
   interface SessionData {
@@ -138,17 +138,11 @@ const sendPasswordResetEmail = async (email: string, token: string, name?: strin
     : `https://${baseUrl}`;
   const resetUrl = new URL("/reset-password", normalizedBaseUrl);
   resetUrl.searchParams.set("token", token);
-  const gmailUser = process.env.GMAIL_SMTP_USER;
-  const gmailPass = process.env.GMAIL_SMTP_PASS;
-  if (gmailUser && gmailPass) {
+  const sendgridKey = process.env.SENDGRID_API_KEY;
+  const sendgridFrom = process.env.SENDGRID_FROM_EMAIL;
+  if (sendgridKey && sendgridFrom) {
     try {
-      const transporter = nodemailer.createTransport({
-        service: "gmail",
-        auth: {
-          user: gmailUser,
-          pass: gmailPass,
-        },
-      });
+      sgMail.setApiKey(sendgridKey);
       const safeName = name?.trim() ? name.trim() : "there";
       const logoUrl =
         process.env.EMAIL_LOGO_URL ||
@@ -207,9 +201,13 @@ const sendPasswordResetEmail = async (email: string, token: string, name?: strin
     </table>
   </body>
 </html>`;
-      await transporter.sendMail({
-        from: `MatSim <${gmailUser}>`,
+      await sgMail.send({
         to: email,
+        from: {
+          email: sendgridFrom,
+          name: process.env.SENDGRID_FROM_NAME || "MatSim",
+        },
+        replyTo: process.env.SENDGRID_REPLY_TO || undefined,
         subject: "Reset your MatSim password",
         html,
         text: `Hi ${safeName},
@@ -220,10 +218,10 @@ This link expires in 1 hour. If you did not request a reset, you can ignore this
 
 - MatSim`,
       });
-      console.log(`[auth] Gmail reset email sent to ${email}`);
+      console.log(`[auth] SendGrid reset email sent to ${email}`);
       return;
     } catch (err) {
-      console.error("[auth] Gmail SMTP send failed:", err);
+      console.error("[auth] SendGrid send failed:", err);
       console.log(`[auth] Password reset link for ${email}: ${resetUrl.toString()}`);
       return;
     }
@@ -238,17 +236,11 @@ const sendVerificationEmail = async (email: string, token: string, name?: string
     : `https://${baseUrl}`;
   const verifyUrl = new URL("/verify", normalizedBaseUrl);
   verifyUrl.searchParams.set("token", token);
-  const gmailUser = process.env.GMAIL_SMTP_USER;
-  const gmailPass = process.env.GMAIL_SMTP_PASS;
-  if (gmailUser && gmailPass) {
+  const sendgridKey = process.env.SENDGRID_API_KEY;
+  const sendgridFrom = process.env.SENDGRID_FROM_EMAIL;
+  if (sendgridKey && sendgridFrom) {
     try {
-      const transporter = nodemailer.createTransport({
-        service: "gmail",
-        auth: {
-          user: gmailUser,
-          pass: gmailPass,
-        },
-      });
+      sgMail.setApiKey(sendgridKey);
       const safeName = name?.trim() ? name.trim() : "there";
       const logoUrl =
         process.env.EMAIL_LOGO_URL ||
@@ -288,7 +280,7 @@ const sendVerificationEmail = async (email: string, token: string, name?: string
                   </a>
                 </div>
                 <p style="margin:0 0 12px;font-size:12px;color:#64748b;">
-                  This link expires in 24 hours. If you didn’t create a MatSim account, you can ignore this email.
+                  This link expires in 24 hours. If you didn?t create a MatSim account, you can ignore this email.
                 </p>
                 <p style="margin:0;font-size:12px;color:#94a3b8;">
                   Or copy and paste this link into your browser:<br />
@@ -298,7 +290,7 @@ const sendVerificationEmail = async (email: string, token: string, name?: string
             </tr>
             <tr>
               <td style="padding:18px 28px;border-top:1px solid #e2e8f0;font-size:12px;color:#94a3b8;">
-                © ${new Date().getFullYear()} MatSim • Simulation workspace for materials & geometry
+                Copyright ${new Date().getFullYear()} MatSim ? Simulation workspace for materials & geometry
               </td>
             </tr>
           </table>
@@ -307,17 +299,29 @@ const sendVerificationEmail = async (email: string, token: string, name?: string
     </table>
   </body>
 </html>`;
-      await transporter.sendMail({
-        from: `MatSim <${gmailUser}>`,
+      await sgMail.send({
         to: email,
+        from: {
+          email: sendgridFrom,
+          name: process.env.SENDGRID_FROM_NAME || "MatSim",
+        },
+        replyTo: process.env.SENDGRID_REPLY_TO || undefined,
         subject: "Verify your MatSim email",
         html,
-        text: `Hi ${safeName},\n\nWelcome to MatSim! Please confirm your email address to activate your account.\n\nVerify email: ${verifyUrl.toString()}\n\nThis link expires in 24 hours. If you didn’t create a MatSim account, you can ignore this email.\n\n— MatSim`,
+        text: `Hi ${safeName},
+
+Welcome to MatSim! Please confirm your email address to activate your account.
+
+Verify email: ${verifyUrl.toString()}
+
+This link expires in 24 hours. If you didn?t create a MatSim account, you can ignore this email.
+
+- MatSim`,
       });
-      console.log(`[auth] Gmail verification email sent to ${email}`);
+      console.log(`[auth] SendGrid verification email sent to ${email}`);
       return;
     } catch (err) {
-      console.error("[auth] Gmail SMTP send failed:", err);
+      console.error("[auth] SendGrid send failed:", err);
       console.log(`[auth] Verification link for ${email}: ${verifyUrl.toString()}`);
       return;
     }
